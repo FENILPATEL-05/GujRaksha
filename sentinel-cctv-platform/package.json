@@ -14,8 +14,8 @@
     "gis",
     "spatial-registry"
   ],
-  "author": "Gujarat Police Hackathon Participant",
-  "license": "MIT",
+  "author": "Fenil Patel (GujRaksha)",
+  "license": "UNLICENSED",
   "dependencies": {
     "cors": "^2.8.5",
     "csv-parser": "^3.0.0",

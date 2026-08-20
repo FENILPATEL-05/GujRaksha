@@ -64,6 +64,8 @@ GujRaksha/
 
 ---
 
-## 🔒 License
+## 🔒 License & Usage
 
-Licensed under the [MIT License](LICENSE).
+Copyright (c) 2026 Fenil Patel (GujRaksha). All Rights Reserved.
+
+**Strictly Proprietary & Confidential.** No one is permitted to copy, modify, distribute, or use this codebase without explicit written permission from Fenil Patel.
