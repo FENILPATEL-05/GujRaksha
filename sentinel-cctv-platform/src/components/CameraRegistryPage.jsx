@@ -1,4 +1,16 @@
 import React, { useState } from 'react';
+import {
+  FileSpreadsheet,
+  Search,
+  FolderOpen,
+  ChevronUp,
+  ChevronDown,
+  Play,
+  SquarePen,
+  ChevronLeft,
+  ChevronRight,
+  Plus
+} from 'lucide-react';
 
 export const CameraRegistryPage = ({
   cameras,
@@ -6,7 +18,8 @@ export const CameraRegistryPage = ({
   onFilterChange,
   onCameraSelect,
   onEditCamera,
-  onExportCsv
+  onExportCsv,
+  onAddCamera
 }) => {
   const [expandedCameraId, setExpandedCameraId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -30,119 +43,96 @@ export const CameraRegistryPage = ({
   };
 
   return (
-    <div style={{
-      height: 'calc(100vh - 60px)',
-      overflowY: 'auto',
-      padding: '24px',
-      background: 'var(--bg-main)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '16px'
-    }}>
+    <div className="table-view" style={{ display: 'block' }}>
       {/* Page Header & Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+      <div className="table-toolbar">
         <div>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--text-main)' }}>
-            <i className="fa-solid fa-table" style={{ color: 'var(--accent-gold)', marginRight: '10px' }}></i>
-            Statewide CCTV Asset Registry Table
-          </h2>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            High-density tabular inventory of Gujarat Police & Department camera nodes.
-          </div>
+          <h2>Camera Registry</h2>
+          <div className="sub">Complete statewide inventory — search, sort and manage every registered device.</div>
         </div>
 
-        <button className="btn-clean btn-clean-gold" onClick={onExportCsv}>
-          <i className="fa-solid fa-file-export"></i> Export Report Options
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button className="btn" onClick={onExportCsv} title="Export CSV, JSON, GeoJSON Reports">
+            <FileSpreadsheet size={15} strokeWidth={2.2} /> Export Report
+          </button>
+          <button className="btn btn-primary" onClick={onAddCamera} title="Onboard New Camera Node">
+            <Plus size={15} strokeWidth={2.4} /> Add Camera
+          </button>
+        </div>
       </div>
 
       {/* Search & Filter Controls Bar */}
-      <div style={{
-        background: 'var(--bg-panel)',
-        padding: '14px 18px',
-        borderRadius: '12px',
-        border: '1px solid var(--border-color)',
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '14px',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        boxShadow: 'var(--shadow-card)',
-        flexShrink: 0
-      }}>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', flex: 1 }}>
-          <div style={{ position: 'relative', minWidth: '260px' }}>
-            <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}></i>
-            <input
-              type="text"
-              className="filter-input-clean"
-              style={{ width: '100%', paddingLeft: '36px' }}
-              placeholder="Search ID, Location, District, VMS..."
-              value={filters.search}
-              onChange={(e) => {
-                onFilterChange('search', e.target.value);
-                setCurrentPage(1);
-              }}
-            />
-          </div>
-
-          <select
-            className="filter-select-clean"
-            value={filters.department}
+      <div className="floating filter-bar" style={{ position: 'static', transform: 'none', minWidth: '100%', marginBottom: '18px' }}>
+        <div className="search-box">
+          <Search size={15} strokeWidth={2.2} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+          <input
+            type="text"
+            placeholder="Search ID, Location, District, VMS..."
+            value={filters.search}
             onChange={(e) => {
-              onFilterChange('department', e.target.value);
+              onFilterChange('search', e.target.value);
               setCurrentPage(1);
             }}
-          >
-            <option value="ALL">All Departments (26)</option>
-            <option value="HOME">Home Dept / Gujarat Police</option>
-            <option value="TRANSPORT">Transport Dept / RTO Gujarat</option>
-            <option value="CIVIL_SUPPLIES">Food & Civil Supplies</option>
-            <option value="PORTS">Gujarat Maritime Board / Ports</option>
-            <option value="PRIVATE_FEED">Private Commercial Feeder</option>
-          </select>
-
-          <select
-            className="filter-select-clean"
-            value={filters.district}
-            onChange={(e) => {
-              onFilterChange('district', e.target.value);
-              setCurrentPage(1);
-            }}
-          >
-            <option value="ALL">All Districts</option>
-            <option value="Gandhinagar">Gandhinagar</option>
-            <option value="Ahmedabad">Ahmedabad</option>
-            <option value="Surat">Surat</option>
-            <option value="Rajkot">Rajkot</option>
-            <option value="Vadodara">Vadodara</option>
-            <option value="Junagadh">Junagadh</option>
-            <option value="Gir Somnath">Gir Somnath</option>
-            <option value="Navsari">Navsari</option>
-            <option value="Patan">Patan</option>
-            <option value="Kutch">Kutch</option>
-          </select>
-
-          <select
-            className="filter-select-clean"
-            value={filters.status}
-            onChange={(e) => {
-              onFilterChange('status', e.target.value);
-              setCurrentPage(1);
-            }}
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="ACTIVE">ACTIVE / Online</option>
-            <option value="MAINTENANCE">MAINTENANCE</option>
-            <option value="OFFLINE">OFFLINE</option>
-          </select>
+          />
         </div>
 
+        <select
+          className="filter-select"
+          value={filters.department}
+          onChange={(e) => {
+            onFilterChange('department', e.target.value);
+            setCurrentPage(1);
+          }}
+        >
+          <option value="ALL">All Departments (26)</option>
+          <option value="HOME">Home Dept / Gujarat Police</option>
+          <option value="TRANSPORT">Transport Dept / RTO Gujarat</option>
+          <option value="CIVIL_SUPPLIES">Food & Civil Supplies</option>
+          <option value="PORTS">Gujarat Maritime Board / Ports</option>
+          <option value="PRIVATE_FEED">Private Commercial Feeder</option>
+        </select>
+
+        <select
+          className="filter-select"
+          value={filters.district}
+          onChange={(e) => {
+            onFilterChange('district', e.target.value);
+            setCurrentPage(1);
+          }}
+        >
+          <option value="ALL">All Districts</option>
+          <option value="Gandhinagar">Gandhinagar</option>
+          <option value="Ahmedabad">Ahmedabad</option>
+          <option value="Surat">Surat</option>
+          <option value="Rajkot">Rajkot</option>
+          <option value="Vadodara">Vadodara</option>
+          <option value="Junagadh">Junagadh</option>
+          <option value="Gir Somnath">Gir Somnath</option>
+          <option value="Navsari">Navsari</option>
+          <option value="Patan">Patan</option>
+          <option value="Kutch">Kutch</option>
+        </select>
+
+        <select
+          className="filter-select"
+          value={filters.status}
+          onChange={(e) => {
+            onFilterChange('status', e.target.value);
+            setCurrentPage(1);
+          }}
+        >
+          <option value="ALL">All Statuses</option>
+          <option value="ACTIVE">ACTIVE / Online</option>
+          <option value="MAINTENANCE">MAINTENANCE</option>
+          <option value="OFFLINE">OFFLINE</option>
+        </select>
+
         {/* Per Page Select */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'var(--text-sub)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
           <span>Per Page:</span>
           <select
-            className="filter-select-clean"
+            className="filter-select"
+            style={{ minWidth: '70px' }}
             value={itemsPerPage}
             onChange={(e) => {
               setItemsPerPage(Number(e.target.value));
@@ -157,114 +147,87 @@ export const CameraRegistryPage = ({
       </div>
 
       {/* Clean High-Density Data Table */}
-      <div style={{
-        background: 'var(--bg-panel)',
-        borderRadius: '12px',
-        border: '1px solid var(--border-color)',
-        overflow: 'hidden',
-        boxShadow: 'var(--shadow-card)',
-        flex: 1
-      }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+      <div className="table-wrap">
+        <table>
           <thead>
-            <tr style={{ background: 'var(--bg-card)', borderBottom: '2px solid var(--border-color)', color: 'var(--accent-gold)', fontWeight: 800 }}>
-              <th style={{ padding: '12px 16px' }}>Asset Code</th>
-              <th style={{ padding: '12px 16px' }}>Camera Name / Location</th>
-              <th style={{ padding: '12px 16px' }}>Department</th>
-              <th style={{ padding: '12px 16px' }}>District</th>
-              <th style={{ padding: '12px 16px' }}>Type</th>
-              <th style={{ padding: '12px 16px' }}>GPS Coordinates</th>
-              <th style={{ padding: '12px 16px' }}>SLA Status</th>
-              <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
+            <tr>
+              <th>Camera</th>
+              <th>Department</th>
+              <th>District</th>
+              <th>Type</th>
+              <th>GPS Coordinates</th>
+              <th>Status</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {currentCameras.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <i className="fa-solid fa-folder-open" style={{ fontSize: '2rem', marginBottom: '10px', color: 'var(--accent-gold)' }}></i>
+                <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>
+                  <FolderOpen size={36} strokeWidth={1.5} style={{ color: 'var(--accent)', marginBottom: '8px' }} />
                   <div>No camera assets match the search criteria.</div>
                 </td>
               </tr>
             ) : (
               currentCameras.map(cam => {
                 const isExpanded = expandedCameraId === cam.id;
-                let statusClass = 'status-active';
-                if (cam.status === 'MAINTENANCE') statusClass = 'status-maintenance';
-                if (cam.status === 'OFFLINE') statusClass = 'status-offline';
-
-                const isLive = cam.stream_url && cam.stream_url.includes('live.sentinelgujarat.in');
+                const isActive = cam.status === 'ACTIVE';
+                const isMaint = cam.status === 'MAINTENANCE';
+                let statusClass = isActive ? 'active' : 'offline';
+                if (isMaint) statusClass = 'maintenance';
 
                 return (
                   <React.Fragment key={cam.id}>
                     <tr
-                      style={{
-                        borderBottom: '1px solid var(--border-color)',
-                        background: isExpanded ? 'var(--bg-card)' : 'transparent',
-                        cursor: 'pointer'
-                      }}
+                      style={{ background: isExpanded ? 'var(--hover-bg)' : 'transparent', cursor: 'pointer' }}
                       onClick={() => toggleExpand(cam.id)}
                     >
-                      <td style={{ padding: '12px 16px', fontWeight: 800, color: 'var(--accent-gold)' }}>
-                        {cam.camera_code}
+                      <td>
+                        <div className="cell-name">{cam.name}</div>
+                        <div className="cell-id">{cam.camera_code || cam.id}</div>
                       </td>
 
-                      <td style={{ padding: '12px 16px', fontWeight: 800, color: 'var(--text-main)' }}>
-                        {cam.name}
-                        {isLive && (
-                          <span style={{ color: 'var(--accent-gold)', fontSize: '0.68rem', fontWeight: 800, marginLeft: '8px' }}>
-                            LIVE
-                          </span>
-                        )}
+                      <td>
+                        <span className="dept-tag">{cam.department_name || cam.department_id}</span>
                       </td>
 
-                      <td style={{ padding: '12px 16px', color: 'var(--text-sub)' }}>
-                        {cam.department_name || cam.department_id}
-                      </td>
-
-                      <td style={{ padding: '12px 16px', color: 'var(--text-sub)' }}>
+                      <td style={{ color: 'var(--text-secondary)' }}>
                         {cam.district}
                       </td>
 
-                      <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>
+                      <td style={{ color: 'var(--text-dim)', fontSize: '12px' }}>
                         {cam.camera_type || 'ANPR_SPECIAL'}
                       </td>
 
-                      <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: 'var(--text-sub)', fontSize: '0.78rem' }}>
+                      <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', fontSize: '11.5px' }}>
                         {cam.latitude}, {cam.longitude}
                       </td>
 
-                      <td style={{ padding: '12px 16px' }}>
-                        <span className={`cam-status ${statusClass}`}>{cam.status}</span>
+                      <td>
+                        <span className={`badge ${statusClass}`}>{cam.status}</span>
                       </td>
 
-                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
+                      <td style={{ textAlign: 'right' }}>
+                        <div className="row-actions" onClick={(e) => e.stopPropagation()}>
                           <button
-                            className="btn-clean btn-clean-outline"
-                            style={{ padding: '4px 8px', fontSize: '0.75rem' }}
                             title="Expand Details"
                             onClick={() => toggleExpand(cam.id)}
                           >
-                            <i className={`fa-solid ${isExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
+                            {isExpanded ? <ChevronUp size={14} strokeWidth={2} /> : <ChevronDown size={14} strokeWidth={2} />}
                           </button>
 
                           <button
-                            className="btn-clean btn-clean-outline"
-                            style={{ padding: '4px 8px', fontSize: '0.75rem' }}
                             title="Watch Stream"
                             onClick={() => onCameraSelect(cam)}
                           >
-                            <i className="fa-solid fa-play"></i>
+                            <Play size={13} strokeWidth={2} />
                           </button>
 
                           <button
-                            className="btn-clean btn-clean-gold"
-                            style={{ padding: '4px 8px', fontSize: '0.75rem' }}
                             title="Edit Details"
                             onClick={() => onEditCamera(cam)}
                           >
-                            <i className="fa-solid fa-pen-to-square"></i>
+                            <SquarePen size={13} strokeWidth={2} />
                           </button>
                         </div>
                       </td>
@@ -272,37 +235,37 @@ export const CameraRegistryPage = ({
 
                     {/* Expandable Table Sub-Row Details */}
                     {isExpanded && (
-                      <tr style={{ background: 'var(--bg-card)', borderBottom: '2px solid var(--accent-gold)' }}>
-                        <td colSpan={8} style={{ padding: '16px 20px' }}>
+                      <tr>
+                        <td colSpan={7} style={{ padding: '16px 20px', background: 'var(--input-bg)' }}>
                           <div style={{
                             display: 'grid',
                             gridTemplateColumns: 'repeat(3, 1fr)',
                             gap: '12px'
                           }}>
-                            <div style={{ background: 'var(--bg-input)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 800 }}>Ownership Type</div>
-                              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '2px' }}>
+                            <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Ownership Type</div>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
                                 {cam.ownership_type || 'GOVERNMENT'}
                               </div>
                             </div>
 
-                            <div style={{ background: 'var(--bg-input)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 800 }}>VMS Vendor Platform</div>
-                              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '2px' }}>
+                            <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>VMS Vendor Platform</div>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
                                 {cam.vms_vendor || 'Hikvision Platform'}
                               </div>
                             </div>
 
-                            <div style={{ background: 'var(--bg-input)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 800 }}>Taluka / Area</div>
-                              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '2px' }}>
+                            <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Taluka / Area</div>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
                                 {cam.taluka || 'Central Zone'}
                               </div>
                             </div>
 
-                            <div style={{ gridColumn: '1 / -1', background: 'var(--bg-input)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 800 }}>Stream Endpoint URL</div>
-                              <div style={{ fontSize: '0.8rem', fontFamily: 'monospace', color: '#38bdf8', marginTop: '2px', wordBreak: 'break-all' }}>
+                            <div style={{ gridColumn: '1 / -1', background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Stream Endpoint URL</div>
+                              <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginTop: '2px', wordBreak: 'break-all' }}>
                                 {cam.stream_url || 'N/A Direct Protocol'}
                               </div>
                             </div>
@@ -325,29 +288,29 @@ export const CameraRegistryPage = ({
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: '14px 18px',
-          background: 'var(--bg-panel)',
+          background: 'var(--panel-bg)',
           borderRadius: '12px',
-          border: '1px solid var(--border-color)',
-          flexShrink: 0
+          border: '1px solid var(--panel-border)',
+          marginTop: '16px'
         }}>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-sub)' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
             Showing records <b>{startIndex + 1}</b> to <b>{Math.min(startIndex + itemsPerPage, totalItems)}</b> of <b>{totalItems}</b>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
-              className="btn-clean btn-clean-outline"
+              className="btn btn-sm"
               disabled={currentPage === 1}
               onClick={() => handlePageChange(currentPage - 1)}
             >
-              <i className="fa-solid fa-chevron-left"></i> Prev
+              <ChevronLeft size={14} strokeWidth={2} /> Prev
             </button>
 
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
               <button
                 key={page}
-                className={`btn-clean ${currentPage === page ? 'btn-clean-gold' : 'btn-clean-outline'}`}
-                style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                className={`btn btn-sm ${currentPage === page ? 'btn-primary' : ''}`}
+                style={{ minWidth: '32px' }}
                 onClick={() => handlePageChange(page)}
               >
                 {page}
@@ -355,11 +318,11 @@ export const CameraRegistryPage = ({
             ))}
 
             <button
-              className="btn-clean btn-clean-outline"
+              className="btn btn-sm"
               disabled={currentPage === totalPages}
               onClick={() => handlePageChange(currentPage + 1)}
             >
-              Next <i className="fa-solid fa-chevron-right"></i>
+              Next <ChevronRight size={14} strokeWidth={2} />
             </button>
           </div>
         </div>

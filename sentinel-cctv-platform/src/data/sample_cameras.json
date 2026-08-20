@@ -7,18 +7,18 @@
     "department_name": "Home Department / Police",
     "district": "Ahmedabad",
     "taluka": "",
-    "latitude": 23.0256,
-    "longitude": 72.5332,
+    "latitude": 23.0107,
+    "longitude": 72.5712,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
     "stream_url": "https://live.sentinelgujarat.in/stream/1",
     "retention_days": 15,
-    "status": "ACTIVE",
+    "status": "MAINTENANCE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.881Z",
-    "updated_at": "2026-08-20T07:10:12.881Z"
+    "created_at": "2026-08-20T10:49:11.012Z",
+    "updated_at": "2026-08-20T10:57:23.165Z"
   },
   {
     "id": "gov-feed-2",
@@ -28,8 +28,8 @@
     "department_name": "Home Department / Police",
     "district": "Ahmedabad",
     "taluka": "",
-    "latitude": 23.0015,
-    "longitude": 72.5896,
+    "latitude": 23.0107,
+    "longitude": 72.5915,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
@@ -38,8 +38,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.882Z",
-    "updated_at": "2026-08-20T07:10:12.882Z"
+    "created_at": "2026-08-20T10:49:11.013Z",
+    "updated_at": "2026-08-20T10:49:11.013Z"
   },
   {
     "id": "gov-feed-3",
@@ -49,8 +49,8 @@
     "department_name": "Home Department / Police",
     "district": "Ahmedabad",
     "taluka": "",
-    "latitude": 23.0513,
-    "longitude": 72.6065,
+    "latitude": 23.0076,
+    "longitude": 72.5544,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "DOME_INDOOR",
@@ -59,8 +59,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.889Z",
-    "updated_at": "2026-08-20T07:10:12.889Z"
+    "created_at": "2026-08-20T10:49:11.019Z",
+    "updated_at": "2026-08-20T10:49:11.019Z"
   },
   {
     "id": "gov-feed-4",
@@ -70,8 +70,8 @@
     "department_name": "Home Department / Police",
     "district": "Ahmedabad",
     "taluka": "",
-    "latitude": 23.0323,
-    "longitude": 72.5597,
+    "latitude": 23.0383,
+    "longitude": 72.597,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
@@ -80,8 +80,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.890Z",
-    "updated_at": "2026-08-20T07:10:12.890Z"
+    "created_at": "2026-08-20T10:49:11.019Z",
+    "updated_at": "2026-08-20T10:49:11.019Z"
   },
   {
     "id": "gov-feed-5",
@@ -91,8 +91,8 @@
     "department_name": "Home Department / Police",
     "district": "Ahmedabad",
     "taluka": "",
-    "latitude": 22.9895,
-    "longitude": 72.5701,
+    "latitude": 23.0586,
+    "longitude": 72.5372,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "FIXED_BULLET",
@@ -101,8 +101,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.891Z",
-    "updated_at": "2026-08-20T07:10:12.891Z"
+    "created_at": "2026-08-20T10:49:11.020Z",
+    "updated_at": "2026-08-20T10:49:11.020Z"
   },
   {
     "id": "gov-feed-6",
@@ -112,8 +112,8 @@
     "department_name": "Home Department / Police",
     "district": "Junagadh",
     "taluka": "",
-    "latitude": 21.5321,
-    "longitude": 70.4702,
+    "latitude": 21.5101,
+    "longitude": 70.4577,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
@@ -122,8 +122,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.891Z",
-    "updated_at": "2026-08-20T07:10:12.891Z"
+    "created_at": "2026-08-20T10:49:11.020Z",
+    "updated_at": "2026-08-20T10:49:11.020Z"
   },
   {
     "id": "gov-feed-7",
@@ -133,8 +133,8 @@
     "department_name": "Home Department / Police",
     "district": "Gir Somnath",
     "taluka": "",
-    "latitude": 20.8941,
-    "longitude": 70.3598,
+    "latitude": 20.9129,
+    "longitude": 70.3815,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "DOME_INDOOR",
@@ -143,8 +143,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.892Z",
-    "updated_at": "2026-08-20T07:10:12.892Z"
+    "created_at": "2026-08-20T10:49:11.020Z",
+    "updated_at": "2026-08-20T10:49:11.020Z"
   },
   {
     "id": "gov-feed-8",
@@ -154,8 +154,8 @@
     "department_name": "Home Department / Police",
     "district": "Junagadh",
     "taluka": "",
-    "latitude": 21.5154,
-    "longitude": 70.4405,
+    "latitude": 21.5054,
+    "longitude": 70.4756,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
@@ -164,8 +164,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.892Z",
-    "updated_at": "2026-08-20T07:10:12.892Z"
+    "created_at": "2026-08-20T10:49:11.020Z",
+    "updated_at": "2026-08-20T10:49:11.020Z"
   },
   {
     "id": "gov-feed-9",
@@ -175,8 +175,8 @@
     "department_name": "Home Department / Police",
     "district": "Junagadh",
     "taluka": "",
-    "latitude": 21.5306,
-    "longitude": 70.4778,
+    "latitude": 21.5279,
+    "longitude": 70.4493,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "ANPR_SPECIAL",
@@ -185,8 +185,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.893Z",
-    "updated_at": "2026-08-20T07:10:12.893Z"
+    "created_at": "2026-08-20T10:49:11.021Z",
+    "updated_at": "2026-08-20T10:49:11.021Z"
   },
   {
     "id": "gov-feed-10",
@@ -196,8 +196,8 @@
     "department_name": "Home Department / Police",
     "district": "Junagadh",
     "taluka": "",
-    "latitude": 21.5276,
-    "longitude": 70.4647,
+    "latitude": 21.5216,
+    "longitude": 70.4708,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
@@ -206,8 +206,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.893Z",
-    "updated_at": "2026-08-20T07:10:12.893Z"
+    "created_at": "2026-08-20T10:49:11.021Z",
+    "updated_at": "2026-08-20T10:49:11.021Z"
   },
   {
     "id": "gov-feed-11",
@@ -217,8 +217,8 @@
     "department_name": "Home Department / Police",
     "district": "Junagadh",
     "taluka": "",
-    "latitude": 21.5126,
-    "longitude": 70.444,
+    "latitude": 21.5129,
+    "longitude": 70.4535,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "DOME_INDOOR",
@@ -227,8 +227,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.894Z",
-    "updated_at": "2026-08-20T07:10:12.894Z"
+    "created_at": "2026-08-20T10:49:11.021Z",
+    "updated_at": "2026-08-20T10:49:11.021Z"
   },
   {
     "id": "gov-feed-12",
@@ -238,8 +238,8 @@
     "department_name": "Home Department / Police",
     "district": "Gandhinagar",
     "taluka": "",
-    "latitude": 23.2063,
-    "longitude": 72.636,
+    "latitude": 23.1992,
+    "longitude": 72.6569,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "ANPR_SPECIAL",
@@ -248,8 +248,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.895Z",
-    "updated_at": "2026-08-20T07:10:12.895Z"
+    "created_at": "2026-08-20T10:49:11.022Z",
+    "updated_at": "2026-08-20T10:49:11.022Z"
   },
   {
     "id": "gov-feed-13",
@@ -259,8 +259,8 @@
     "department_name": "Home Department / Police",
     "district": "Ahmedabad",
     "taluka": "",
-    "latitude": 22.9915,
-    "longitude": 72.5909,
+    "latitude": 23.06,
+    "longitude": 72.5609,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "FIXED_BULLET",
@@ -269,8 +269,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.895Z",
-    "updated_at": "2026-08-20T07:10:12.895Z"
+    "created_at": "2026-08-20T10:49:11.022Z",
+    "updated_at": "2026-08-20T10:49:11.022Z"
   },
   {
     "id": "gov-feed-14",
@@ -280,8 +280,8 @@
     "department_name": "Home Department / Police",
     "district": "Ahmedabad",
     "taluka": "",
-    "latitude": 23.0537,
-    "longitude": 72.5688,
+    "latitude": 23.0454,
+    "longitude": 72.5964,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
@@ -290,8 +290,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.896Z",
-    "updated_at": "2026-08-20T07:10:12.896Z"
+    "created_at": "2026-08-20T10:49:11.022Z",
+    "updated_at": "2026-08-20T10:49:11.022Z"
   },
   {
     "id": "gov-feed-15",
@@ -301,8 +301,8 @@
     "department_name": "Home Department / Police",
     "district": "Ahmedabad",
     "taluka": "",
-    "latitude": 23.0458,
-    "longitude": 72.5354,
+    "latitude": 23.0143,
+    "longitude": 72.5713,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "DOME_INDOOR",
@@ -311,8 +311,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.897Z",
-    "updated_at": "2026-08-20T07:10:12.897Z"
+    "created_at": "2026-08-20T10:49:11.022Z",
+    "updated_at": "2026-08-20T10:49:11.022Z"
   },
   {
     "id": "gov-feed-16",
@@ -322,8 +322,8 @@
     "department_name": "Home Department / Police",
     "district": "Ahmedabad",
     "taluka": "",
-    "latitude": 23.0268,
-    "longitude": 72.5902,
+    "latitude": 23.0105,
+    "longitude": 72.5658,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
@@ -332,8 +332,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.897Z",
-    "updated_at": "2026-08-20T07:10:12.897Z"
+    "created_at": "2026-08-20T10:49:11.022Z",
+    "updated_at": "2026-08-20T10:49:11.022Z"
   },
   {
     "id": "gov-feed-17",
@@ -343,8 +343,8 @@
     "department_name": "Home Department / Police",
     "district": "Rajkot",
     "taluka": "",
-    "latitude": 22.2895,
-    "longitude": 70.7861,
+    "latitude": 22.3177,
+    "longitude": 70.8021,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "FIXED_BULLET",
@@ -353,8 +353,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.898Z",
-    "updated_at": "2026-08-20T07:10:12.898Z"
+    "created_at": "2026-08-20T10:49:11.023Z",
+    "updated_at": "2026-08-20T10:49:11.023Z"
   },
   {
     "id": "gov-feed-18",
@@ -364,8 +364,8 @@
     "department_name": "Home Department / Police",
     "district": "Rajkot",
     "taluka": "",
-    "latitude": 22.2931,
-    "longitude": 70.7963,
+    "latitude": 22.3173,
+    "longitude": 70.786,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
@@ -374,8 +374,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.898Z",
-    "updated_at": "2026-08-20T07:10:12.898Z"
+    "created_at": "2026-08-20T10:49:11.023Z",
+    "updated_at": "2026-08-20T10:49:11.023Z"
   },
   {
     "id": "gov-feed-19",
@@ -385,8 +385,8 @@
     "department_name": "Home Department / Police",
     "district": "Rajkot",
     "taluka": "",
-    "latitude": 22.3117,
-    "longitude": 70.7915,
+    "latitude": 22.32,
+    "longitude": 70.8141,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "DOME_INDOOR",
@@ -395,8 +395,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.898Z",
-    "updated_at": "2026-08-20T07:10:12.898Z"
+    "created_at": "2026-08-20T10:49:11.023Z",
+    "updated_at": "2026-08-20T10:49:11.023Z"
   },
   {
     "id": "gov-feed-20",
@@ -406,8 +406,8 @@
     "department_name": "Home Department / Police",
     "district": "Navsari",
     "taluka": "",
-    "latitude": 20.8837,
-    "longitude": 72.9627,
+    "latitude": 20.8531,
+    "longitude": 72.9124,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "ANPR_SPECIAL",
@@ -416,8 +416,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.899Z",
-    "updated_at": "2026-08-20T07:10:12.899Z"
+    "created_at": "2026-08-20T10:49:11.023Z",
+    "updated_at": "2026-08-20T10:49:11.023Z"
   },
   {
     "id": "gov-feed-21",
@@ -427,8 +427,8 @@
     "department_name": "Home Department / Police",
     "district": "Gandhinagar",
     "taluka": "",
-    "latitude": 23.2155,
-    "longitude": 72.6306,
+    "latitude": 23.2185,
+    "longitude": 72.633,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "FIXED_BULLET",
@@ -437,8 +437,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.899Z",
-    "updated_at": "2026-08-20T07:10:12.899Z"
+    "created_at": "2026-08-20T10:49:11.024Z",
+    "updated_at": "2026-08-20T10:49:11.024Z"
   },
   {
     "id": "gov-feed-22",
@@ -448,8 +448,8 @@
     "department_name": "Home Department / Police",
     "district": "Patan",
     "taluka": "",
-    "latitude": 23.8398,
-    "longitude": 72.114,
+    "latitude": 23.8659,
+    "longitude": 72.109,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "ANPR_SPECIAL",
@@ -458,8 +458,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.899Z",
-    "updated_at": "2026-08-20T07:10:12.899Z"
+    "created_at": "2026-08-20T10:49:11.024Z",
+    "updated_at": "2026-08-20T10:49:11.024Z"
   },
   {
     "id": "gov-feed-23",
@@ -469,8 +469,8 @@
     "department_name": "Home Department / Police",
     "district": "Ahmedabad",
     "taluka": "",
-    "latitude": 23.0113,
-    "longitude": 72.5948,
+    "latitude": 23.0474,
+    "longitude": 72.5541,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "DOME_INDOOR",
@@ -479,8 +479,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.900Z",
-    "updated_at": "2026-08-20T07:10:12.900Z"
+    "created_at": "2026-08-20T10:49:11.024Z",
+    "updated_at": "2026-08-20T10:49:11.024Z"
   },
   {
     "id": "gov-feed-24",
@@ -490,8 +490,8 @@
     "department_name": "Home Department / Police",
     "district": "Gandhinagar",
     "taluka": "",
-    "latitude": 23.2006,
-    "longitude": 72.6563,
+    "latitude": 23.2449,
+    "longitude": 72.6303,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "ANPR_SPECIAL",
@@ -500,8 +500,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.900Z",
-    "updated_at": "2026-08-20T07:10:12.900Z"
+    "created_at": "2026-08-20T10:49:11.024Z",
+    "updated_at": "2026-08-20T10:49:11.024Z"
   },
   {
     "id": "gov-feed-25",
@@ -511,8 +511,8 @@
     "department_name": "Home Department / Police",
     "district": "Gandhinagar",
     "taluka": "",
-    "latitude": 23.2416,
-    "longitude": 72.6314,
+    "latitude": 23.194,
+    "longitude": 72.6328,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "FIXED_BULLET",
@@ -521,8 +521,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.900Z",
-    "updated_at": "2026-08-20T07:10:12.900Z"
+    "created_at": "2026-08-20T10:49:11.025Z",
+    "updated_at": "2026-08-20T10:49:11.025Z"
   },
   {
     "id": "gov-feed-26",
@@ -532,8 +532,8 @@
     "department_name": "Home Department / Police",
     "district": "Navsari",
     "taluka": "",
-    "latitude": 20.8101,
-    "longitude": 72.9486,
+    "latitude": 20.822,
+    "longitude": 72.9163,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
@@ -542,8 +542,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.901Z",
-    "updated_at": "2026-08-20T07:10:12.901Z"
+    "created_at": "2026-08-20T10:49:11.025Z",
+    "updated_at": "2026-08-20T10:49:11.025Z"
   },
   {
     "id": "gov-feed-27",
@@ -553,8 +553,8 @@
     "department_name": "Home Department / Police",
     "district": "Navsari",
     "taluka": "",
-    "latitude": 20.8103,
-    "longitude": 72.9529,
+    "latitude": 20.8158,
+    "longitude": 72.9976,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "DOME_INDOOR",
@@ -563,8 +563,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.901Z",
-    "updated_at": "2026-08-20T07:10:12.901Z"
+    "created_at": "2026-08-20T10:49:11.025Z",
+    "updated_at": "2026-08-20T10:49:11.025Z"
   },
   {
     "id": "gov-feed-28",
@@ -574,8 +574,8 @@
     "department_name": "Home Department / Police",
     "district": "Navsari",
     "taluka": "",
-    "latitude": 20.8596,
-    "longitude": 72.9476,
+    "latitude": 20.8702,
+    "longitude": 72.9129,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "ANPR_SPECIAL",
@@ -584,8 +584,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.902Z",
-    "updated_at": "2026-08-20T07:10:12.902Z"
+    "created_at": "2026-08-20T10:49:11.025Z",
+    "updated_at": "2026-08-20T10:49:11.025Z"
   },
   {
     "id": "gov-feed-29",
@@ -595,8 +595,8 @@
     "department_name": "Home Department / Police",
     "district": "Navsari",
     "taluka": "",
-    "latitude": 20.8837,
-    "longitude": 72.9715,
+    "latitude": 20.8664,
+    "longitude": 72.925,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "FIXED_BULLET",
@@ -605,8 +605,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.903Z",
-    "updated_at": "2026-08-20T07:10:12.903Z"
+    "created_at": "2026-08-20T10:49:11.026Z",
+    "updated_at": "2026-08-20T10:49:11.026Z"
   },
   {
     "id": "gov-feed-30",
@@ -616,8 +616,8 @@
     "department_name": "Home Department / Police",
     "district": "Navsari",
     "taluka": "",
-    "latitude": 20.8974,
-    "longitude": 72.9459,
+    "latitude": 20.8707,
+    "longitude": 72.9471,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
@@ -626,8 +626,8 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.903Z",
-    "updated_at": "2026-08-20T07:10:12.903Z"
+    "created_at": "2026-08-20T10:49:11.026Z",
+    "updated_at": "2026-08-20T10:49:11.026Z"
   },
   {
     "id": "gov-feed-1787137548382",
@@ -658,8 +658,8 @@
     "department_name": "Home Department / Police",
     "district": "Kutch",
     "taluka": "",
-    "latitude": 23.0496,
-    "longitude": 70.1378,
+    "latitude": 23.071,
+    "longitude": 70.0981,
     "address": "",
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
@@ -668,7 +668,7 @@
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
-    "created_at": "2026-08-20T07:10:12.903Z",
-    "updated_at": "2026-08-20T07:10:12.903Z"
+    "created_at": "2026-08-20T10:49:11.026Z",
+    "updated_at": "2026-08-20T10:49:11.026Z"
   }
 ]

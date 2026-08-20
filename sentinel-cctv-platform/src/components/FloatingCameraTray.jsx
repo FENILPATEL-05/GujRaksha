@@ -1,62 +1,49 @@
 import React, { useState } from 'react';
+import { Video, ChevronDown, ChevronUp, SquarePen } from 'lucide-react';
 
 export const FloatingCameraTray = ({ cameras, onCameraSelect, onEditCamera }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
 
   return (
-    <div className="floating-camera-tray" style={{ height: isOpen ? '360px' : '44px' }}>
-      <div className="tray-header" onClick={() => setIsOpen(!isOpen)}>
-        <div className="tray-title">
-          <i className="fa-solid fa-layer-group"></i> Camera Registry ({cameras.length})
+    <div className={`floating camera-list-panel ${!isOpen ? 'collapsed' : ''}`} style={{ maxHeight: isOpen ? '420px' : '48px' }}>
+      <div className="panel-header" onClick={() => setIsOpen(!isOpen)}>
+        <div className="htitle">
+          <Video size={15} strokeWidth={2.2} style={{ color: 'var(--accent)' }} /> Camera Feed List <span className="count-pill">{cameras.length}</span>
         </div>
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-          {isOpen ? <i className="fa-solid fa-chevron-down"></i> : <i className="fa-solid fa-chevron-up"></i>}
-        </div>
+        {isOpen ? <ChevronDown size={16} strokeWidth={2} /> : <ChevronUp size={16} strokeWidth={2} />}
       </div>
 
       {isOpen && (
-        <div className="tray-body">
+        <div className="camera-list-body">
           {cameras.length === 0 ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center', padding: '16px' }}>
+            <div className="empty-note">
               No cameras match filters.
             </div>
           ) : (
             cameras.map(cam => {
-              const isLive = cam.stream_url && cam.stream_url.includes('live.sentinelgujarat.in');
+              const isActive = cam.status === 'ACTIVE';
 
               return (
                 <div
                   key={cam.id}
-                  className="tray-card"
+                  className="cam-row"
                   onClick={() => onCameraSelect(cam)}
                 >
-                  <div className="tray-card-info">
-                    <div className="tray-card-name">
-                      {cam.name}
-                    </div>
-                    <div className="tray-card-sub">
-                      {cam.camera_code} • {cam.district} • {cam.department_name || cam.department_id}
-                    </div>
+                  <span className={`dot ${isActive ? 'active' : 'offline'}`}></span>
+                  <div className="meta">
+                    <div className="name">{cam.name}</div>
+                    <div className="sub">{cam.camera_code} · {cam.district} · {cam.department_name || cam.department_id}</div>
                   </div>
-
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    {isLive && (
-                      <span style={{ color: 'var(--accent-gold)', fontSize: '0.7rem', fontWeight: 800 }}>
-                        LIVE
-                      </span>
-                    )}
-                    <button
-                      className="btn-clean btn-clean-outline"
-                      style={{ padding: '3px 6px', fontSize: '0.72rem' }}
-                      title="Edit Camera"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditCamera(cam);
-                      }}
-                    >
-                      <i className="fa-solid fa-pen-to-square"></i>
-                    </button>
-                  </div>
+                  <button
+                    className="cam-edit-btn"
+                    title="Edit Camera"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditCamera(cam);
+                    }}
+                  >
+                    <SquarePen size={13} strokeWidth={2.2} />
+                  </button>
                 </div>
               );
             })

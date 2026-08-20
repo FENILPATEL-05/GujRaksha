@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { useTheme } from '../context/ThemeContext';
+import { Plus, Minus, Crosshair } from 'lucide-react';
 
 export const MapView = ({ cameras, onCameraSelect }) => {
   const mapRef = useRef(null);
@@ -11,9 +12,18 @@ export const MapView = ({ cameras, onCameraSelect }) => {
 
   useEffect(() => {
     if (!leafletMap.current && mapRef.current) {
+      // Bounding Box (expanded on the West/Left to include Arabian Sea coast comfortably)
+      const mapBounds = [
+        [6.0, 64.5],   // South-West coordinates (extended West for Gujarat coastline)
+        [37.5, 97.5]   // North-East coordinates
+      ];
+
       leafletMap.current = L.map(mapRef.current, {
-        center: [22.2587, 71.1924],
+        center: [22.35, 70.6], // Balanced center keeping Gujarat prominently in view
         zoom: 7,
+        minZoom: 6,
+        maxBounds: mapBounds,
+        maxBoundsViscosity: 0.9,
         zoomControl: false
       });
 
@@ -58,59 +68,56 @@ export const MapView = ({ cameras, onCameraSelect }) => {
     cameras.forEach(cam => {
       if (!cam.latitude || !cam.longitude) return;
 
-      let color = '#fbbf24'; // Police Gold
-      if (cam.status === 'OFFLINE') color = '#ef4444';
-      if (cam.status === 'MAINTENANCE') color = '#f59e0b';
-      if (cam.department_id === 'TRANSPORT') color = '#0284c7';
-      if (cam.department_id === 'CIVIL_SUPPLIES') color = '#f59e0b';
-      if (cam.department_id === 'PORTS') color = '#06b6d4';
-
-      const isGovLive = cam.stream_url && cam.stream_url.includes('live.sentinelgujarat.in');
+      const isActive = cam.status === 'ACTIVE';
+      const isMaint = cam.status === 'MAINTENANCE';
+      let statusClass = isActive ? 'active' : 'offline';
+      if (isMaint) statusClass = 'maintenance';
 
       const iconHtml = `
-        <div style="
-          position: relative;
-          width: 32px;
-          height: 32px;
-          background: ${color};
-          border-radius: 50%;
-          border: 2px solid #050b14;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 6px 16px rgba(0,0,0,0.5);
-          color: #050b14;
-          font-size: 14px;
-        ">
-          <i class="fa-solid fa-camera"></i>
-          ${isGovLive ? '<div style="position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; background: #ff6b00; border-radius: 50%; border: 1.5px solid #050b14;"></div>' : ''}
+        <div class="cam-pin ${statusClass}">
+          <div class="ring"></div>
+          <div class="core">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
+          </div>
         </div>
       `;
 
       const customIcon = L.divIcon({
         html: iconHtml,
         className: 'custom-leaflet-marker',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
+        iconSize: [34, 34],
+        iconAnchor: [17, 17]
       });
 
       const marker = L.marker([cam.latitude, cam.longitude], { icon: customIcon });
 
       const popupHtml = `
-        <div style="font-family: 'Plus Jakarta Sans', sans-serif; padding: 4px;">
-          <div style="font-size: 0.72rem; font-weight: 800; color: #d97706; margin-bottom: 2px;">${cam.camera_code}</div>
-          <div style="font-size: 0.88rem; font-weight: 800; color: #0f172a; margin-bottom: 6px;">${cam.name}</div>
-          <div style="font-size: 0.75rem; color: #475569; margin-bottom: 8px;">
-            <div><b>Department:</b> ${cam.department_name || cam.department_id}</div>
-            <div><b>District:</b> ${cam.district}</div>
-            <div><b>SLA Status:</b> <span style="font-weight: 700; color: ${cam.status === 'ACTIVE' ? '#16a34a' : '#dc2626'}">${cam.status}</span></div>
+        <div class="popup-card">
+          <div class="popup-head">
+            <div>
+              <div class="pname">${cam.name}</div>
+              <div class="pid">${cam.camera_code || cam.id}</div>
+            </div>
+            <span class="status-chip ${isActive ? 'active' : 'offline'}">${cam.status}</span>
           </div>
+          <div class="popup-grid">
+            <div><span>District</span><b>${cam.district || '—'}</b></div>
+            <div><span>Department</span><b>${cam.department_name || cam.department_id || '—'}</b></div>
+            <div><span>Type</span><b>${cam.camera_type || 'ANPR_SPECIAL'}</b></div>
+            <div><span>Vendor</span><b>${cam.vms_vendor || 'Hikvision'}</b></div>
+          </div>
+          <button class="popup-stream-btn" id="stream-btn-${cam.id}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg> Watch Live Stream
+          </button>
         </div>
       `;
 
       marker.bindPopup(popupHtml);
-      marker.on('click', () => {
-        onCameraSelect(cam);
+      marker.on('popupopen', () => {
+        const btn = document.getElementById(`stream-btn-${cam.id}`);
+        if (btn) {
+          btn.onclick = () => onCameraSelect(cam);
+        }
       });
 
       markersLayer.current.addLayer(marker);
@@ -119,19 +126,46 @@ export const MapView = ({ cameras, onCameraSelect }) => {
     if (leafletMap.current) leafletMap.current.invalidateSize();
   }, [cameras, onCameraSelect]);
 
+  const handleZoomIn = () => {
+    if (leafletMap.current) leafletMap.current.zoomIn();
+  };
+
+  const handleZoomOut = () => {
+    if (leafletMap.current) leafletMap.current.zoomOut();
+  };
+
+  const handleRecenter = () => {
+    if (leafletMap.current) {
+      leafletMap.current.setView([22.35, 70.6], 7);
+    }
+  };
+
   return (
-    <main className="map-container">
+    <main className="map-hero-workspace">
       <div id="gis-map" ref={mapRef}></div>
 
-      {/* 3D Map Legend */}
-      <div className="map-legend-3d">
-        <h4><i className="fa-solid fa-layer-group"></i> GIS State Layers</h4>
-        <div className="legend-item"><span className="dot active"></span> Gujarat Police (Active)</div>
-        <div className="legend-item"><span class="dot transport"></span> Gujarat RTO / Transport</div>
-        <div className="legend-item"><span class="dot supplies"></span> Food & Civil Supplies</div>
-        <div className="legend-item"><span class="dot ports"></span> Maritime Board / Ports</div>
-        <div className="legend-item"><span class="dot maintenance"></span> Maintenance Flag</div>
-        <div className="legend-item"><span class="dot offline"></span> Offline Critical</div>
+      {/* Map Controls */}
+      <div className="map-controls">
+        <button onClick={handleZoomIn} title="Zoom in"><Plus size={18} strokeWidth={2.4} /></button>
+        <button onClick={handleZoomOut} title="Zoom out"><Minus size={18} strokeWidth={2.4} /></button>
+        <button onClick={handleRecenter} title="Recenter to Gujarat"><Crosshair size={18} strokeWidth={2} /></button>
+      </div>
+
+      {/* Floating Map Legend */}
+      <div className="floating legend-panel">
+        <div className="legend-title">Map Legend</div>
+        <div className="legend-row">
+          <span className="legend-dot" style={{ background: 'var(--success)', boxShadow: '0 0 0 3px var(--success-glow)' }}></span>
+          Active Camera
+        </div>
+        <div className="legend-row">
+          <span className="legend-dot" style={{ background: 'var(--danger)', boxShadow: '0 0 0 3px var(--danger-glow)' }}></span>
+          Offline Critical
+        </div>
+        <div className="legend-row">
+          <span className="legend-dot" style={{ background: 'var(--accent)' }}></span>
+          Selected Node
+        </div>
       </div>
     </main>
   );

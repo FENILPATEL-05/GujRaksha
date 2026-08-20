@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SquarePen, X, Trash2, Save } from 'lucide-react';
 
 export const EditModal = ({ camera, onClose, onSaveSuccess, addToast }) => {
   const [form, setForm] = useState({
@@ -78,20 +79,20 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-card-3d">
-        <div className="modal-header">
-          <h3><i className="fa-solid fa-pen-to-square"></i> Edit Camera Asset Details</h3>
-          <button className="modal-close" onClick={onClose}>&times;</button>
+      <div className="modal modal-md">
+        <div className="modal-head">
+          <h3><SquarePen size={16} strokeWidth={2.2} style={{ color: 'var(--accent)' }} /> Edit Camera Asset Details</h3>
+          <button className="modal-close" onClick={onClose}><X size={16} strokeWidth={2.2} /></button>
         </div>
         <div className="modal-body">
           <form onSubmit={handleSubmit}>
             <div className="form-grid">
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <div className="form-field">
                 <label>Camera Asset Code</label>
                 <input type="text" value={camera.camera_code} disabled style={{ opacity: 0.6 }} />
               </div>
 
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <div className="form-field span-2">
                 <label>Camera Name / Location *</label>
                 <input
                   type="text"
@@ -101,7 +102,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast }) => {
                 />
               </div>
 
-              <div className="form-group">
+              <div className="form-field">
                 <label>Department Ownership</label>
                 <select
                   value={form.department_id}
@@ -115,7 +116,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast }) => {
                 </select>
               </div>
 
-              <div className="form-group">
+              <div className="form-field">
                 <label>District</label>
                 <input
                   type="text"
@@ -125,7 +126,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast }) => {
                 />
               </div>
 
-              <div className="form-group">
+              <div className="form-field">
                 <label>Taluka / Area</label>
                 <input
                   type="text"
@@ -134,7 +135,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast }) => {
                 />
               </div>
 
-              <div className="form-group">
+              <div className="form-field">
                 <label>Ownership Type</label>
                 <select
                   value={form.ownership_type}
@@ -145,29 +146,27 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast }) => {
                 </select>
               </div>
 
-              <div className="form-group">
-                <label>Latitude (GPS) *</label>
+              <div className="form-field">
+                <label>Latitude *</label>
                 <input
-                  type="number"
-                  step="any"
+                  type="text"
                   required
                   value={form.latitude}
                   onChange={(e) => setForm({ ...form, latitude: e.target.value })}
                 />
               </div>
 
-              <div className="form-group">
-                <label>Longitude (GPS) *</label>
+              <div className="form-field">
+                <label>Longitude *</label>
                 <input
-                  type="number"
-                  step="any"
+                  type="text"
                   required
                   value={form.longitude}
                   onChange={(e) => setForm({ ...form, longitude: e.target.value })}
                 />
               </div>
 
-              <div className="form-group">
+              <div className="form-field">
                 <label>Camera Type</label>
                 <select
                   value={form.camera_type}
@@ -179,7 +178,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast }) => {
                 </select>
               </div>
 
-              <div className="form-group">
+              <div className="form-field">
                 <label>Status SLA</label>
                 <select
                   value={form.status}
@@ -191,16 +190,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast }) => {
                 </select>
               </div>
 
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label>Address / Landmark</label>
-                <input
-                  type="text"
-                  value={form.address}
-                  onChange={(e) => setForm({ ...form, address: e.target.value })}
-                />
-              </div>
-
-              <div className="form-group">
+              <div className="form-field">
                 <label>VMS Vendor / Platform</label>
                 <input
                   type="text"
@@ -209,7 +199,16 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast }) => {
                 />
               </div>
 
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <div className="form-field">
+                <label>Address / Landmark</label>
+                <input
+                  type="text"
+                  value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                />
+              </div>
+
+              <div className="form-field span-2">
                 <label>Stream URL (HTTP / MJPEG / RTSP / MP4)</label>
                 <input
                   type="text"
@@ -220,18 +219,20 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast }) => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+            <div className="modal-foot" style={{ padding: '12px 0 0 0', marginTop: '12px', display: 'flex', justifyContent: 'space-between' }}>
               <button
                 type="button"
-                className="btn-3d btn-3d-outline"
-                style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.4)' }}
+                className="btn btn-danger-outline"
                 onClick={handleDelete}
               >
-                <i className="fa-solid fa-trash"></i> Delete
+                <Trash2 size={14} strokeWidth={2} /> Delete
               </button>
-              <button type="submit" className="btn-3d btn-3d-gold" style={{ flex: 1 }}>
-                <i className="fa-solid fa-floppy-disk"></i> Save Camera Changes
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button type="button" className="btn" onClick={onClose}>Cancel</button>
+                <button type="submit" className="btn btn-primary">
+                  <Save size={14} strokeWidth={2.4} /> Save Changes
+                </button>
+              </div>
             </div>
           </form>
         </div>

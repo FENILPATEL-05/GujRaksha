@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { FileSpreadsheet, FileCode, MapPin, Download, X } from 'lucide-react';
 
 export const ExportModal = ({ isOpen, onClose, cameras, addToast }) => {
   const [format, setFormat] = useState('csv');
@@ -100,49 +101,45 @@ export const ExportModal = ({ isOpen, onClose, cameras, addToast }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-card-clean">
-        <div className="modal-header">
-          <h3><i className="fa-solid fa-file-export"></i> CCTV Registry Export & Location Reports</h3>
-          <button className="modal-close" onClick={onClose}>&times;</button>
+      <div className="modal modal-md">
+        <div className="modal-head">
+          <h3><FileSpreadsheet size={16} strokeWidth={2.2} style={{ color: 'var(--accent)' }} /> Export & Location Reports</h3>
+          <button className="modal-close" onClick={onClose}><X size={16} strokeWidth={2.2} /></button>
         </div>
         <div className="modal-body">
-          <div className="form-group" style={{ marginBottom: '14px' }}>
-            <label style={{ fontWeight: 800, color: 'var(--accent-gold)' }}>Export File Format</label>
+          <div className="form-field" style={{ marginBottom: '14px' }}>
+            <label>Export File Format</label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '6px' }}>
               <button
                 type="button"
-                className={`btn-clean ${format === 'csv' ? 'btn-clean-gold' : 'btn-clean-outline'}`}
-                style={{ justifyContent: 'center' }}
+                className={`btn btn-sm ${format === 'csv' ? 'btn-primary' : ''}`}
                 onClick={() => setFormat('csv')}
               >
-                <i className="fa-solid fa-file-csv"></i> CSV File
+                <FileSpreadsheet size={14} strokeWidth={2} /> CSV
               </button>
               <button
                 type="button"
-                className={`btn-clean ${format === 'json' ? 'btn-clean-gold' : 'btn-clean-outline'}`}
-                style={{ justifyContent: 'center' }}
+                className={`btn btn-sm ${format === 'json' ? 'btn-primary' : ''}`}
                 onClick={() => setFormat('json')}
               >
-                <i className="fa-solid fa-file-code"></i> JSON Data
+                <FileCode size={14} strokeWidth={2} /> JSON
               </button>
               <button
                 type="button"
-                className={`btn-clean ${format === 'geojson' ? 'btn-clean-gold' : 'btn-clean-outline'}`}
-                style={{ justifyContent: 'center' }}
+                className={`btn btn-sm ${format === 'geojson' ? 'btn-primary' : ''}`}
                 onClick={() => setFormat('geojson')}
               >
-                <i className="fa-solid fa-map-location-dot"></i> GeoJSON GIS
+                <MapPin size={14} strokeWidth={2} /> GeoJSON
               </button>
             </div>
           </div>
 
-          <div className="form-group" style={{ marginBottom: '14px' }}>
-            <label style={{ fontWeight: 800, color: 'var(--accent-gold)' }}>Report Scope & Criteria</label>
+          <div className="form-field" style={{ marginBottom: '14px' }}>
+            <label>Report Scope & Criteria</label>
             <select
               value={scope}
               onChange={(e) => setScope(e.target.value)}
-              className="filter-select-clean"
-              style={{ marginTop: '6px', width: '100%' }}
+              style={{ marginTop: '6px' }}
             >
               <option value="filtered">Currently Filtered Cameras ({cameras.length})</option>
               <option value="district_wise">Location / District-Wise Report</option>
@@ -154,13 +151,12 @@ export const ExportModal = ({ isOpen, onClose, cameras, addToast }) => {
           </div>
 
           {scope === 'district_wise' && (
-            <div className="form-group" style={{ marginBottom: '14px' }}>
-              <label style={{ fontWeight: 700, color: 'var(--text-main)' }}>Select District Location</label>
+            <div className="form-field" style={{ marginBottom: '14px' }}>
+              <label>Select District Location</label>
               <select
                 value={selectedDistrict}
                 onChange={(e) => setSelectedDistrict(e.target.value)}
-                className="filter-select-clean"
-                style={{ marginTop: '4px', width: '100%' }}
+                style={{ marginTop: '4px' }}
               >
                 <option value="ALL">All Districts ({cameras.length} cameras)</option>
                 {districts.map(d => {
@@ -176,13 +172,12 @@ export const ExportModal = ({ isOpen, onClose, cameras, addToast }) => {
           )}
 
           {scope === 'selected_camera' && (
-            <div className="form-group" style={{ marginBottom: '14px' }}>
-              <label style={{ fontWeight: 700, color: 'var(--text-main)' }}>Select Camera Asset</label>
+            <div className="form-field" style={{ marginBottom: '14px' }}>
+              <label>Select Camera Asset</label>
               <select
                 value={selectedCameraId}
                 onChange={(e) => setSelectedCameraId(e.target.value)}
-                className="filter-select-clean"
-                style={{ marginTop: '4px', width: '100%' }}
+                style={{ marginTop: '4px' }}
               >
                 <option value="ALL">Select Camera Node...</option>
                 {cameras.map(c => (
@@ -194,10 +189,11 @@ export const ExportModal = ({ isOpen, onClose, cameras, addToast }) => {
             </div>
           )}
 
-          <div className="form-group" style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+          <div className="form-field" style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', textTransform: 'none', fontSize: '13px' }}>
               <input
                 type="checkbox"
+                style={{ height: 'auto', width: 'auto' }}
                 checked={includeStreams}
                 onChange={(e) => setIncludeStreams(e.target.checked)}
               />
@@ -205,12 +201,12 @@ export const ExportModal = ({ isOpen, onClose, cameras, addToast }) => {
             </label>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button className="btn-clean btn-clean-outline" onClick={onClose} style={{ flex: 1 }}>
+          <div className="modal-foot" style={{ padding: '16px 0 0 0', marginTop: '16px' }}>
+            <button className="btn" onClick={onClose}>
               Cancel
             </button>
-            <button className="btn-clean btn-clean-gold" onClick={handleExport} style={{ flex: 2, justifyContent: 'center' }}>
-              <i className="fa-solid fa-download"></i> Generate Location Report
+            <button className="btn btn-primary" onClick={handleExport}>
+              <Download size={14} strokeWidth={2.2} /> Generate Report
             </button>
           </div>
         </div>

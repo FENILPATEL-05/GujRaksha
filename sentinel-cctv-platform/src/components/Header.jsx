@@ -6,8 +6,17 @@
 
 import React, { useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import {
+  Radar,
+  MapPin,
+  Table,
+  Moon,
+  Sun,
+  RefreshCw,
+  PieChart
+} from 'lucide-react';
 
-export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenOnboard, onOpenGap }) => {
+export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap }) => {
   const { theme, toggleTheme } = useTheme();
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -18,56 +27,46 @@ export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenOnboard, o
   };
 
   return (
-    <header className="gov-navbar-clean">
-      <div className="brand-clean">
-        <div className="brand-icon-clean">
-          <i className="fa-solid fa-shield-halved"></i>
+    <header className="app-header">
+      <div className="brand">
+        <div className="brand-mark">
+          <div className="sweep"></div>
+          <Radar size={18} strokeWidth={2.2} style={{ position: 'relative', zIndex: 2 }} />
         </div>
-        <div className="brand-title-clean">
-          GUJRAKSHA
-          <small>CCTV CONTROL</small>
-        </div>
-
-        {/* View Switcher Pills */}
-        <div style={{ display: 'flex', gap: '6px', marginLeft: '20px' }}>
-          <button
-            className={`btn-clean ${activeView === 'map' ? 'btn-clean-gold' : 'btn-clean-outline'}`}
-            onClick={() => onViewChange('map')}
-          >
-            <i className="fa-solid fa-map"></i> GIS Map
-          </button>
-          <button
-            className={`btn-clean ${activeView === 'registry' ? 'btn-clean-gold' : 'btn-clean-outline'}`}
-            onClick={() => onViewChange('registry')}
-          >
-            <i className="fa-solid fa-table-list"></i> Camera Registry
-          </button>
+        <div className="brand-text">
+          <div className="title">GUJRAKSHA <span style={{ color: 'var(--accent)' }}>·</span> NETRA</div>
+          <div className="subtitle">Statewide CCTV Surveillance GIS — Gujarat</div>
         </div>
       </div>
 
-      <div className="nav-actions-clean">
-        {/* Light / Dark Mode Toggle Switch */}
-        <button className="theme-btn-clean" onClick={toggleTheme} title="Toggle Light / Dark Mode">
-          <div
-            className="theme-toggle-pill"
-            style={{ transform: theme === 'light' ? 'translateX(16px)' : 'translateX(0px)' }}
-          >
-            {theme === 'dark' ? <i className="fa-solid fa-moon"></i> : <i className="fa-solid fa-sun"></i>}
-          </div>
-          <span>{theme === 'dark' ? 'Dark' : 'Light'}</span>
+      {/* View Switcher Pills */}
+      <div className="view-switcher">
+        <button
+          className={activeView === 'map' ? 'active' : ''}
+          onClick={() => onViewChange('map')}
+        >
+          <MapPin size={15} strokeWidth={2} /> GIS Map
+        </button>
+        <button
+          className={activeView === 'registry' ? 'active' : ''}
+          onClick={() => onViewChange('registry')}
+        >
+          <Table size={15} strokeWidth={2} /> Table Registry
+        </button>
+      </div>
+
+      <div className="header-actions">
+        <button className="btn btn-icon" onClick={toggleTheme} title="Toggle Dark / Light Theme">
+          {theme === 'dark' ? <Moon size={16} strokeWidth={2} /> : <Sun size={16} strokeWidth={2} />}
         </button>
 
-        <button className="btn-clean btn-clean-outline" onClick={handleSyncClick} disabled={isSyncing}>
-          <i className={`fa-solid ${isSyncing ? 'fa-spinner fa-spin' : 'fa-rotate'}`}></i>
+        <button className="btn" onClick={handleSyncClick} disabled={isSyncing}>
+          <RefreshCw size={15} strokeWidth={2} className={isSyncing ? 'animate-spin' : ''} style={{ animation: isSyncing ? 'radarSpin 1s linear infinite' : 'none' }} />
           {isSyncing ? 'Syncing...' : 'Sync Feeds'}
         </button>
 
-        <button className="btn-clean btn-clean-outline" onClick={onOpenGap}>
-          <i className="fa-solid fa-chart-pie"></i> Gap Analysis
-        </button>
-
-        <button className="btn-clean btn-clean-gold" onClick={onOpenOnboard}>
-          <i className="fa-solid fa-plus"></i> Add Camera
+        <button className="btn" onClick={onOpenGap}>
+          <PieChart size={15} strokeWidth={2} /> Gap Analysis
         </button>
       </div>
     </header>

@@ -1,4 +1,22 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Radio,
+  X,
+  Network,
+  CheckCircle2,
+  AlertTriangle,
+  ShieldAlert,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Home,
+  ZoomIn,
+  ZoomOut,
+  SquarePen,
+  ExternalLink,
+  Power
+} from 'lucide-react';
 
 export const StreamModal = ({ camera, onClose, onEditCamera }) => {
   const [streamType, setStreamType] = useState('video');
@@ -36,89 +54,124 @@ export const StreamModal = ({ camera, onClose, onEditCamera }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-card-clean modal-lg">
-        <div className="modal-header">
-          <h3><i className="fa-solid fa-circle-play text-accent"></i> Police Command Center Stream Monitor</h3>
-          <button className="modal-close" onClick={onClose}>&times;</button>
+      <div className="modal modal-lg">
+        <div className="modal-head">
+          <h3><Radio size={16} strokeWidth={2.2} style={{ color: 'var(--accent)' }} /> Live Stream — <span>{camera.name}</span></h3>
+          <button className="modal-close" onClick={onClose}><X size={16} strokeWidth={2.2} /></button>
         </div>
-        <div className="modal-body" style={{ padding: '16px', textAlign: 'center' }}>
-          <div style={{
-            background: '#020617',
-            borderRadius: '10px',
-            overflow: 'hidden',
-            border: '1px solid var(--border-color)',
-            position: 'relative',
-            minHeight: '300px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            {streamType === 'rtsp' && (
-              <div style={{ padding: '30px', textAlign: 'center' }}>
-                <i className="fa-solid fa-network-wired" style={{ fontSize: '2.5rem', color: 'var(--accent-gold)', marginBottom: '12px' }}></i>
-                <h4 style={{ fontSize: '1.1rem', color: 'var(--text-main)', marginBottom: '6px' }}>Local RTSP Network Feed Connected</h4>
-                <div style={{ fontSize: '0.82rem', color: 'var(--text-sub)', maxWidth: '500px', margin: '0 auto 14px' }}>
-                  Web browsers cannot decode native <code>rtsp://</code> socket protocols directly in HTML5 tags.
-                </div>
-                <div style={{ background: 'var(--bg-input)', padding: '12px', borderRadius: '6px', fontFamily: 'monospace', fontSize: '0.8rem', color: '#38bdf8', border: '1px solid var(--border-color)', marginBottom: '14px', wordBreak: 'break-all' }}>
-                  {rawStreamUrl}
-                </div>
-                <div style={{ fontSize: '0.75rem', color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '8px 12px', borderRadius: '6px', display: 'inline-block' }}>
-                  <i className="fa-solid fa-circle-check"></i> Connected to Police RTSP Stream Gateway Relay
-                </div>
+        <div className="modal-body">
+          <div className="stream-modal-layout">
+            {/* Left: Stream Monitor Screen */}
+            <div className="stream-screen">
+              <div className="stream-noise"></div>
+              <div className="stream-scan"></div>
+              <div className="stream-vignette"></div>
+              <div className="stream-crosshair"></div>
+
+              <div className="stream-badges">
+                <div className="rec-badge"><span className="rec-dot"></span> LIVE</div>
               </div>
-            )}
 
-            {streamType === 'video' && !hasError && (
-              <video
-                controls
-                autoPlay
-                muted
-                style={{ width: '100%', maxHeight: '440px', background: '#000', display: 'block' }}
-                src={rawStreamUrl}
-                onError={handleVideoError}
-              />
-            )}
+              <div className="stream-camtag">{camera.camera_code || camera.id}</div>
+              <div className="stream-timestamp">{new Date().toLocaleTimeString()}</div>
 
-            {streamType === 'mjpeg' && !hasError && (
-              <img
-                style={{ width: '100%', maxHeight: '440px', objectFit: 'contain', background: '#000' }}
-                src={rawStreamUrl}
-                onError={handleImageError}
-                alt="Live Camera Feed"
-              />
-            )}
+              {streamType === 'rtsp' && (
+                <div style={{ position: 'relative', zIndex: 2, padding: '30px 16px', textAlign: 'center' }}>
+                  <Network size={36} strokeWidth={1.6} style={{ color: 'var(--accent)', marginBottom: '8px' }} />
+                  <h4 style={{ fontSize: '14px', color: 'var(--text-primary)', marginBottom: '4px' }}>Local RTSP Network Feed Connected</h4>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', maxWidth: '420px', margin: '0 auto 8px' }}>
+                    Web browsers cannot decode native <code>rtsp://</code> socket protocols directly in HTML5 tags.
+                  </div>
+                  <div style={{ background: 'var(--input-bg)', padding: '8px', borderRadius: '6px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)', border: '1px solid var(--panel-border)', marginBottom: '8px', wordBreak: 'break-all' }}>
+                    {rawStreamUrl}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--success)', background: 'rgba(52,211,153,0.15)', padding: '4px 10px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <CheckCircle2 size={13} strokeWidth={2} /> Connected to Police RTSP Gateway Relay
+                  </div>
+                </div>
+              )}
 
-            {hasError && (
-              <div style={{ padding: '30px', color: '#ef4444' }}>
-                <i className="fa-solid fa-triangle-exclamation" style={{ fontSize: '2.2rem', marginBottom: '8px' }}></i>
-                <div>Live stream source requiring direct gateway proxy or authentication.</div>
-                <div style={{ fontSize: '0.8rem', marginTop: '6px', color: 'var(--text-muted)' }}>Source URL: {rawStreamUrl}</div>
-                <button className="btn-clean btn-clean-outline" style={{ fontSize: '0.8rem', marginTop: '12px' }} onClick={handleProxyClick}>
-                  <i className="fa-solid fa-shield-virus"></i> Launch Stream Proxy Gateway Relay
-                </button>
-              </div>
-            )}
-          </div>
+              {streamType === 'video' && !hasError && (
+                <video
+                  controls
+                  autoPlay
+                  muted
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000', position: 'relative', zIndex: 1 }}
+                  src={rawStreamUrl}
+                  onError={handleVideoError}
+                />
+              )}
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px', textAlign: 'left' }}>
+              {streamType === 'mjpeg' && !hasError && (
+                <img
+                  style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000', position: 'relative', zIndex: 1 }}
+                  src={rawStreamUrl}
+                  onError={handleImageError}
+                  alt="Live Camera Feed"
+                />
+              )}
+
+              {hasError && (
+                <div style={{ position: 'relative', zIndex: 2, padding: '30px 16px', color: 'var(--danger)', textAlign: 'center' }}>
+                  <AlertTriangle size={32} strokeWidth={1.8} style={{ marginBottom: '6px' }} />
+                  <div style={{ fontWeight: 700, fontSize: '13px' }}>Live stream source requiring direct gateway proxy or authentication.</div>
+                  <div style={{ fontSize: '11px', marginTop: '4px', color: 'var(--text-secondary)' }}>Source URL: {rawStreamUrl}</div>
+                  <button className="btn btn-sm" style={{ marginTop: '10px' }} onClick={handleProxyClick}>
+                    <ShieldAlert size={13} strokeWidth={2} /> Launch Stream Proxy Gateway
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Metadata Grid + PTZ Controls */}
             <div>
-              <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                {camera.name} [{camera.camera_code}]
-              </h4>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-sub)' }}>
-                Department: {camera.department_name || camera.department_id} • District: {camera.district} • VMS Platform: {camera.vms_vendor || 'N/A'}
+              <div className="stream-meta-grid">
+                <div className="item"><span>District</span><b>{camera.district || '—'}</b></div>
+                <div className="item"><span>Department</span><b>{camera.department_name || camera.department_id || '—'}</b></div>
+                <div className="item"><span>Resolution</span><b>{camera.resolution || '1080p Full HD'}</b></div>
+                <div className="item"><span>VMS Vendor</span><b>{camera.vms_vendor || 'Hikvision Platform'}</b></div>
+                <div className="item"><span>Coordinates</span><b>{camera.latitude}, {camera.longitude}</b></div>
+                <div className="item"><span>Status</span><b style={{ color: camera.status === 'ACTIVE' ? 'var(--success)' : 'var(--danger)' }}>{camera.status}</b></div>
+              </div>
+
+              {/* PTZ Panel */}
+              <div className="ptz-panel">
+                <div>
+                  <div className="ptz-dpad">
+                    <span></span><button title="Tilt Up"><ChevronUp size={13} strokeWidth={2.4} /></button><span></span>
+                    <button title="Pan Left"><ChevronLeft size={13} strokeWidth={2.4} /></button>
+                    <button className="center" title="Reset"><Home size={11} strokeWidth={2.2} /></button>
+                    <button title="Pan Right"><ChevronRight size={13} strokeWidth={2.4} /></button>
+                    <span></span><button title="Tilt Down"><ChevronDown size={13} strokeWidth={2.4} /></button><span></span>
+                  </div>
+                  <div className="ptz-label">Directional</div>
+                </div>
+
+                <div>
+                  <div className="ptz-zoom">
+                    <button title="Zoom In"><ZoomIn size={13} strokeWidth={2} /></button>
+                    <button title="Zoom Out"><ZoomOut size={13} strokeWidth={2} /></button>
+                  </div>
+                  <div className="ptz-label">Zoom</div>
+                </div>
+
+                <div>
+                  <div className="ptz-zoom">
+                    <button title="Edit Camera" onClick={() => onEditCamera(camera)}><SquarePen size={13} strokeWidth={2} /></button>
+                    <a href={rawStreamUrl} target="_blank" rel="noreferrer">
+                      <button title="Open Stream Link"><ExternalLink size={13} strokeWidth={2} /></button>
+                    </a>
+                  </div>
+                  <div className="ptz-label">Actions</div>
+                </div>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn-clean btn-clean-outline" onClick={() => onEditCamera(camera)}>
-                <i className="fa-solid fa-pen-to-square"></i> Edit Camera
-              </button>
-              <a href={rawStreamUrl} target="_blank" rel="noreferrer" className="btn-clean btn-clean-outline" style={{ fontSize: '0.75rem' }}>
-                <i className="fa-solid fa-arrow-up-right-from-square"></i> Open Stream Link
-              </a>
-            </div>
           </div>
+        </div>
+
+        <div className="modal-foot">
+          <button className="btn btn-danger-outline" onClick={onClose}><Power size={14} strokeWidth={2} /> Close Session</button>
+          <button className="btn btn-primary" onClick={() => window.open(rawStreamUrl, '_blank')}><ExternalLink size={14} strokeWidth={2} /> Full Stream URL</button>
         </div>
       </div>
     </div>

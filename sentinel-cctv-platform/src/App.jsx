@@ -90,7 +90,6 @@ export function AppContent() {
         activeView={activeView}
         onViewChange={(view) => setActiveView(view)}
         onSyncFeeds={handleSyncGovFeeds}
-        onOpenOnboard={() => setIsOnboardOpen(true)}
         onOpenGap={() => setIsGapOpen(true)}
       />
 
@@ -127,6 +126,7 @@ export function AppContent() {
           onCameraSelect={(cam) => setSelectedCameraForStream(cam)}
           onEditCamera={(cam) => setSelectedCameraForEdit(cam)}
           onExportCsv={() => setIsExportOpen(true)}
+          onAddCamera={() => setIsOnboardOpen(true)}
         />
       )}
 
@@ -156,6 +156,7 @@ export function AppContent() {
       <GapAnalysisModal
         isOpen={isGapOpen}
         onClose={() => setIsGapOpen(false)}
+        cameras={cameras}
       />
 
       <ExportModal

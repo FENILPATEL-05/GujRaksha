@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NETRA · Statewide CCTV Surveillance Command Center</title>
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- FontAwesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ============================= TOKENS ============================= */
+:root{
+  --font-display:'Plus Jakarta Sans',sans-serif;
+  --font-body:'Inter',sans-serif;
+  --font-mono:'Roboto Mono',monospace;
+
+  --radius-sm:8px;
+  --radius-md:14px;
+  --radius-lg:20px;
+  --blur:22px;
+
+  --success:#34d399;
+  --success-glow:rgba(52,211,153,.45);
+  --danger:#f87171;
+  --danger-glow:rgba(248,113,113,.45);
+  --warning:#fbbf24;
+  --accent:#22d3ee;
+  --accent-2:#818cf8;
+}
+
+[data-theme="dark"]{
+  --bg:#080d18;
+  --bg-grid:#0c1425;
+  --panel-bg:rgba(16,23,42,.68);
+  --panel-bg-solid:#0f1729;
+  --panel-border:rgba(148,163,184,.14);
+  --panel-border-strong:rgba(148,163,184,.28);
+  --text-primary:#eaf1f8;
+  --text-secondary:#8ea0b8;
+  --text-dim:#5b6b83;
+  --input-bg:rgba(255,255,255,.04);
+  --hover-bg:rgba(255,255,255,.06);
+  --shadow:0 20px 60px -20px rgba(0,0,0,.6);
+  --header-bg:rgba(10,15,28,.82);
+}
+[data-theme="light"]{
+  --bg:#eef2f8;
+  --bg-grid:#e4eaf3;
+  --panel-bg:rgba(255,255,255,.72);
+  --panel-bg-solid:#ffffff;
+  --panel-border:rgba(15,23,42,.08);
+  --panel-border-strong:rgba(15,23,42,.14);
+  --text-primary:#101728;
+  --text-secondary:#54627a;
+  --text-dim:#8b96a8;
+  --input-bg:rgba(15,23,42,.04);
+  --hover-bg:rgba(15,23,42,.05);
+  --shadow:0 20px 50px -22px rgba(30,41,59,.25);
+  --header-bg:rgba(255,255,255,.86);
+}
+
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+body{
+  font-family:var(--font-body);
+  background:var(--bg);
+  color:var(--text-primary);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+  transition:background .25s ease, color .25s ease;
+}
+::selection{background:var(--accent); color:#04121a;}
+::-webkit-scrollbar{width:8px; height:8px;}
+::-webkit-scrollbar-thumb{background:var(--panel-border-strong); border-radius:10px;}
+::-webkit-scrollbar-track{background:transparent;}
+a{color:inherit;}
+button{font-family:inherit; cursor:pointer;}
+
+/* subtle radar-grid backdrop behind everything */
+body::before{
+  content:"";
+  position:fixed; inset:0; z-index:-1;
+  background-image:
+    radial-gradient(circle at 15% 20%, rgba(34,211,238,.06), transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(129,140,248,.06), transparent 40%);
+}
+
+/* ============================= HEADER ============================= */
+.app-header{
+  position:fixed; top:0; left:0; right:0; height:64px; z-index:1000;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 22px;
+  background:var(--header-bg);
+  backdrop-filter:blur(var(--blur));
+  -webkit-backdrop-filter:blur(var(--blur));
+  border-bottom:1px solid var(--panel-border);
+}
+.brand{display:flex; align-items:center; gap:12px;}
+.brand-mark{
+  position:relative; width:38px; height:38px; border-radius:11px;
+  background:linear-gradient(145deg,#0e2a38,#0a1826);
+  border:1px solid rgba(34,211,238,.35);
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 0 0 1px rgba(34,211,238,.08) inset, 0 0 18px -4px rgba(34,211,238,.55);
+}
+.brand-mark i{color:var(--accent); font-size:15px; z-index:2;}
+.brand-mark .sweep{
+  position:absolute; inset:3px; border-radius:8px; overflow:hidden;
+}
+.brand-mark .sweep::after{
+  content:""; position:absolute; inset:0;
+  background:conic-gradient(from 0deg, rgba(34,211,238,.55), transparent 35%);
+  animation:spin 3.2s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.brand-text{line-height:1.15;}
+.brand-text .title{font-family:var(--font-display); font-weight:800; font-size:16.5px; letter-spacing:.2px;}
+.brand-text .subtitle{font-size:11px; color:var(--text-secondary); font-weight:500; letter-spacing:.4px; text-transform:uppercase;}
+
+.view-switcher{
+  display:flex; align-items:center; gap:2px; padding:4px;
+  background:var(--input-bg); border:1px solid var(--panel-border);
+  border-radius:12px;
+}
+.view-switcher button{
+  border:none; background:transparent; color:var(--text-secondary);
+  font-family:var(--font-display); font-weight:600; font-size:13px;
+  padding:8px 16px; border-radius:9px; display:flex; align-items:center; gap:7px;
+  transition:all .18s ease;
+}
+.view-switcher button.active{
+  background:var(--panel-bg-solid); color:var(--text-primary);
+  box-shadow:var(--shadow), 0 0 0 1px var(--panel-border-strong) inset;
+}
+.view-switcher button:hover:not(.active){color:var(--text-primary);}
+
+.header-actions{display:flex; align-items:center; gap:10px;}
+
+.btn{
+  display:inline-flex; align-items:center; gap:8px;
+  border-radius:11px; border:1px solid var(--panel-border-strong);
+  font-family:var(--font-display); font-weight:600; font-size:13px;
+  padding:10px 16px; color:var(--text-primary); background:var(--panel-bg-solid);
+  box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 6px 14px -8px rgba(0,0,0,.5);
+  transition:transform .12s ease, box-shadow .12s ease, filter .12s ease;
+}
+.btn:hover{transform:translateY(-1px); filter:brightness(1.08);}
+.btn:active{transform:translateY(0px) scale(.98);}
+.btn-primary{
+  background:linear-gradient(155deg,#22d3ee,#2563eb);
+  border-color:transparent; color:#031017;
+  box-shadow:0 8px 20px -8px rgba(34,211,238,.55), 0 1px 0 rgba(255,255,255,.35) inset;
+}
+.btn-icon{
+  width:38px; height:38px; padding:0; justify-content:center;
+  background:var(--input-bg); border:1px solid var(--panel-border);
+}
+.btn-icon:hover{background:var(--hover-bg);}
+.btn-danger-outline{color:var(--danger); border-color:rgba(248,113,113,.35); background:rgba(248,113,113,.08);}
+.btn-sm{padding:7px 11px; font-size:12px; border-radius:8px;}
+
+/* ============================= MAP WORKSPACE ============================= */
+.workspace{position:fixed; top:64px; left:0; right:0; bottom:0;}
+#map{width:100%; height:100%; background:var(--bg-grid);}
+.leaflet-control-attribution{
+  background:var(--panel-bg) !important; color:var(--text-dim) !important;
+  backdrop-filter:blur(10px); border-radius:6px 0 0 0; font-size:10px;
+}
+.leaflet-control-attribution a{color:var(--text-secondary) !important;}
+.leaflet-control-zoom{display:none;}
+
+.floating{
+  position:absolute; z-index:500;
+  background:var(--panel-bg);
+  backdrop-filter:blur(var(--blur)); -webkit-backdrop-filter:blur(var(--blur));
+  border:1px solid var(--panel-border);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow);
+}
+
+/* --- filter/search bar --- */
+.filter-bar{
+  top:18px; left:50%; transform:translateX(-50%);
+  display:flex; align-items:center; gap:8px; padding:8px;
+  min-width:640px;
+}
+.search-box{
+  display:flex; align-items:center; gap:9px; padding:0 12px;
+  background:var(--input-bg); border:1px solid var(--panel-border);
+  border-radius:10px; height:38px; flex:1.2; min-width:170px;
+}
+.search-box i{color:var(--text-dim); font-size:13px;}
+.search-box input{
+  border:none; outline:none; background:transparent; color:var(--text-primary);
+  font-size:13px; width:100%; font-family:var(--font-body);
+}
+.search-box input::placeholder{color:var(--text-dim);}
+.filter-select{
+  height:38px; border-radius:10px; border:1px solid var(--panel-border);
+  background:var(--input-bg); color:var(--text-secondary); font-size:12.5px;
+  font-family:var(--font-display); font-weight:600; padding:0 10px 0 12px;
+  outline:none; min-width:118px; appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238ea0b8'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 10px center; padding-right:24px;
+}
+.filter-select:focus{border-color:var(--accent);}
+
+/* --- stats card --- */
+.stats-card{
+  top:80px; left:18px; padding:16px; display:flex; gap:14px;
+}
+.stat-item{display:flex; flex-direction:column; gap:2px; min-width:64px;}
+.stat-item .num{font-family:var(--font-display); font-size:22px; font-weight:800; line-height:1;}
+.stat-item .lbl{font-size:10.5px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.5px; font-weight:600; margin-top:4px;}
+.stat-item.active .num{color:var(--success);}
+.stat-item.offline .num{color:var(--danger);}
+.stat-divider{width:1px; background:var(--panel-border);}
+
+/* --- camera list panel --- */
+.camera-list-panel{
+  bottom:18px; left:18px; width:300px; max-height:min(52vh,460px);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.panel-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 16px; border-bottom:1px solid var(--panel-border); cursor:pointer;
+  user-select:none;
+}
+.panel-header .htitle{font-family:var(--font-display); font-weight:700; font-size:13.5px; display:flex; align-items:center; gap:8px;}
+.panel-header .htitle i{color:var(--accent); font-size:12px;}
+.panel-header .count-pill{
+  background:var(--input-bg); border:1px solid var(--panel-border); color:var(--text-secondary);
+  font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; font-family:var(--font-mono);
+}
+.panel-toggle-icon{color:var(--text-secondary); transition:transform .25s ease; font-size:12px;}
+.camera-list-panel.collapsed .panel-toggle-icon{transform:rotate(-90deg);}
+.camera-list-body{overflow-y:auto; padding:8px;}
+.camera-list-panel.collapsed .camera-list-body{display:none;}
+
+.cam-row{
+  display:flex; align-items:center; gap:11px; padding:9px 10px;
+  border-radius:10px; transition:background .15s ease;
+}
+.cam-row:hover{background:var(--hover-bg);}
+.cam-row .dot{
+  width:9px; height:9px; border-radius:50%; flex-shrink:0;
+  box-shadow:0 0 0 3px transparent;
+}
+.cam-row .dot.active{background:var(--success); box-shadow:0 0 0 3px var(--success-glow);}
+.cam-row .dot.offline{background:var(--danger); box-shadow:0 0 0 3px var(--danger-glow);}
+.cam-row .meta{flex:1; min-width:0;}
+.cam-row .name{font-size:12.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.cam-row .sub{font-size:10.5px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.cam-row button{
+  border:none; background:var(--input-bg); color:var(--text-secondary);
+  width:26px; height:26px; border-radius:7px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:11px;
+}
+.cam-row button:hover{background:var(--accent); color:#04222b;}
+.empty-note{padding:24px 12px; text-align:center; color:var(--text-dim); font-size:12px;}
+
+/* --- legend --- */
+.legend-panel{bottom:18px; right:18px; padding:14px 16px; min-width:170px;}
+.legend-title{font-family:var(--font-display); font-weight:700; font-size:11.5px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.6px; margin-bottom:10px;}
+.legend-row{display:flex; align-items:center; gap:9px; font-size:12px; padding:4px 0; color:var(--text-primary);}
+.legend-dot{width:10px; height:10px; border-radius:50%; flex-shrink:0;}
+
+/* --- map controls (custom) --- */
+.map-controls{top:80px; right:18px; display:flex; flex-direction:column; gap:8px; background:transparent; border:none; box-shadow:none; backdrop-filter:none;}
+.map-controls button{
+  width:40px; height:40px; border-radius:12px; border:1px solid var(--panel-border);
+  background:var(--panel-bg); backdrop-filter:blur(var(--blur)); color:var(--text-primary);
+  box-shadow:var(--shadow); font-size:14px;
+}
+.map-controls button:hover{color:var(--accent);}
+
+/* ============================= LEAFLET MARKER ============================= */
+.cam-pin{position:relative; width:34px; height:34px;}
+.cam-pin .ring{
+  position:absolute; inset:0; border-radius:50%;
+  animation:pulseRing 2.2s ease-out infinite;
+}
+.cam-pin.active .ring{background:radial-gradient(circle, var(--success-glow), transparent 70%);}
+.cam-pin.offline .ring{display:none;}
+@keyframes pulseRing{
+  0%{transform:scale(.5); opacity:.9;}
+  100%{transform:scale(1.9); opacity:0;}
+}
+.cam-pin .core{
+  position:absolute; inset:5px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  border:2.5px solid #fff; box-shadow:0 3px 10px -2px rgba(0,0,0,.55);
+  font-size:12px; color:#fff;
+}
+.cam-pin.active .core{background:linear-gradient(155deg,#34d399,#059669); border-color:#d1fae5;}
+.cam-pin.offline .core{background:linear-gradient(155deg,#f87171,#b91c1c); border-color:#fee2e2;}
+
+.leaflet-popup-content-wrapper{
+  background:var(--panel-bg-solid); color:var(--text-primary);
+  border-radius:14px; border:1px solid var(--panel-border-strong);
+  padding:0; box-shadow:var(--shadow);
+}
+.leaflet-popup-content{margin:0; width:250px !important;}
+.leaflet-popup-tip{background:var(--panel-bg-solid); border:1px solid var(--panel-border-strong);}
+.leaflet-popup-close-button{color:var(--text-secondary) !important; font-size:18px !important; padding:8px !important;}
+
+.popup-card{padding:14px;}
+.popup-head{display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:8px;}
+.popup-head .pname{font-family:var(--font-display); font-weight:700; font-size:14px;}
+.popup-head .pid{font-size:10.5px; color:var(--text-dim); font-family:var(--font-mono);}
+.status-chip{
+  font-size:10px; font-weight:700; padding:3px 8px; border-radius:20px; text-transform:uppercase;
+  letter-spacing:.4px; display:inline-flex; align-items:center; gap:5px;
+}
+.status-chip.active{background:rgba(52,211,153,.15); color:var(--success);}
+.status-chip.offline{background:rgba(248,113,113,.15); color:var(--danger);}
+.status-chip::before{content:""; width:6px; height:6px; border-radius:50%; background:currentColor;}
+.popup-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:11.5px; margin:10px 0 12px;}
+.popup-grid div span{display:block; color:var(--text-dim); font-size:10px; text-transform:uppercase; letter-spacing:.3px; margin-bottom:2px;}
+.popup-stream-btn{
+  width:100%; border:none; border-radius:9px; padding:9px; font-family:var(--font-display);
+  font-weight:700; font-size:12px; background:linear-gradient(155deg,#22d3ee,#2563eb); color:#031017;
+  display:flex; align-items:center; justify-content:center; gap:7px;
+}
+.popup-stream-btn:hover{filter:brightness(1.08);}
+
+/* ============================= TABLE VIEW ============================= */
+.table-view{
+  position:fixed; top:64px; left:0; right:0; bottom:0; overflow-y:auto;
+  padding:26px 30px 60px; display:none;
+}
+.table-view.visible{display:block;}
+.table-toolbar{
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  margin-bottom:18px; flex-wrap:wrap;
+}
+.table-toolbar h2{font-family:var(--font-display); font-size:20px; font-weight:800;}
+.table-toolbar .sub{color:var(--text-secondary); font-size:12.5px; margin-top:2px; font-weight:500;}
+.table-search{
+  display:flex; align-items:center; gap:9px; padding:0 14px; height:40px;
+  background:var(--panel-bg); border:1px solid var(--panel-border); border-radius:11px;
+  min-width:260px; backdrop-filter:blur(var(--blur));
+}
+.table-search i{color:var(--text-dim);}
+.table-search input{border:none; outline:none; background:transparent; color:var(--text-primary); font-size:13px; width:100%;}
+
+.table-wrap{
+  background:var(--panel-bg); border:1px solid var(--panel-border); border-radius:var(--radius-lg);
+  backdrop-filter:blur(var(--blur)); overflow:hidden; box-shadow:var(--shadow);
+}
+table{width:100%; border-collapse:collapse; font-size:13px;}
+thead th{
+  text-align:left; padding:13px 16px; font-family:var(--font-display); font-weight:700;
+  font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-secondary);
+  border-bottom:1px solid var(--panel-border); cursor:pointer; white-space:nowrap; user-select:none;
+  position:sticky; top:0; background:var(--panel-bg-solid); z-index:2;
+}
+thead th i{margin-left:5px; font-size:9px; opacity:.5;}
+thead th:hover{color:var(--text-primary);}
+tbody td{padding:12px 16px; border-bottom:1px solid var(--panel-border); vertical-align:middle;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr{transition:background .15s ease;}
+tbody tr:hover{background:var(--hover-bg);}
+.cell-name{font-weight:700; font-family:var(--font-display); font-size:13px;}
+.cell-id{font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim);}
+.badge{
+  font-size:10.5px; font-weight:700; padding:4px 10px; border-radius:20px; display:inline-flex;
+  align-items:center; gap:5px; text-transform:uppercase; letter-spacing:.3px;
+}
+.badge.active{background:rgba(52,211,153,.15); color:var(--success);}
+.badge.offline{background:rgba(248,113,113,.15); color:var(--danger);}
+.badge::before{content:""; width:6px; height:6px; border-radius:50%; background:currentColor;}
+.dept-tag{
+  font-size:11px; font-weight:600; padding:4px 9px; border-radius:7px;
+  background:var(--input-bg); border:1px solid var(--panel-border); color:var(--text-secondary);
+}
+.row-actions{display:flex; gap:6px;}
+.row-actions button{
+  width:30px; height:30px; border-radius:8px; border:1px solid var(--panel-border);
+  background:var(--input-bg); color:var(--text-secondary); font-size:12px;
+  display:flex; align-items:center; justify-content:center;
+}
+.row-actions button:hover{background:var(--accent); color:#04222b; border-color:var(--accent);}
+.row-actions button.del:hover{background:var(--danger); color:#2b0505; border-color:var(--danger);}
+.row-actions button.map-jump:hover{background:var(--accent-2); color:#0a0a1a; border-color:var(--accent-2);}
+
+/* ============================= MODALS ============================= */
+.modal-overlay{
+  position:fixed; inset:0; z-index:2000; background:rgba(3,7,16,.62);
+  backdrop-filter:blur(6px); display:none; align-items:center; justify-content:center; padding:20px;
+}
+.modal-overlay.open{display:flex; animation:fadeIn .18s ease;}
+@keyframes fadeIn{from{opacity:0;} to{opacity:1;}}
+.modal{
+  background:var(--panel-bg-solid); border:1px solid var(--panel-border-strong);
+  border-radius:20px; box-shadow:0 30px 80px -20px rgba(0,0,0,.6); width:100%;
+  max-height:88vh; overflow-y:auto; animation:pop .2s cubic-bezier(.2,.9,.3,1.2);
+}
+@keyframes pop{from{transform:scale(.94) translateY(10px); opacity:0;} to{transform:scale(1) translateY(0); opacity:1;}}
+.modal.modal-md{max-width:460px;}
+.modal.modal-lg{max-width:820px;}
+.modal-head{
+  display:flex; align-items:center; justify-content:space-between; padding:18px 22px;
+  border-bottom:1px solid var(--panel-border); position:sticky; top:0; background:var(--panel-bg-solid); z-index:2;
+}
+.modal-head h3{font-family:var(--font-display); font-size:16px; font-weight:800; display:flex; align-items:center; gap:9px;}
+.modal-head h3 i{color:var(--accent);}
+.modal-close{
+  width:32px; height:32px; border-radius:9px; border:none; background:var(--input-bg);
+  color:var(--text-secondary); display:flex; align-items:center; justify-content:center;
+}
+.modal-close:hover{background:var(--danger); color:#fff;}
+.modal-body{padding:22px;}
+.modal-foot{
+  display:flex; justify-content:flex-end; gap:10px; padding:16px 22px; border-top:1px solid var(--panel-border);
+}
+
+/* --- add camera form --- */
+.form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+.form-field{display:flex; flex-direction:column; gap:6px;}
+.form-field.full{grid-column:1/-1;}
+.form-field label{font-size:11.5px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.4px;}
+.form-field input, .form-field select{
+  height:42px; border-radius:10px; border:1px solid var(--panel-border-strong);
+  background:var(--input-bg); color:var(--text-primary); padding:0 13px; font-size:13.5px;
+  outline:none; font-family:var(--font-body);
+}
+.form-field input:focus, .form-field select:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(34,211,238,.15);}
+.form-field select{
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238ea0b8'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 14px center;
+}
+.field-hint{font-size:10.5px; color:var(--text-dim); margin-top:2px;}
+
+/* --- live stream modal --- */
+.stream-screen{
+  background:#000; border-radius:14px; aspect-ratio:16/9; position:relative; overflow:hidden;
+  border:1px solid rgba(255,255,255,.08);
+}
+.stream-noise{
+  position:absolute; inset:0;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.02) 0px, transparent 1px, transparent 2px),
+    radial-gradient(ellipse at 30% 20%, rgba(34,211,238,.10), transparent 55%),
+    radial-gradient(ellipse at 75% 80%, rgba(20,30,50,.9), #05070c 70%);
+}
+.stream-scan{position:absolute; left:0; right:0; height:2px; background:rgba(34,211,238,.5); filter:blur(1px); animation:scan 3.2s linear infinite;}
+@keyframes scan{0%{top:0;} 100%{top:100%;}}
+.stream-vignette{position:absolute; inset:0; box-shadow:inset 0 0 120px 40px rgba(0,0,0,.65); pointer-events:none;}
+.stream-badges{position:absolute; top:12px; left:12px; display:flex; gap:8px; align-items:center;}
+.rec-badge{
+  display:flex; align-items:center; gap:6px; background:rgba(0,0,0,.5); backdrop-filter:blur(6px);
+  padding:5px 10px; border-radius:20px; font-size:11px; font-weight:700; color:#fff; font-family:var(--font-mono);
+}
+.rec-dot{width:7px; height:7px; border-radius:50%; background:#ef4444; animation:blink 1.1s infinite;}
+@keyframes blink{50%{opacity:.2;}}
+.stream-timestamp{
+  position:absolute; bottom:12px; left:12px; font-family:var(--font-mono); color:#e6faff;
+  background:rgba(0,0,0,.5); backdrop-filter:blur(6px); padding:6px 10px; border-radius:8px; font-size:12px;
+}
+.stream-camtag{
+  position:absolute; top:12px; right:12px; font-family:var(--font-mono); font-size:11px;
+  background:rgba(0,0,0,.5); backdrop-filter:blur(6px); color:#9fd9e6; padding:5px 10px; border-radius:8px;
+}
+.stream-crosshair{
+  position:absolute; top:50%; left:50%; width:70px; height:70px; transform:translate(-50%,-50%);
+  border:1px solid rgba(34,211,238,.35); border-radius:6px; opacity:.6;
+}
+.stream-crosshair::before, .stream-crosshair::after{content:""; position:absolute; background:rgba(34,211,238,.4);}
+.stream-crosshair::before{top:50%; left:-10px; right:-10px; height:1px;}
+.stream-crosshair::after{left:50%; top:-10px; bottom:-10px; width:1px;}
+
+.stream-meta-grid{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:16px;
+}
+.stream-meta-grid .item{
+  background:var(--input-bg); border:1px solid var(--panel-border); border-radius:10px; padding:10px 12px;
+}
+.stream-meta-grid .item span{display:block; font-size:9.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px;}
+.stream-meta-grid .item b{font-size:13px; font-family:var(--font-display);}
+
+.ptz-panel{
+  margin-top:16px; display:flex; align-items:center; justify-content:space-between; gap:18px;
+  background:var(--input-bg); border:1px solid var(--panel-border); border-radius:14px; padding:14px 18px;
+}
+.ptz-dpad{display:grid; grid-template-columns:repeat(3,34px); grid-template-rows:repeat(3,34px); gap:4px;}
+.ptz-dpad button{
+  border:1px solid var(--panel-border-strong); background:var(--panel-bg-solid); color:var(--text-secondary);
+  border-radius:8px; font-size:12px; display:flex; align-items:center; justify-content:center;
+}
+.ptz-dpad button:hover{color:var(--accent); border-color:var(--accent);}
+.ptz-dpad .center{background:var(--input-bg); color:var(--text-dim);}
+.ptz-zoom{display:flex; flex-direction:column; gap:6px;}
+.ptz-zoom button{
+  width:38px; height:34px; border-radius:8px; border:1px solid var(--panel-border-strong);
+  background:var(--panel-bg-solid); color:var(--text-secondary); font-size:13px;
+}
+.ptz-zoom button:hover{color:var(--accent); border-color:var(--accent);}
+.ptz-label{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px; font-weight:700; text-align:center; margin-top:6px;}
+
+/* ============================= TOASTS ============================= */
+.toast-stack{position:fixed; top:78px; right:18px; z-index:3000; display:flex; flex-direction:column; gap:10px; width:300px;}
+.toast{
+  display:flex; align-items:flex-start; gap:11px; padding:13px 14px;
+  background:var(--panel-bg-solid); border:1px solid var(--panel-border-strong);
+  border-left:3px solid var(--accent); border-radius:12px; box-shadow:var(--shadow);
+  animation:toastIn .25s cubic-bezier(.2,.9,.3,1.2);
+}
+@keyframes toastIn{from{transform:translateX(30px); opacity:0;} to{transform:translateX(0); opacity:1;}}
+.toast.success{border-left-color:var(--success);}
+.toast.error{border-left-color:var(--danger);}
+.toast.warning{border-left-color:var(--warning);}
+.toast i{margin-top:2px; font-size:14px;}
+.toast.success i{color:var(--success);}
+.toast.error i{color:var(--danger);}
+.toast.warning i{color:var(--warning);}
+.toast .body{flex:1;}
+.toast .ttitle{font-size:12.5px; font-weight:700; font-family:var(--font-display);}
+.toast .tmsg{font-size:11.5px; color:var(--text-secondary); margin-top:2px;}
+.toast.leaving{animation:toastOut .2s ease forwards;}
+@keyframes toastOut{to{transform:translateX(40px); opacity:0;}}
+
+/* misc */
+.hidden{display:none !important;}
+@media (max-width:900px){
+  .filter-bar{min-width:0; width:calc(100% - 36px); flex-wrap:wrap; left:18px; right:18px; transform:none;}
+  .brand-text .subtitle{display:none;}
+  .stats-card{top:auto; bottom:calc(52vh + 30px);}
+}
+</style>
+</head>
+<body data-theme="dark">
+
+<!-- ============================= HEADER ============================= -->
+<header class="app-header">
+  <div class="brand">
+    <div class="brand-mark"><div class="sweep"></div><i class="fa-solid fa-satellite-dish"></i></div>
+    <div class="brand-text">
+      <div class="title">NETRA <span style="color:var(--accent)">·</span> Command Center</div>
+      <div class="subtitle">Statewide CCTV Surveillance GIS — Gujarat</div>
+    </div>
+  </div>
+
+  <div class="view-switcher">
+    <button id="btnViewMap" class="active" onclick="switchView('map')"><i class="fa-solid fa-map-location-dot"></i> GIS Map</button>
+    <button id="btnViewTable" onclick="switchView('table')"><i class="fa-solid fa-table-list"></i> Table Registry</button>
+  </div>
+
+  <div class="header-actions">
+    <button class="btn btn-primary" onclick="openAddModal()"><i class="fa-solid fa-plus"></i> Add Camera</button>
+    <button class="btn btn-icon" id="themeToggle" onclick="toggleTheme()" title="Toggle theme"><i class="fa-solid fa-moon"></i></button>
+  </div>
+</header>
+
+<!-- ============================= MAP WORKSPACE ============================= -->
+<div class="workspace" id="mapWorkspace">
+  <div id="map"></div>
+
+  <!-- filter / search bar -->
+  <div class="floating filter-bar">
+    <div class="search-box">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" id="mapSearch" placeholder="Search camera name, ID or location…" oninput="applyFilters()">
+    </div>
+    <select class="filter-select" id="filterDept" onchange="applyFilters()"><option value="">All Departments</option></select>
+    <select class="filter-select" id="filterDistrict" onchange="applyFilters()"><option value="">All Districts</option></select>
+    <select class="filter-select" id="filterStatus" onchange="applyFilters()">
+      <option value="">All Status</option>
+      <option value="active">Active</option>
+      <option value="offline">Offline</option>
+    </select>
+  </div>
+
+  <!-- stats card -->
+  <div class="floating stats-card">
+    <div class="stat-item"><div class="num" id="statTotal">0</div><div class="lbl">Total</div></div>
+    <div class="stat-divider"></div>
+    <div class="stat-item active"><div class="num" id="statActive">0</div><div class="lbl">Active</div></div>
+    <div class="stat-divider"></div>
+    <div class="stat-item offline"><div class="num" id="statOffline">0</div><div class="lbl">Offline</div></div>
+  </div>
+
+  <!-- custom zoom controls -->
+  <div class="floating map-controls">
+    <button onclick="map.zoomIn()" title="Zoom in"><i class="fa-solid fa-plus"></i></button>
+    <button onclick="map.zoomOut()" title="Zoom out"><i class="fa-solid fa-minus"></i></button>
+    <button onclick="recenterMap()" title="Recenter"><i class="fa-solid fa-crosshairs"></i></button>
+    <button onclick="toggleMapTiles()" title="Toggle map style" id="tileToggleBtn"><i class="fa-solid fa-layer-group"></i></button>
+  </div>
+
+  <!-- camera list panel -->
+  <div class="floating camera-list-panel" id="camListPanel">
+    <div class="panel-header" onclick="toggleCamList()">
+      <div class="htitle"><i class="fa-solid fa-video"></i> Camera Feed List <span class="count-pill" id="camListCount">0</span></div>
+      <i class="fa-solid fa-chevron-down panel-toggle-icon"></i>
+    </div>
+    <div class="camera-list-body" id="camListBody"></div>
+  </div>
+
+  <!-- legend -->
+  <div class="floating legend-panel">
+    <div class="legend-title">Map Legend</div>
+    <div class="legend-row"><span class="legend-dot" style="background:var(--success); box-shadow:0 0 0 3px var(--success-glow);"></span> Active Camera</div>
+    <div class="legend-row"><span class="legend-dot" style="background:var(--danger); box-shadow:0 0 0 3px var(--danger-glow);"></span> Offline Camera</div>
+    <div class="legend-row"><span class="legend-dot" style="background:var(--accent);"></span> Selected Pin</div>
+  </div>
+</div>
+
+<!-- ============================= TABLE VIEW ============================= -->
+<div class="table-view" id="tableView">
+  <div class="table-toolbar">
+    <div>
+      <h2>Camera Registry</h2>
+      <div class="sub">Complete statewide inventory — search, sort and manage every registered device.</div>
+    </div>
+    <div class="table-search">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" id="tableSearch" placeholder="Search registry…" oninput="renderTable()">
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortTable('name')">Camera <i class="fa-solid fa-sort"></i></th>
+          <th onclick="sortTable('district')">District <i class="fa-solid fa-sort"></i></th>
+          <th onclick="sortTable('department')">Department <i class="fa-solid fa-sort"></i></th>
+          <th onclick="sortTable('resolution')">Resolution <i class="fa-solid fa-sort"></i></th>
+          <th onclick="sortTable('ip')">IP Address <i class="fa-solid fa-sort"></i></th>
+          <th onclick="sortTable('status')">Status <i class="fa-solid fa-sort"></i></th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ============================= ADD CAMERA MODAL ============================= -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal modal-md">
+    <div class="modal-head">
+      <h3><i class="fa-solid fa-camera-cctv"></i> Register New Camera</h3>
+      <button class="modal-close" onclick="closeModal('addModal')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <form id="addCameraForm" onsubmit="submitAddCamera(event)">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-field full">
+            <label>Camera Name</label>
+            <input type="text" id="fName" placeholder="e.g. Ashram Road Junction Cam-04" required>
+          </div>
+          <div class="form-field">
+            <label>Latitude</label>
+            <input type="text" id="fLat" placeholder="23.0225" required>
+          </div>
+          <div class="form-field">
+            <label>Longitude</label>
+            <input type="text" id="fLng" placeholder="72.5714" required>
+          </div>
+          <div class="form-field">
+            <label>District</label>
+            <select id="fDistrict" required></select>
+          </div>
+          <div class="form-field">
+            <label>Department</label>
+            <select id="fDepartment" required></select>
+          </div>
+          <div class="form-field">
+            <label>Resolution</label>
+            <select id="fResolution">
+              <option>4K Ultra HD</option>
+              <option>1080p Full HD</option>
+              <option>720p HD</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Status</label>
+            <select id="fStatus">
+              <option value="active">Active</option>
+              <option value="offline">Offline</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-hint" style="margin-top:12px;"><i class="fa-solid fa-circle-info"></i> Coordinates must fall within Gujarat state bounds for the pin to render on the map.</div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn" onclick="closeModal('addModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Register Camera</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============================= LIVE STREAM MODAL ============================= -->
+<div class="modal-overlay" id="streamModal">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <h3><i class="fa-solid fa-satellite-dish"></i> Live Stream — <span id="streamCamName">Camera</span></h3>
+      <button class="modal-close" onclick="closeStreamModal()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="stream-screen">
+        <div class="stream-noise"></div>
+        <div class="stream-scan"></div>
+        <div class="stream-vignette"></div>
+        <div class="stream-crosshair"></div>
+        <div class="stream-badges">
+          <div class="rec-badge"><span class="rec-dot"></span> LIVE</div>
+        </div>
+        <div class="stream-camtag" id="streamCamTag">CAM-000</div>
+        <div class="stream-timestamp" id="streamTimestamp">00:00:00</div>
+      </div>
+
+      <div class="stream-meta-grid">
+        <div class="item"><span>District</span><b id="metaDistrict">—</b></div>
+        <div class="item"><span>Department</span><b id="metaDept">—</b></div>
+        <div class="item"><span>Resolution</span><b id="metaRes">—</b></div>
+        <div class="item"><span>IP Address</span><b id="metaIp">—</b></div>
+        <div class="item"><span>Coordinates</span><b id="metaCoords">—</b></div>
+        <div class="item"><span>Status</span><b id="metaStatus">—</b></div>
+      </div>
+
+      <div class="ptz-panel">
+        <div>
+          <div class="ptz-dpad">
+            <span></span><button onclick="ptzAction('Tilt Up')"><i class="fa-solid fa-chevron-up"></i></button><span></span>
+            <button onclick="ptzAction('Pan Left')"><i class="fa-solid fa-chevron-left"></i></button>
+            <button class="center" onclick="ptzAction('Reset Position')"><i class="fa-solid fa-house"></i></button>
+            <button onclick="ptzAction('Pan Right')"><i class="fa-solid fa-chevron-right"></i></button>
+            <span></span><button onclick="ptzAction('Tilt Down')"><i class="fa-solid fa-chevron-down"></i></button><span></span>
+          </div>
+          <div class="ptz-label">PTZ Directional</div>
+        </div>
+        <div>
+          <div class="ptz-zoom">
+            <button onclick="ptzAction('Zoom In')"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+            <button onclick="ptzAction('Zoom Out')"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+          </div>
+          <div class="ptz-label">Zoom</div>
+        </div>
+        <div>
+          <div class="ptz-zoom">
+            <button onclick="ptzAction('Snapshot Captured')"><i class="fa-solid fa-camera"></i></button>
+            <button onclick="ptzAction('Recording Toggled')"><i class="fa-solid fa-circle-dot"></i></button>
+          </div>
+          <div class="ptz-label">Capture</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger-outline" onclick="closeStreamModal()"><i class="fa-solid fa-power-off"></i> End Session</button>
+      <button class="btn btn-primary" onclick="ptzAction('Feed Refreshed')"><i class="fa-solid fa-rotate"></i> Refresh Feed</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= TOASTS ============================= -->
+<div class="toast-stack" id="toastStack"></div>
+
+<script>
+/* ============================================================
+   MOCK DATA
+   ============================================================ */
+const DEPARTMENTS = ["Traffic Police","City Police","Municipal Corporation","Highway Patrol","Railway Security","Smart City Command"];
+const DISTRICTS = ["Ahmedabad","Surat","Vadodara","Rajkot","Bhavnagar","Jamnagar","Junagadh","Gandhinagar","Anand","Mehsana","Bharuch","Navsari","Porbandar","Dwarka"];
+const RESOLUTIONS = ["4K Ultra HD","1080p Full HD","720p HD"];
+
+let cameras = [
+  {id:"CAM-1001", name:"Kalupur Railway Gate Cam", lat:23.0272, lng:72.6023, district:"Ahmedabad", department:"Railway Security", status:"active", resolution:"4K Ultra HD", ip:"10.24.11.4"},
+  {id:"CAM-1002", name:"Ashram Road Junction", lat:23.0325, lng:72.5697, district:"Ahmedabad", department:"Traffic Police", status:"active", resolution:"1080p Full HD", ip:"10.24.11.9"},
+  {id:"CAM-1003", name:"Sarthana Nature Park Gate", lat:21.2200, lng:72.8500, district:"Surat", department:"Municipal Corporation", status:"offline", resolution:"1080p Full HD", ip:"10.31.4.2"},
+  {id:"CAM-1004", name:"Surat Diamond Bourse Ext.", lat:21.1554, lng:72.7930, district:"Surat", department:"Smart City Command", status:"active", resolution:"4K Ultra HD", ip:"10.31.4.7"},
+  {id:"CAM-1005", name:"Laxmi Vilas Palace Rd", lat:22.3100, lng:73.2000, district:"Vadodara", department:"City Police", status:"active", resolution:"1080p Full HD", ip:"10.19.2.3"},
+  {id:"CAM-1006", name:"Sayajigunj Circle", lat:22.3150, lng:73.1900, district:"Vadodara", department:"Traffic Police", status:"offline", resolution:"720p HD", ip:"10.19.2.8"},
+  {id:"CAM-1007", name:"Rajkot Race Course Rd", lat:22.3000, lng:70.7900, district:"Rajkot", department:"Highway Patrol", status:"active", resolution:"1080p Full HD", ip:"10.42.7.1"},
+  {id:"CAM-1008", name:"Bhavnagar Ghogha Circle", lat:21.7700, lng:72.1600, district:"Bhavnagar", department:"City Police", status:"active", resolution:"720p HD", ip:"10.55.3.5"},
+  {id:"CAM-1009", name:"Jamnagar Bedi Gate", lat:22.4750, lng:70.0650, district:"Jamnagar", department:"Municipal Corporation", status:"offline", resolution:"1080p Full HD", ip:"10.61.9.2"},
+  {id:"CAM-1010", name:"Junagadh Uparkot Fort Rd", lat:21.5250, lng:70.4650, district:"Junagadh", department:"Smart City Command", status:"active", resolution:"4K Ultra HD", ip:"10.72.1.6"},
+  {id:"CAM-1011", name:"Gandhinagar Sachivalaya Gate", lat:23.2200, lng:72.6400, district:"Gandhinagar", department:"Highway Patrol", status:"active", resolution:"4K Ultra HD", ip:"10.11.0.1"},
+  {id:"CAM-1012", name:"Anand Dairy Rd Junction", lat:22.5600, lng:72.9350, district:"Anand", department:"Traffic Police", status:"active", resolution:"1080p Full HD", ip:"10.83.5.4"},
+  {id:"CAM-1013", name:"Mehsana Bus Stand", lat:23.5900, lng:72.3750, district:"Mehsana", department:"City Police", status:"offline", resolution:"720p HD", ip:"10.90.2.9"},
+  {id:"CAM-1014", name:"Bharuch Golden Bridge Rd", lat:21.7100, lng:73.0000, district:"Bharuch", department:"Highway Patrol", status:"active", resolution:"1080p Full HD", ip:"10.33.6.2"},
+  {id:"CAM-1015", name:"Navsari Station Rd", lat:20.9500, lng:72.9600, district:"Navsari", department:"Railway Security", status:"active", resolution:"1080p Full HD", ip:"10.47.8.3"},
+  {id:"CAM-1016", name:"Porbandar Chowpatty", lat:21.6450, lng:69.6350, district:"Porbandar", department:"Municipal Corporation", status:"offline", resolution:"720p HD", ip:"10.58.1.1"},
+  {id:"CAM-1017", name:"Dwarkadhish Temple Approach", lat:22.2400, lng:68.9700, district:"Dwarka", department:"Smart City Command", status:"active", resolution:"4K Ultra HD", ip:"10.66.4.5"}
+];
+
+let map, markersById = {}, tileLight, tileDark, currentTile = "dark";
+let camListCollapsed = false;
+let tableSortKey = "name", tableSortAsc = true;
+let streamTimerHandle = null;
+let activeCamId = null;
+
+const GUJARAT_BOUNDS = L.latLngBounds([19.4, 67.3], [25.6, 75.4]);
+const GUJARAT_CENTER = [22.55, 71.6];
+
+/* ============================================================
+   INIT
+   ============================================================ */
+window.addEventListener("DOMContentLoaded", () => {
+  populateSelects();
+  initMap();
+  applyFilters();
+  renderTable();
+});
+
+function populateSelects(){
+  const deptSets = [document.getElementById("filterDept"), document.getElementById("fDepartment")];
+  const distSets = [document.getElementById("filterDistrict"), document.getElementById("fDistrict")];
+
+  deptSets.forEach((sel, idx) => {
+    DEPARTMENTS.forEach(d => {
+      const o = document.createElement("option");
+      o.value = d; o.textContent = d;
+      sel.appendChild(o);
+    });
+  });
+  distSets.forEach((sel, idx) => {
+    DISTRICTS.forEach(d => {
+      const o = document.createElement("option");
+      o.value = d; o.textContent = d;
+      sel.appendChild(o);
+    });
+  });
+}
+
+/* ============================================================
+   MAP
+   ============================================================ */
+function initMap(){
+  map = L.map("map", {
+    zoomControl:false,
+    minZoom:6.6,
+    maxZoom:17,
+    maxBounds:GUJARAT_BOUNDS,
+    maxBoundsViscosity:1.0
+  }).setView(GUJARAT_CENTER, 7);
+
+  tileLight = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+    attribution:"&copy; OpenStreetMap &copy; CARTO", subdomains:"abcd", maxZoom:19
+  });
+  tileDark = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    attribution:"&copy; OpenStreetMap &copy; CARTO", subdomains:"abcd", maxZoom:19
+  });
+  tileDark.addTo(map);
+
+  map.fitBounds(GUJARAT_BOUNDS.pad(-0.02));
+}
+
+function toggleMapTiles(){
+  if(currentTile === "dark"){
+    map.removeLayer(tileDark); tileLight.addTo(map); currentTile = "light";
+  } else {
+    map.removeLayer(tileLight); tileDark.addTo(map); currentTile = "dark";
+  }
+  showToast("Map Style Updated", `Switched to ${currentTile} basemap tiles.`, "success");
+}
+
+function recenterMap(){
+  map.fitBounds(GUJARAT_BOUNDS.pad(-0.02));
+  showToast("View Reset", "Map recentered to statewide extent.", "success");
+}
+
+function createCameraIcon(status){
+  return L.divIcon({
+    className:"",
+    html:`<div class="cam-pin ${status}"><div class="ring"></div><div class="core"><i class="fa-solid fa-video"></i></div></div>`,
+    iconSize:[34,34],
+    iconAnchor:[17,17],
+    popupAnchor:[0,-16]
+  });
+}
+
+function buildPopupHtml(cam){
+  return `
+    <div class="popup-card">
+      <div class="popup-head">
+        <div>
+          <div class="pname">${cam.name}</div>
+          <div class="pid">${cam.id}</div>
+        </div>
+        <span class="status-chip ${cam.status}">${cam.status}</span>
+      </div>
+      <div class="popup-grid">
+        <div><span>District</span>${cam.district}</div>
+        <div><span>Department</span>${cam.department}</div>
+        <div><span>Resolution</span>${cam.resolution}</div>
+        <div><span>IP Address</span>${cam.ip}</div>
+      </div>
+      <button class="popup-stream-btn" onclick="openStreamModal('${cam.id}')"><i class="fa-solid fa-play"></i> View Live Stream</button>
+    </div>
+  `;
+}
+
+function renderMarkers(list){
+  Object.values(markersById).forEach(m => map.removeLayer(m));
+  markersById = {};
+  list.forEach(cam => {
+    const marker = L.marker([cam.lat, cam.lng], {icon:createCameraIcon(cam.status)}).addTo(map);
+    marker.bindPopup(buildPopupHtml(cam));
+    markersById[cam.id] = marker;
+  });
+}
+
+function flyToCamera(id){
+  const cam = cameras.find(c => c.id === id);
+  if(!cam) return;
+  map.flyTo([cam.lat, cam.lng], 13, {duration:0.9});
+  const marker = markersById[id];
+  if(marker){ setTimeout(()=>marker.openPopup(), 850); }
+}
+
+/* ============================================================
+   FILTERS / STATS / LIST
+   ============================================================ */
+function getFilteredCameras(){
+  const q = document.getElementById("mapSearch").value.trim().toLowerCase();
+  const dept = document.getElementById("filterDept").value;
+  const dist = document.getElementById("filterDistrict").value;
+  const status = document.getElementById("filterStatus").value;
+
+  return cameras.filter(c => {
+    if(dept && c.department !== dept) return false;
+    if(dist && c.district !== dist) return false;
+    if(status && c.status !== status) return false;
+    if(q && !(c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q) || c.district.toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function applyFilters(){
+  const list = getFilteredCameras();
+  renderMarkers(list);
+  updateStats(list);
+  renderCameraList(list);
+}
+
+function updateStats(list){
+  document.getElementById("statTotal").textContent = list.length;
+  document.getElementById("statActive").textContent = list.filter(c=>c.status==="active").length;
+  document.getElementById("statOffline").textContent = list.filter(c=>c.status==="offline").length;
+}
+
+function renderCameraList(list){
+  const body = document.getElementById("camListBody");
+  document.getElementById("camListCount").textContent = list.length;
+  if(list.length === 0){
+    body.innerHTML = `<div class="empty-note"><i class="fa-solid fa-video-slash" style="font-size:20px; margin-bottom:8px; display:block;"></i>No cameras match current filters</div>`;
+    return;
+  }
+  body.innerHTML = list.map(c => `
+    <div class="cam-row">
+      <span class="dot ${c.status}"></span>
+      <div class="meta" onclick="flyToCamera('${c.id}')" style="cursor:pointer;">
+        <div class="name">${c.name}</div>
+        <div class="sub">${c.district} · ${c.department}</div>
+      </div>
+      <button title="View stream" onclick="openStreamModal('${c.id}')"><i class="fa-solid fa-play"></i></button>
+    </div>
+  `).join("");
+}
+
+function toggleCamList(){
+  camListCollapsed = !camListCollapsed;
+  document.getElementById("camListPanel").classList.toggle("collapsed", camListCollapsed);
+}
+
+/* ============================================================
+   VIEW SWITCH
+   ============================================================ */
+function switchView(view){
+  const isMap = view === "map";
+  document.getElementById("btnViewMap").classList.toggle("active", isMap);
+  document.getElementById("btnViewTable").classList.toggle("active", !isMap);
+  document.getElementById("mapWorkspace").style.display = isMap ? "block" : "none";
+  document.getElementById("tableView").classList.toggle("visible", !isMap);
+  if(isMap){ setTimeout(()=>map.invalidateSize(), 80); }
+  else { renderTable(); }
+}
+
+/* ============================================================
+   TABLE REGISTRY
+   ============================================================ */
+function sortTable(key){
+  if(tableSortKey === key){ tableSortAsc = !tableSortAsc; }
+  else { tableSortKey = key; tableSortAsc = true; }
+  renderTable();
+}
+
+function renderTable(){
+  const q = (document.getElementById("tableSearch")?.value || "").trim().toLowerCase();
+  let list = cameras.filter(c =>
+    !q || c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q) ||
+    c.district.toLowerCase().includes(q) || c.department.toLowerCase().includes(q) || c.ip.includes(q)
+  );
+  list.sort((a,b) => {
+    let va = a[tableSortKey], vb = b[tableSortKey];
+    if(typeof va === "string") va = va.toLowerCase();
+    if(typeof vb === "string") vb = vb.toLowerCase();
+    if(va < vb) return tableSortAsc ? -1 : 1;
+    if(va > vb) return tableSortAsc ? 1 : -1;
+    return 0;
+  });
+
+  const body = document.getElementById("tableBody");
+  if(list.length === 0){
+    body.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:40px; color:var(--text-dim);">No cameras found for this search.</td></tr>`;
+    return;
+  }
+  body.innerHTML = list.map(c => `
+    <tr>
+      <td>
+        <div class="cell-name">${c.name}</div>
+        <div class="cell-id">${c.id}</div>
+      </td>
+      <td>${c.district}</td>
+      <td><span class="dept-tag">${c.department}</span></td>
+      <td>${c.resolution}</td>
+      <td style="font-family:var(--font-mono); font-size:12px;">${c.ip}</td>
+      <td><span class="badge ${c.status}">${c.status}</span></td>
+      <td>
+        <div class="row-actions">
+          <button title="View live stream" onclick="openStreamModal('${c.id}')"><i class="fa-solid fa-play"></i></button>
+          <button class="map-jump" title="Locate on map" onclick="jumpToMapFromTable('${c.id}')"><i class="fa-solid fa-map-pin"></i></button>
+          <button class="del" title="Remove camera" onclick="deleteCamera('${c.id}')"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>
+  `).join("");
+}
+
+function jumpToMapFromTable(id){
+  switchView("map");
+  document.getElementById("btnViewMap").classList.add("active");
+  document.getElementById("btnViewTable").classList.remove("active");
+  setTimeout(()=>flyToCamera(id), 150);
+}
+
+function deleteCamera(id){
+  const cam = cameras.find(c=>c.id===id);
+  cameras = cameras.filter(c => c.id !== id);
+  renderTable();
+  applyFilters();
+  showToast("Camera Removed", `${cam ? cam.name : id} was deleted from the registry.`, "warning");
+}
+
+/* ============================================================
+   ADD CAMERA MODAL
+   ============================================================ */
+function openAddModal(){
+  document.getElementById("addCameraForm").reset();
+  document.getElementById("addModal").classList.add("open");
+}
+function closeModal(id){
+  document.getElementById(id).classList.remove("open");
+}
+
+function submitAddCamera(e){
+  e.preventDefault();
+  const lat = parseFloat(document.getElementById("fLat").value);
+  const lng = parseFloat(document.getElementById("fLng").value);
+
+  if(isNaN(lat) || isNaN(lng) || !GUJARAT_BOUNDS.contains([lat,lng])){
+    showToast("Invalid Coordinates", "Latitude/Longitude must fall within Gujarat state bounds.", "error");
+    return;
+  }
+
+  const newId = "CAM-" + (1000 + cameras.length + Math.floor(Math.random()*90) + 1);
+  const newCam = {
+    id:newId,
+    name:document.getElementById("fName").value.trim(),
+    lat, lng,
+    district:document.getElementById("fDistrict").value,
+    department:document.getElementById("fDepartment").value,
+    resolution:document.getElementById("fResolution").value,
+    status:document.getElementById("fStatus").value,
+    ip:`10.${Math.floor(Math.random()*90+10)}.${Math.floor(Math.random()*90+1)}.${Math.floor(Math.random()*250+1)}`
+  };
+  cameras.push(newCam);
+  closeModal("addModal");
+  applyFilters();
+  renderTable();
+  showToast("Camera Registered", `${newCam.name} added to the ${newCam.district} network.`, "success");
+  switchView("map");
+  setTimeout(()=>flyToCamera(newId), 250);
+}
+
+/* ============================================================
+   LIVE STREAM MODAL
+   ============================================================ */
+function openStreamModal(id){
+  const cam = cameras.find(c => c.id === id);
+  if(!cam) return;
+  activeCamId = id;
+
+  document.getElementById("streamCamName").textContent = cam.name;
+  document.getElementById("streamCamTag").textContent = cam.id;
+  document.getElementById("metaDistrict").textContent = cam.district;
+  document.getElementById("metaDept").textContent = cam.department;
+  document.getElementById("metaRes").textContent = cam.resolution;
+  document.getElementById("metaIp").textContent = cam.ip;
+  document.getElementById("metaCoords").textContent = `${cam.lat.toFixed(4)}, ${cam.lng.toFixed(4)}`;
+  document.getElementById("metaStatus").textContent = cam.status === "active" ? "Online" : "Offline";
+
+  document.getElementById("streamModal").classList.add("open");
+  tickStreamClock();
+  streamTimerHandle = setInterval(tickStreamClock, 1000);
+
+  if(cam.status === "offline"){
+    showToast("Signal Degraded", `${cam.name} is currently offline. Showing last cached frame.`, "warning");
+  }
+}
+
+function tickStreamClock(){
+  const now = new Date();
+  document.getElementById("streamTimestamp").textContent = now.toLocaleString("en-GB", {
+    day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false
+  });
+}
+
+function closeStreamModal(){
+  document.getElementById("streamModal").classList.remove("open");
+  clearInterval(streamTimerHandle);
+  activeCamId = null;
+}
+
+function ptzAction(label){
+  showToast("PTZ Command Sent", `${label} — command relayed to camera controller.`, "success");
+}
+
+/* ============================================================
+   THEME
+   ============================================================ */
+function toggleTheme(){
+  const body = document.body;
+  const isDark = body.getAttribute("data-theme") === "dark";
+  body.setAttribute("data-theme", isDark ? "light" : "dark");
+  document.getElementById("themeToggle").innerHTML = isDark
+    ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
+  showToast("Theme Switched", `Interface set to ${isDark ? "light" : "dark"} mode.`, "success");
+}
+
+/* ============================================================
+   TOASTS
+   ============================================================ */
+function showToast(title, msg, type="success"){
+  const icons = {success:"fa-circle-check", error:"fa-circle-exclamation", warning:"fa-triangle-exclamation"};
+  const stack = document.getElementById("toastStack");
+  const el = document.createElement("div");
+  el.className = `toast ${type}`;
+  el.innerHTML = `
+    <i class="fa-solid ${icons[type] || icons.success}"></i>
+    <div class="body">
+      <div class="ttitle">${title}</div>
+      <div class="tmsg">${msg}</div>
+    </div>
+  `;
+  stack.appendChild(el);
+  setTimeout(() => {
+    el.classList.add("leaving");
+    setTimeout(() => el.remove(), 220);
+  }, 3800);
+}
+
+/* close modals on overlay click */
+document.querySelectorAll(".modal-overlay").forEach(ov => {
+  ov.addEventListener("click", (e) => {
+    if(e.target === ov){
+      if(ov.id === "streamModal") closeStreamModal();
+      else closeModal(ov.id);
+    }
+  });
+});
+</script>
+</body>
+</html>

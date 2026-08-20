@@ -1,21 +1,22 @@
 import React from 'react';
+import { Search, FileSpreadsheet } from 'lucide-react';
 
 export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv }) => {
   return (
-    <div className="floating-filter-bar">
-      <div style={{ position: 'relative' }}>
-        <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.8rem' }}></i>
+    <div className="floating filter-bar">
+      <div className="search-box">
+        <Search size={15} strokeWidth={2.2} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
         <input
           type="text"
-          className="filter-input-clean"
-          placeholder="Search Camera ID, Junction, District..."
+          id="mapSearch"
+          placeholder="Search camera name, ID or location…"
           value={filters.search}
           onChange={(e) => onFilterChange('search', e.target.value)}
         />
       </div>
 
       <select
-        className="filter-select-clean"
+        className="filter-select"
         value={filters.department}
         onChange={(e) => onFilterChange('department', e.target.value)}
       >
@@ -28,7 +29,7 @@ export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv }) => {
       </select>
 
       <select
-        className="filter-select-clean"
+        className="filter-select"
         value={filters.district}
         onChange={(e) => onFilterChange('district', e.target.value)}
       >
@@ -46,7 +47,7 @@ export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv }) => {
       </select>
 
       <select
-        className="filter-select-clean"
+        className="filter-select"
         value={filters.status}
         onChange={(e) => onFilterChange('status', e.target.value)}
       >
@@ -56,8 +57,8 @@ export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv }) => {
         <option value="OFFLINE">Offline</option>
       </select>
 
-      <button className="btn-clean btn-clean-outline" style={{ padding: '6px 10px', fontSize: '0.75rem' }} onClick={onExportCsv} title="Export CSV">
-        <i className="fa-solid fa-file-export"></i> CSV
+      <button className="btn btn-sm" onClick={onExportCsv} title="Export CSV Report">
+        <FileSpreadsheet size={14} strokeWidth={2} /> CSV
       </button>
     </div>
   );

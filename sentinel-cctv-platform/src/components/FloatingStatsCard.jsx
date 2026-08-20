@@ -3,23 +3,23 @@ import React from 'react';
 export const FloatingStatsCard = ({ cameras }) => {
   const totalCount = cameras.length;
   const activeCount = cameras.filter(c => c.status === 'ACTIVE').length;
+  const offlineCount = cameras.filter(c => c.status === 'OFFLINE').length;
 
   return (
-    <div className="floating-stats-card">
+    <div className="floating stats-card">
       <div className="stat-item">
-        <i className="fa-solid fa-video" style={{ color: 'var(--accent-gold)' }}></i>
-        <div>
-          <div className="stat-val" style={{ color: 'var(--accent-gold)' }}>{totalCount}</div>
-          <div className="stat-lbl">Cameras</div>
-        </div>
+        <div className="num" id="statTotal">{totalCount}</div>
+        <div className="lbl">Total</div>
       </div>
-
-      <div className="stat-item">
-        <i className="fa-solid fa-circle-check" style={{ color: '#22c55e' }}></i>
-        <div>
-          <div className="stat-val" style={{ color: '#22c55e' }}>{activeCount}</div>
-          <div className="stat-lbl">Active SLA</div>
-        </div>
+      <div className="stat-divider"></div>
+      <div className="stat-item active">
+        <div className="num" id="statActive">{activeCount}</div>
+        <div className="lbl">Active</div>
+      </div>
+      <div className="stat-divider"></div>
+      <div className="stat-item offline">
+        <div className="num" id="statOffline">{offlineCount}</div>
+        <div className="lbl">Offline</div>
       </div>
     </div>
   );
