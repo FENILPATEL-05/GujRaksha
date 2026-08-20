@@ -1,3 +1,9 @@
+/**
+ * GujRaksha (ગુજ રક્ષા) — Statewide CCTV Asset Registry & Spatial GIS Control Platform
+ * Copyright (c) 2026 Fenil Patel. All Rights Reserved.
+ * Proprietary & Confidential — Unauthorized copying or distribution is strictly prohibited.
+ */
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
