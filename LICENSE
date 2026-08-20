@@ -1,7 +1,100 @@
-Copyright (c) 2026 Fenil Patel (GujRaksha). All Rights Reserved.
+CUSTOM LICENSE - DEEPLENSE AI / GUJRAKSHA PROJECT
+===================================================
 
-PROPRIETARY AND CONFIDENTIAL CONTENT
+Version 1.0
+Effective Date: March 2026
 
-This software and its documentation are proprietary to Fenil Patel. No part of this software, source code, UI designs, system architecture, database schemas, or project assets may be used, copied, reproduced, modified, merged, published, distributed, disclosed, sublicensed, or sold in any form or by any means (commercial or non-commercial) without the prior explicit written permission of the copyright holder (Fenil Patel).
+TERMS AND CONDITIONS
 
-Unauthorized copying, redistribution, reverse engineering, or use of this codebase via any medium is strictly prohibited.
+1. OWNERSHIP
+   This software, including all source code, documentation, designs, and related assets,
+   is the exclusive intellectual property of Fenil Patel (https://github.com/FENILPATEL-05).
+
+2. PERMISSION REQUIREMENT
+   You are PROHIBITED from:
+   - Using this software for any purpose without explicit written permission from Fenil Patel
+   - Modifying, adapting, or creating derivative works
+   - Distributing, copying, or sharing the software or any part of it
+   - Using this software in commercial or non-commercial projects
+   - Reproducing the code or functionality in any form
+   - Reverse engineering or attempting to derive the underlying architecture
+
+3. PERMITTED USES
+   Only the following uses are permitted:
+   - Viewing and reading the source code for educational purposes (no copying)
+   - Using the application locally for personal evaluation
+   - Contributing to the project through authorized channels with explicit permission
+
+4. RESTRICTIONS ON DISTRIBUTION
+   This software may not be:
+   - Redistributed under the same or different license
+   - Published or made available to third parties
+   - Forked or modified without written permission
+   - Used as a basis for commercial products or services
+   - Included in other software projects or packages
+
+5. TRADEMARK & ATTRIBUTION
+   - The name "Deeplense" / "GujRaksha" and all associated branding are trademarked by Fenil Patel
+   - Any use of this software must include appropriate attribution and links to:
+     https://github.com/FENILPATEL-05/GujRaksha
+   - You must not remove or alter any copyright notices or this license
+
+6. OBTAINING PERMISSION
+   To request permission for any use not explicitly allowed, contact:
+   - Author: Fenil Patel
+   - GitHub: https://github.com/FENILPATEL-05
+   - Email: Please contact through GitHub profile
+
+   Permission requests should include:
+   - Description of intended use
+   - Scope and duration of requested use
+   - Any modifications intended
+   - Intended audience or distribution
+
+7. DISCLAIMER OF WARRANTIES
+   THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+   INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+   PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+   IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+8. LIABILITY LIMITATION
+   The author will not be held liable for:
+   - Any damage to systems or data
+   - Loss of profits or revenue
+   - Business interruption
+   - Any other indirect or consequential damages
+   - Unauthorized use or misuse of this software
+
+9. ENFORCEMENT
+   The author reserves the right to:
+   - Seek legal action against unauthorized use
+   - Demand removal of unauthorized copies
+   - Require payment of damages for infringement
+   - Take down projects using this software without permission
+
+10. MODIFICATIONS TO LICENSE
+    The author reserves the right to modify these terms at any time.
+    Users must comply with the most current version of this license.
+
+11. TERMINATION
+    This license is effective until explicitly terminated by the author.
+    Upon termination, all rights granted herein immediately cease.
+
+12. GOVERNING LAW
+    This license is governed by and construed in accordance with the laws applicable
+    in the jurisdiction where Fenil Patel resides.
+
+13. ENTIRE AGREEMENT
+    This license constitutes the entire agreement between the parties regarding
+    the use of this software and supersedes all prior agreements.
+
+---
+
+For licensing inquiries or to request permission for additional uses,
+please contact Fenil Patel through GitHub:
+https://github.com/FENILPATEL-05
+
+COPYRIGHT © 2026 FENIL PATEL. ALL RIGHTS RESERVED.

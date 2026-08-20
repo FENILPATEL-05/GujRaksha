@@ -70,9 +70,9 @@ GujRaksha/
 
 - **Owner**: Fenil Patel
 - **Project**: GujRaksha (ગુજ રક્ષા) Statewide CCTV Platform
-- **License**: Strictly Proprietary & Confidential
+- **License**: Custom License v1.0 (Strictly Proprietary & Confidential)
 
-### Legal Notice
-All rights reserved. The source code, software architecture, user interfaces, documentation, visual assets, database schemas, and algorithms contained in this repository are the exclusive intellectual property of **Fenil Patel**. 
+### Legal Notice & License Terms
+All rights reserved. The source code, software architecture, user interfaces, documentation, visual assets, database schemas, and algorithms contained in this repository are governed by the **[Custom License](LICENSE)** terms.
 
-No individual or organization may copy, clone, distribute, reverse engineer, modify, sublicense, or use any portion of this project (commercially or non-commercially) without prior explicit written authorization from the owner.
+No individual or organization may copy, clone, distribute, reverse engineer, modify, sublicense, or use any portion of this project without prior explicit written permission from **Fenil Patel**. For full legal terms, see the [LICENSE](LICENSE) file.
