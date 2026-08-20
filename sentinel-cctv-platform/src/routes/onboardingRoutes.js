@@ -1,0 +1,40 @@
+const express = require('express');
+const router = express.Router();
+const onboardingService = require('../services/onboardingService');
+const { authenticateToken } = require('../middleware/auth');
+
+router.post('/bulk-csv', authenticateToken, (req, res, next) => {
+  try {
+    const csvContent = req.body.csv || req.body.data;
+    if (!csvContent) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'EMPTY_PAYLOAD', message: 'No CSV payload provided in request body.' }
+      });
+    }
+
+    const result = onboardingService.processBulkCsv(csvContent);
+    res.json({
+      success: true,
+      message: `Bulk onboarding completed. ${result.successCount} cameras registered.`,
+      data: result
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/sync-gov-feeds', authenticateToken, async (req, res, next) => {
+  try {
+    const result = await onboardingService.syncGovernmentLiveFeeds();
+    res.json({
+      success: true,
+      message: `Successfully synchronized ${result.count} live government feeds from https://live.sentinelgujarat.in/`,
+      data: result
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+module.exports = router;

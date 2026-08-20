@@ -1,0 +1,56 @@
+const db = require('../db/pool');
+
+class CameraService {
+  getCameras(filters) {
+    const cameras = db.getAll(filters);
+    return {
+      total: cameras.length,
+      cameras: cameras
+    };
+  }
+
+  getCameraById(id) {
+    const camera = db.getById(id);
+    if (!camera) {
+      const err = new Error(`Camera asset '${id}' not found in state registry.`);
+      err.statusCode = 404;
+      err.code = 'ASSET_NOT_FOUND';
+      throw err;
+    }
+    return camera;
+  }
+
+  registerCamera(cameraData) {
+    if (!cameraData.name || cameraData.latitude === undefined || cameraData.longitude === undefined) {
+      const err = new Error('Camera Name, Latitude, and Longitude are mandatory parameters.');
+      err.statusCode = 400;
+      err.code = 'INVALID_PAYLOAD';
+      throw err;
+    }
+    return db.create(cameraData);
+  }
+
+  updateCamera(id, updateData) {
+    const updated = db.update(id, updateData);
+    if (!updated) {
+      const err = new Error(`Camera asset '${id}' not found for update.`);
+      err.statusCode = 404;
+      err.code = 'ASSET_NOT_FOUND';
+      throw err;
+    }
+    return updated;
+  }
+
+  deleteCamera(id) {
+    const deleted = db.delete(id);
+    if (!deleted) {
+      const err = new Error(`Camera asset '${id}' not found for deletion.`);
+      err.statusCode = 404;
+      err.code = 'ASSET_NOT_FOUND';
+      throw err;
+    }
+    return deleted;
+  }
+}
+
+module.exports = new CameraService();

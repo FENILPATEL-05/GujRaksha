@@ -1,0 +1,4177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-ridate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Problem Statement and Solution Flow | Gujarat Police Innovation Challenge 2026</title>
+    <link rel="icon" type="image/png" href="https://sentinel.gujarat.gov.in/public/logos/gujarat police logo.png">
+    <link href="https://sentinel.gujarat.gov.in/public/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://sentinel.gujarat.gov.in/public/css/all.min.css" rel="stylesheet">
+    <link href="https://sentinel.gujarat.gov.in/public/css/plus-jakarta-sans.css" rel="stylesheet">
+    <style>
+        :root {
+            --navy: #0a1628;
+            --blue: #0f2d5e;
+            --accent: #FF6B00;
+            --accent2: #e8a020;
+            --light: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --muted: #64748b;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            /* clip, not hidden: keeps the sticky navbar working */
+            overflow-x: clip;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #ffffff;
+            color: var(--text);
+            margin: 0;
+            max-width: 100%;
+            overflow-x: clip;
+        }
+
+        /* ── Announcement bar ── */
+        .announce-bar {
+            background: var(--navy);
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 0.75rem;
+            padding: 7px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .announce-bar a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .announce-bar .sep {
+            margin: 0 12px;
+            opacity: 0.3;
+        }
+
+        /* ── Navbar ── */
+        .site-nav {
+            background: #ffffff;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(10, 22, 40, 0.12);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            transition: box-shadow 0.3s;
+        }
+
+        .site-nav.scrolled {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            flex-shrink: 0;
+        }
+
+        .nav-brand img {
+            height: 52px;
+        }
+
+        .nav-brand-text {
+            line-height: 1.2;
+        }
+
+        .nav-brand-title {
+            color: #000000;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+        }
+
+        .nav-brand-sub {
+            color: #000000;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+        }
+
+        .nav-brand-powered {
+            font-size: 0.52rem;
+            font-weight: 500;
+            color: rgba(0, 0, 0, 0.5);
+            letter-spacing: 0.2px;
+            margin-top: 1px;
+            white-space: nowrap;
+        }
+
+        .nav-brand-powered span {
+            color: rgba(0, 0, 0, 0.75);
+            font-weight: 600;
+        }
+
+        .site-nav .nav-link {
+            color: #000000 !important;
+            font-size: 0.9rem;
+            font-weight: 500;
+            padding: 8px 14px !important;
+            transition: color 0.2s ease-in-out;
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+
+        .site-nav .nav-link:hover {
+            color: #000000 !important;
+            background: rgba(0, 0, 0, 0.06) !important;
+            border-radius: 6px;
+            box-shadow: none !important;
+            transform: none !important;
+        }
+
+        .site-nav .nav-link.active {
+            color: #000000 !important;
+            background: rgba(0, 0, 0, 0.08) !important;
+            border-radius: 6px;
+            font-weight: 800;
+            box-shadow: none !important;
+        }
+
+        /* Guest-only hover hint (Resources nav item) */
+        .site-nav .nav-hint-wrap {
+            position: relative;
+        }
+
+        .site-nav .nav-hint {
+            position: absolute;
+            top: calc(100% + 10px);
+            left: 50%;
+            transform: translateX(-50%) translateY(-6px);
+            z-index: 1080;
+            width: max-content;
+            max-width: 240px;
+            white-space: normal;
+            text-align: center;
+            background: #0a1628;
+            color: #fff;
+            font-size: 0.76rem;
+            font-weight: 600;
+            line-height: 1.35;
+            padding: 8px 12px;
+            border-radius: 6px;
+            box-shadow: 0 6px 18px rgba(10, 22, 40, 0.25);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+        }
+
+        .site-nav .nav-hint::before {
+            content: "";
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-bottom-color: #0a1628;
+        }
+
+        .site-nav .nav-hint-wrap:hover .nav-hint,
+        .site-nav .nav-hint-wrap:focus-within .nav-hint {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        @media (max-width: 1199.98px) {
+            .site-nav .nav-hint {
+                position: static;
+                display: none;
+                transform: none;
+                max-width: 100%;
+                margin: 4px 0 2px;
+            }
+
+            .site-nav .nav-hint::before {
+                display: none;
+            }
+
+            .site-nav .nav-hint-wrap:hover .nav-hint,
+            .site-nav .nav-hint-wrap:focus-within .nav-hint {
+                display: block;
+                transform: none;
+            }
+        }
+
+        .collapse.navbar-collapse.ms-4 {
+            margin-left: 6px !important;
+        }
+
+        .navbar-nav.me-auto {
+            gap: 10px !important;
+        }
+
+        .navbar-nav.align-items-center {
+            gap: 8px !important;
+        }
+
+        .site-nav .navbar-toggler-icon {
+            filter: none;
+        }
+
+        .btn-nav-cta {
+            background: transparent;
+            color: #000000 !important;
+            border: 1.5px solid rgba(0, 0, 0, 0.25);
+            border-radius: 6px;
+            padding: 7px 14px !important;
+            font-weight: 700;
+            font-size: 0.86rem;
+            transition: all 0.2s;
+        }
+
+        .btn-nav-cta:hover {
+            background: rgba(0, 0, 0, 0.06);
+            border-color: rgba(0, 0, 0, 0.5);
+            color: #000000 !important;
+            transform: translateY(-1px);
+        }
+
+        /* beats `.site-nav .nav-link { background: transparent !important }` */
+        .site-nav .nav-link.btn-nav-register {
+            background: #FF6A00 !important;
+            border-color: #FF6A00 !important;
+            color: #000000 !important;
+        }
+
+        .site-nav .nav-link.btn-nav-register:hover {
+            background: #e05a00 !important;
+            border-color: #e05a00 !important;
+            color: #000000 !important;
+        }
+
+        /* Apply Now — primary action for signed-in participants */
+        .site-nav .nav-link.btn-nav-apply {
+            background: #FF6A00 !important;
+            border-color: #FF6A00 !important;
+            color: #000000 !important;
+            box-shadow: 0 4px 12px rgba(255, 106, 0, 0.35);
+        }
+
+        .site-nav .nav-link.btn-nav-apply:hover {
+            background: #e05a00 !important;
+            border-color: #e05a00 !important;
+            color: #000000 !important;
+            box-shadow: 0 6px 16px rgba(255, 106, 0, 0.45);
+        }
+
+        /* Submission — filled orange so it reads apart from the outlined Admin Panel button */
+        .site-nav .nav-link.btn-nav-submission {
+            background: #FF6A00 !important;
+            border-color: #FF6A00 !important;
+            color: #000000 !important;
+            box-shadow: 0 4px 12px rgba(255, 106, 0, 0.35);
+        }
+
+        .site-nav .nav-link.btn-nav-submission:hover {
+            background: #e05a00 !important;
+            border-color: #e05a00 !important;
+            color: #000000 !important;
+            box-shadow: 0 6px 16px rgba(255, 106, 0, 0.45);
+        }
+
+        .site-nav .dropdown-menu {
+            background: #0f2d5e;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            padding: 6px;
+            min-width: 200px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+        }
+
+        .site-nav .dropdown-item {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.84rem;
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+
+        .site-nav .dropdown-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+        }
+
+        .site-nav .dropdown-divider {
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* ── Breadcrumb ── */
+        .page-breadcrumb {
+            background: #fff;
+            border-bottom: 1px solid var(--border);
+            padding: 9px 0;
+            font-size: 0.8rem;
+        }
+
+        .page-breadcrumb .breadcrumb {
+            margin: 0;
+        }
+
+        .page-breadcrumb .breadcrumb-item a {
+            color: var(--blue);
+            text-decoration: none;
+        }
+
+        .page-breadcrumb .breadcrumb-item.active {
+            color: var(--muted);
+        }
+
+        .page-breadcrumb .breadcrumb-item+.breadcrumb-item::before {
+            color: var(--muted);
+        }
+
+        /* ── Main ── */
+        .main-content {
+            min-height: calc(100vh - 280px);
+            padding: 0;
+        }
+
+        /* ── Cards ── */
+        .gp-card {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.04);
+        }
+
+        .gp-card .card-header-gp {
+            background: linear-gradient(90deg, var(--navy), var(--blue));
+            color: #fff;
+            padding: 13px 20px;
+            border-radius: 12px 12px 0 0;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border-left: 4px solid var(--accent);
+        }
+
+        /* ── Buttons ── */
+        .btn-gp-primary {
+            background: var(--blue);
+            color: #fff;
+            border: none;
+            font-weight: 600;
+            border-radius: 8px;
+            letter-spacing: 0.2px;
+            transition: all 0.2s;
+        }
+
+        .btn-gp-primary:hover {
+            background: var(--navy);
+            color: #fff;
+            transform: translateY(-1px);
+        }
+
+        .btn-gp-saffron {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-gp-saffron:hover {
+            background: #e05a00;
+            color: #fff;
+            transform: translateY(-1px);
+        }
+
+        /* ── Footer ── */
+        .site-footer {
+            background: var(--navy);
+            color: rgba(255, 255, 255, 0.55);
+            padding: 56px 0 0;
+            margin-top: 0;
+        }
+
+        .footer-logo-wrap {
+            margin-bottom: 20px;
+        }
+
+        .footer-logo-wrap img {
+            height: 48px;
+        }
+
+        .site-footer h6 {
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 700;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-bottom: 16px;
+        }
+
+        .site-footer p {
+            font-size: 0.84rem;
+            line-height: 1.8;
+        }
+
+        .site-footer a {
+            color: rgba(255, 255, 255, 0.55);
+            text-decoration: none;
+            font-size: 0.84rem;
+            transition: color 0.2s;
+        }
+
+        .site-footer a:hover {
+            color: var(--accent);
+        }
+
+        .site-footer ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .site-footer ul li {
+            margin-bottom: 9px;
+            font-size: 0.84rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .site-footer ul li i {
+            color: var(--accent);
+            margin-top: 3px;
+            flex-shrink: 0;
+            font-size: 0.78rem;
+        }
+
+        .footer-divider {
+            border-color: rgba(255, 255, 255, 0.07);
+            margin: 14px 0 0;
+        }
+
+        .footer-bottom {
+            padding: 8px 0 16px;
+            font-size: 0.76rem;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .footer-bottom a {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .footer-bottom a:hover {
+            color: var(--accent);
+        }
+
+        .footer-social a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.07);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.8rem;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .footer-social a:hover {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        /* ── Alerts ── */
+        .alert {
+            border-radius: 10px;
+            font-size: 0.87rem;
+            border: none;
+        }
+
+        .alert-success {
+            background: #f0fdf4;
+            color: #166534;
+            border-left: 4px solid #22c55e;
+        }
+
+        .alert-danger {
+            background: #fef2f2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+
+        .alert-info {
+            background: #eff6ff;
+            color: #1e40af;
+            border-left: 4px solid #3b82f6;
+        }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--blue);
+        }
+
+        /* ── Accessibility toolbar ── */
+        #acc-toggle {
+            position: fixed;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 1100;
+            background: var(--blue);
+            color: #fff;
+            border: none;
+            border-radius: 0 8px 8px 0;
+            width: 36px;
+            height: 80px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
+            transition: width 0.2s;
+        }
+
+        #acc-toggle:hover {
+            width: 42px;
+            background: var(--navy);
+        }
+
+        #acc-toggle span {
+            writing-mode: vertical-rl;
+            font-size: 0.6rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        #acc-panel {
+            position: fixed;
+            left: -220px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 1099;
+            width: 220px;
+            background: #fff;
+            border-radius: 0 12px 12px 0;
+            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
+            padding: 20px 16px;
+            transition: left 0.3s ease;
+            border: 1px solid var(--border);
+            border-left: none;
+        }
+
+        #acc-panel.open {
+            left: 36px;
+        }
+
+        .acc-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--accent);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .acc-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            background: var(--light);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 9px 12px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--navy);
+            cursor: pointer;
+            margin-bottom: 8px;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .acc-btn:hover {
+            background: #fff;
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .acc-btn.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+
+        .acc-btn i {
+            width: 16px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .acc-font-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .acc-font-row .acc-btn {
+            flex: 1;
+            justify-content: center;
+            margin-bottom: 0;
+        }
+
+        /* High Contrast mode */
+        body.acc-contrast #hc-wrap {
+            filter: invert(1) hue-rotate(180deg);
+            background: #000 !important;
+            min-height: 100vh;
+        }
+
+        body.acc-contrast #hc-wrap .announce-bar,
+        body.acc-contrast #hc-wrap .site-nav,
+        body.acc-contrast #hc-wrap .container,
+        body.acc-contrast #hc-wrap .card,
+        body.acc-contrast #hc-wrap footer {
+            filter: invert(1) hue-rotate(180deg);
+        }
+
+        body.acc-contrast #hc-wrap img,
+        body.acc-contrast #hc-wrap video,
+        body.acc-contrast #hc-wrap iframe {
+            filter: invert(1) hue-rotate(180deg);
+        }
+
+        /* Dyslexia font */
+        body.acc-dyslexia,
+        body.acc-dyslexia * {
+            font-family: 'OpenDyslexic', 'Comic Sans MS', 'Arial', sans-serif !important;
+            letter-spacing: 0.05em;
+            word-spacing: 0.1em;
+            line-height: 1.9 !important;
+        }
+
+        /* TTS highlight */
+        .tts-speaking {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* ════════════════════════════════════════════════════════════
+           🌊 SMOOTH SLIDER & TABLE SCROLLING (MOBILE & DESKTOP)
+           ════════════════════════════════════════════════════════════ */
+        html {
+            scroll-behavior: smooth !important;
+        }
+
+        .gov-table-container,
+        .pdf-table-wrap,
+        .table-responsive,
+        .hiw-steps {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            scroll-behavior: smooth !important;
+            overscroll-behavior-x: contain;
+            touch-action: pan-x pan-y;
+        }
+
+        /* Sleek modern scrollbars */
+        .gov-table-container::-webkit-scrollbar,
+        .pdf-table-wrap::-webkit-scrollbar,
+        .table-responsive::-webkit-scrollbar,
+        .hiw-steps::-webkit-scrollbar {
+            height: 7px;
+            width: 7px;
+        }
+
+        .gov-table-container::-webkit-scrollbar-track,
+        .pdf-table-wrap::-webkit-scrollbar-track,
+        .table-responsive::-webkit-scrollbar-track,
+        .hiw-steps::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+
+        .gov-table-container::-webkit-scrollbar-thumb,
+        .pdf-table-wrap::-webkit-scrollbar-thumb,
+        .table-responsive::-webkit-scrollbar-thumb,
+        .hiw-steps::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+            transition: background 0.2s ease;
+        }
+
+        .gov-table-container::-webkit-scrollbar-thumb:hover,
+        .pdf-table-wrap::-webkit-scrollbar-thumb:hover,
+        .table-responsive::-webkit-scrollbar-thumb:hover,
+        .hiw-steps::-webkit-scrollbar-thumb:hover {
+            background: var(--accent, #ff6b00);
+        }
+
+        .gov-table,
+        .pdf-table {
+            min-width: 520px;
+        }
+    </style>
+        <style>
+        /* ── CSS Variables scoped to psf-wrap ── */
+        .psf-wrap {
+            --navy: #0b2d4f;
+            --blue: #155d9a;
+            --light: #f4f8fc;
+            --border: #d8e3ee;
+            --text: #1e293b;
+            --muted: #64748b;
+            --accent: #f59e0b;
+            --green: #0f766e;
+            --white: #ffffff;
+            --shadow: 0 12px 30px rgba(11, 45, 79, .10);
+            font-family: Inter, "Segoe UI", Arial, sans-serif;
+            color: var(--text);
+            line-height: 1.65;
+        }
+
+        /* ── Section header ── */
+        .psf-wrap .section-label {
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--accent);
+            margin-bottom: 6px;
+        }
+
+        .psf-wrap .section-heading {
+            font-size: clamp(1.5rem, 3vw, 2.2rem);
+            font-weight: 800;
+            color: var(--navy);
+            margin: 0 0 8px;
+        }
+
+        .psf-wrap .section-sub {
+            font-size: 0.95rem;
+            color: var(--muted);
+            max-width: 680px;
+            line-height: 1.6;
+        }
+
+        /* ── Journey header nav ── */
+        .psf-wrap .journey-header-nav {
+            margin: 0 0 14px;
+            padding: 15px 16px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #07345f 0%, #0b5c8f 55%, #0c7b86 100%);
+            box-shadow: 0 14px 30px rgba(7, 52, 95, .18);
+            overflow: hidden;
+        }
+
+        .psf-wrap .step-navigation {
+            display: grid !important;
+            grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+            gap: 8px !important;
+            width: 100% !important;
+            overflow: hidden !important;
+            padding: 0 !important;
+            margin: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+            scrollbar-color: rgba(255, 255, 255, .35) transparent;
+        }
+
+        .psf-wrap .step-navigation-label {
+            grid-column: 1 / -1 !important;
+            margin: 0 0 8px;
+            color: #ffffff;
+            font-size: .82rem;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            opacity: .9;
+        }
+
+        .psf-wrap .step-nav-button {
+            position: relative !important;
+            min-width: 0 !important;
+            width: 100% !important;
+            min-height: 66px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            justify-content: center !important;
+            gap: 4px !important;
+            padding: 9px 8px !important;
+            border: 1px solid rgba(255, 255, 255, .28) !important;
+            border-radius: 12px !important;
+            background: rgba(255, 255, 255, .10) !important;
+            color: #ffffff !important;
+            text-align: left !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .15) !important;
+            backdrop-filter: blur(8px);
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform .2s ease, background .2s ease, border-color .2s ease, box-shadow .2s ease !important;
+        }
+
+        .psf-wrap .step-nav-button::before {
+            content: "" !important;
+            position: absolute !important;
+            inset: 0 !important;
+            background: linear-gradient(105deg, transparent 0 38%, rgba(255, 255, 255, .32) 48%, transparent 58% 100%) !important;
+            transform: translateX(-130%) !important;
+            animation: stepShimmer 4.2s ease-in-out infinite !important;
+            animation-delay: calc(var(--step-index, 0) * .35s) !important;
+            pointer-events: none !important;
+        }
+
+        .psf-wrap .step-nav-button::after {
+            content: "" !important;
+            position: absolute !important;
+            right: 8px !important;
+            top: 8px !important;
+            width: 7px !important;
+            height: 7px !important;
+            border-radius: 50% !important;
+            background: #ffffff !important;
+            box-shadow: 0 0 0 0 rgba(255, 255, 255, .48) !important;
+            animation: stepPulse 2.2s ease-out infinite !important;
+            animation-delay: calc(var(--step-index, 0) * .22s) !important;
+        }
+
+        .psf-wrap .step-nav-button:nth-of-type(1) {
+            --step-index: 0;
+        }
+
+        .psf-wrap .step-nav-button:nth-of-type(2) {
+            --step-index: 1;
+        }
+
+        .psf-wrap .step-nav-button:nth-of-type(3) {
+            --step-index: 2;
+        }
+
+        .psf-wrap .step-nav-button:nth-of-type(4) {
+            --step-index: 3;
+        }
+
+        .psf-wrap .step-nav-button:nth-of-type(5) {
+            --step-index: 4;
+        }
+
+        .psf-wrap .step-nav-button:nth-of-type(6) {
+            --step-index: 5;
+        }
+
+        .psf-wrap .step-nav-button:nth-of-type(7) {
+            --step-index: 6;
+        }
+
+        .psf-wrap .step-nav-button:hover {
+            transform: translateY(-3px) !important;
+            background: rgba(255, 255, 255, .20) !important;
+            border-color: rgba(255, 255, 255, .62) !important;
+            box-shadow: 0 10px 22px rgba(0, 0, 0, .16), inset 0 1px 0 rgba(255, 255, 255, .2) !important;
+        }
+
+        .psf-wrap .step-nav-button.active {
+            transform: translateY(-3px) !important;
+            background: #ffffff !important;
+            color: #0b4776 !important;
+            border-color: rgba(255, 255, 255, .62) !important;
+            box-shadow: 0 10px 22px rgba(0, 0, 0, .16) !important;
+        }
+
+        .psf-wrap .step-nav-button.active::after {
+            background: #ef3f5f !important;
+            box-shadow: 0 0 0 0 rgba(239, 63, 95, .42) !important;
+        }
+
+        .psf-wrap .step-nav-number {
+            position: relative;
+            z-index: 2;
+            display: block;
+            font-size: .62rem !important;
+            font-weight: 900;
+            letter-spacing: .045em !important;
+            text-transform: uppercase;
+            opacity: .82;
+            line-height: 1;
+        }
+
+        .psf-wrap .step-nav-name {
+            position: relative;
+            z-index: 2;
+            display: block;
+            font-size: clamp(.64rem, .72vw, .78rem) !important;
+            font-weight: 800;
+            line-height: 1.16 !important;
+            overflow-wrap: anywhere !important;
+        }
+
+        @keyframes stepShimmer {
+
+            0%,
+            62% {
+                transform: translateX(-130%);
+                opacity: 0;
+            }
+
+            70% {
+                opacity: 1;
+            }
+
+            88%,
+            100% {
+                transform: translateX(130%);
+                opacity: 0;
+            }
+        }
+
+        @keyframes stepPulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(255, 255, 255, .5);
+            }
+
+            65%,
+            100% {
+                box-shadow: 0 0 0 9px rgba(255, 255, 255, 0);
+            }
+        }
+
+        /* ── Journey wrapper ── */
+        .psf-wrap .journey-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        /* ── Journey steps ── */
+        .psf-wrap .journey-step {
+            --step-color: var(--navy);
+            --soft-step: color-mix(in srgb, var(--step-color) 9%, white);
+            position: relative;
+            margin: 24px 0;
+            padding-left: 34px;
+            border: 0;
+            box-shadow: none;
+            background: transparent;
+            overflow: visible;
+        }
+
+        .psf-wrap .journey-step::before {
+            content: "";
+            position: absolute;
+            left: 4px;
+            top: 34px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #fff;
+            border: 4px solid var(--step-color);
+            box-shadow: 0 0 0 6px color-mix(in srgb, var(--step-color) 11%, transparent), 0 5px 12px rgba(15, 23, 42, .12);
+            z-index: 3;
+        }
+
+        .psf-wrap .journey-step:not(:last-of-type)::after {
+            content: "";
+            position: absolute;
+            left: 11px;
+            top: 55px;
+            bottom: -30px;
+            width: 2px;
+            height: auto;
+            background: linear-gradient(var(--step-color), color-mix(in srgb, var(--step-color) 15%, #d9e4ed));
+            z-index: 0;
+        }
+
+        /* Step colors */
+        .psf-wrap .journey-step[data-step="A"] {
+            --step-color: #1769aa;
+        }
+
+        .psf-wrap .journey-step[data-step="B"] {
+            --step-color: #6d28b7;
+        }
+
+        .psf-wrap .journey-step[data-step="C"] {
+            --step-color: #0e8b8f;
+        }
+
+        .psf-wrap .journey-step[data-step="D"] {
+            --step-color: #d97706;
+        }
+
+        .psf-wrap .journey-step[data-step="E"] {
+            --step-color: #cf3a8b;
+        }
+
+        .psf-wrap .journey-step[data-step="F"] {
+            --step-color: #218a50;
+        }
+
+        .psf-wrap .journey-step[data-step="G"] {
+            --step-color: #283b9b;
+        }
+
+        /* Summary */
+        .psf-wrap .journey-step>summary {
+            position: relative;
+            overflow: hidden;
+            list-style: none;
+            display: grid;
+            grid-template-columns: 108px minmax(260px, 1fr) minmax(280px, .95fr) minmax(138px, auto) !important;
+            gap: 20px;
+            min-height: 126px;
+            padding: 20px 22px 20px 20px;
+            border: 1px solid color-mix(in srgb, var(--step-color) 20%, #d5e1ec);
+            border-left: 0;
+            border-radius: 22px;
+            background:
+                linear-gradient(90deg, var(--step-color) 0 8px, transparent 8px),
+                linear-gradient(112deg, #ffffff 0%, #ffffff 66%, var(--soft-step) 100%);
+            box-shadow: 0 15px 40px rgba(16, 43, 70, .10), 0 2px 7px rgba(16, 43, 70, .05);
+            cursor: pointer;
+            user-select: none;
+            transition: none !important;
+            transform: none !important;
+        }
+
+        .psf-wrap .journey-step>summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .psf-wrap .journey-step>summary::marker {
+            display: none;
+        }
+
+        .psf-wrap .journey-step>summary::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: linear-gradient(120deg, rgba(255, 255, 255, .75), transparent 38%);
+            pointer-events: none;
+        }
+
+        .psf-wrap .journey-step>summary::after {
+            content: "";
+            position: absolute;
+            right: -65px;
+            top: -82px;
+            width: 230px;
+            height: 230px;
+            border-radius: 50%;
+            background: radial-gradient(circle, color-mix(in srgb, var(--step-color) 13%, transparent) 0 42%, transparent 43%);
+            pointer-events: none;
+        }
+
+        .psf-wrap .journey-step[open]>summary {
+            border-radius: 22px 22px 0 0;
+            border-bottom-color: transparent;
+            background:
+                linear-gradient(90deg, var(--step-color) 0 8px, transparent 8px),
+                linear-gradient(112deg, #fff 0%, color-mix(in srgb, var(--step-color) 7%, white) 100%);
+            box-shadow: 0 22px 48px color-mix(in srgb, var(--step-color) 18%, transparent);
+        }
+
+        .psf-wrap .journey-step>summary:focus-visible {
+            outline: 3px solid color-mix(in srgb, var(--step-color) 35%, transparent);
+            outline-offset: 4px;
+        }
+
+        /* Step badge */
+        .psf-wrap .step-badge {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            place-items: center;
+            min-height: 78px;
+            border-radius: 18px;
+            font-size: .98rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: .055em;
+            color: #fff;
+            text-align: center;
+            line-height: 1.15;
+            background:
+                linear-gradient(145deg, rgba(255, 255, 255, .20), transparent 45%),
+                linear-gradient(145deg, color-mix(in srgb, var(--step-color) 75%, white), var(--step-color));
+            border: 1px solid rgba(255, 255, 255, .35);
+            box-shadow: 0 13px 28px color-mix(in srgb, var(--step-color) 25%, transparent),
+                inset 0 1px rgba(255, 255, 255, .45), inset 0 -9px 16px rgba(0, 0, 0, .13);
+            transition: transform .2s ease;
+        }
+
+        .psf-wrap .step-badge::before {
+            content: "";
+            display: block;
+            width: 34px;
+            height: 3px;
+            margin-bottom: 7px;
+            border-radius: 99px;
+            background: rgba(255, 255, 255, .72);
+            box-shadow: 0 7px 0 rgba(255, 255, 255, .32);
+        }
+
+        .psf-wrap .journey-step>summary:hover .step-badge {
+            transform: scale(1.035);
+        }
+
+        /* Step title */
+        .psf-wrap .summary-text.step-title {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .psf-wrap .summary-text.step-title strong {
+            display: block;
+            font-size: 1.18rem;
+            font-weight: 900;
+            line-height: 1.25;
+            color: #0b2d4f;
+            letter-spacing: .035em;
+            text-transform: uppercase;
+        }
+
+        .psf-wrap .summary-text.step-title small {
+            display: inline-block;
+            width: max-content;
+            margin-top: 9px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            color: var(--step-color);
+            background: color-mix(in srgb, var(--step-color) 9%, white);
+            font-weight: 800;
+            font-size: .78rem;
+            border: 1px solid color-mix(in srgb, var(--step-color) 18%, white);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .75);
+        }
+
+        .psf-wrap .summary-description {
+            display: block;
+            margin-top: 9px;
+            max-width: 520px;
+            color: #52657a;
+            font-size: .9rem;
+            line-height: 1.4;
+        }
+
+        /* Summary highlights */
+        .psf-wrap .journey-step .summary-highlights {
+            position: relative;
+            z-index: 1;
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 10px 14px !important;
+            align-self: center;
+            list-style: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            columns: 1 !important;
+        }
+
+        .psf-wrap .journey-step .summary-highlights li {
+            position: relative !important;
+            min-height: 42px !important;
+            display: flex !important;
+            align-items: center !important;
+            padding: 9px 12px 9px 34px !important;
+            margin: 0 !important;
+            border: 1px solid color-mix(in srgb, var(--step-color) 20%, #d8e3ee) !important;
+            border-radius: 10px !important;
+            background: color-mix(in srgb, var(--step-color) 5%, white) !important;
+            box-shadow: none !important;
+            color: #334155 !important;
+            font-size: .96rem !important;
+            line-height: 1.4 !important;
+            transition: none !important;
+            transform: none !important;
+            cursor: default;
+            user-select: text;
+            pointer-events: none;
+            break-inside: avoid;
+        }
+
+        .psf-wrap .journey-step .summary-highlights li::before {
+            content: "" !important;
+            position: absolute !important;
+            left: 14px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            width: 10px !important;
+            height: 10px !important;
+            border-radius: 50% !important;
+            background: var(--step-color) !important;
+            box-shadow: 0 0 0 5px color-mix(in srgb, var(--step-color) 13%, transparent) !important;
+        }
+
+        .psf-wrap .journey-step .summary-highlights li:hover {
+            transform: none !important;
+            background: color-mix(in srgb, var(--step-color) 5%, white) !important;
+            border-color: color-mix(in srgb, var(--step-color) 20%, #d8e3ee) !important;
+            box-shadow: none !important;
+        }
+
+        /* Chevron as "Click for more details" button */
+        .psf-wrap .details-prompt {
+            display: none !important;
+        }
+
+        .psf-wrap .journey-step>summary .chevron {
+            position: relative;
+            z-index: 2;
+            width: auto !important;
+            min-width: 138px !important;
+            max-width: 170px !important;
+            height: auto !important;
+            min-height: 40px !important;
+            padding: 7px 12px !important;
+            border-radius: 12px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: rgba(255, 255, 255, .88) !important;
+            border: 1px solid color-mix(in srgb, var(--step-color) 24%, #d6e2ec) !important;
+            color: transparent !important;
+            font-size: 0 !important;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, .10) !important;
+            transform: none !important;
+            transition: none !important;
+            white-space: nowrap !important;
+            justify-self: end !important;
+            line-height: 1.15 !important;
+        }
+
+        .psf-wrap .journey-step>summary .chevron::before {
+            content: "Click for more details";
+            color: var(--step-color);
+            font-size: .73rem !important;
+            font-weight: 800;
+            line-height: 1.2 !important;
+            text-align: center !important;
+            white-space: normal !important;
+        }
+
+        .psf-wrap .journey-step[open]>summary .chevron {
+            background: color-mix(in srgb, var(--step-color) 8%, white) !important;
+            color: transparent !important;
+            transform: none !important;
+        }
+
+        .psf-wrap .journey-step[open]>summary .chevron::before {
+            content: "Hide details";
+            color: var(--step-color);
+        }
+
+        /* Journey body */
+        .psf-wrap .journey-body {
+            background: linear-gradient(180deg, #fff, #fbfdff);
+            border: 1px solid color-mix(in srgb, var(--step-color) 20%, #d8e3ee);
+            border-top: 0;
+            border-radius: 0 0 20px 20px;
+            padding: 22px;
+            margin: 0 10px;
+            box-shadow: 0 20px 42px rgba(16, 43, 70, .10);
+            animation: revealPanel .28s ease both;
+        }
+
+        @keyframes revealPanel {
+            from {
+                opacity: 0;
+                transform: translateY(-7px);
+            }
+
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        /* Panels */
+        .psf-wrap .panel {
+            background: white;
+            border: 1px solid #dfe9f2;
+            border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, .045);
+            padding: 24px;
+            transition: none !important;
+            transform: none !important;
+        }
+
+        .psf-wrap .panel h2,
+        .psf-wrap .panel h3 {
+            color: var(--navy);
+            margin-top: 0;
+        }
+
+        .psf-wrap .panel p,
+        .psf-wrap .panel li {
+            font-size: 0.86rem;
+            color: var(--text);
+            line-height: 1.7;
+        }
+
+        /* Notice */
+        .psf-wrap .journey-notice {
+            border-left: 5px solid var(--step-color, var(--accent));
+            background: linear-gradient(90deg, color-mix(in srgb, var(--step-color, var(--accent)) 9%, white), #fff);
+            padding: 16px 18px;
+            border-radius: 10px;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, .04);
+            font-size: 0.86rem;
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        /* Intro grid */
+        .psf-wrap .intro-grid {
+            display: grid;
+            grid-template-columns: 1.25fr .75fr;
+            gap: 22px;
+            margin-bottom: 26px;
+        }
+
+        /* Single dropdown body */
+        .psf-wrap .single-dropdown-body {
+            margin-top: 16px;
+        }
+
+        /* Participant grid */
+        .psf-wrap .participant-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 10px;
+        }
+
+        .psf-wrap .participant-grid>div {
+            background: linear-gradient(145deg, #f8fbfe, #f2f7fb);
+            border: 1px solid #e3edf6;
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .psf-wrap .participant-grid h4 {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--navy);
+            margin: 6px 0 6px;
+        }
+
+        .psf-wrap .participant-grid p {
+            font-size: 0.82rem;
+            color: var(--muted);
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        /* Tag */
+        .psf-wrap .j-tag {
+            display: inline-block;
+            background: color-mix(in srgb, var(--step-color, var(--green)) 10%, white);
+            color: var(--step-color, var(--green));
+            border: 1px solid color-mix(in srgb, var(--step-color, var(--green)) 20%, white);
+            padding: 4px 9px;
+            border-radius: 999px;
+            font-size: .8rem;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+
+        /* Architecture principles panel */
+        .psf-wrap .architecture-principles-panel {
+            margin-bottom: 16px;
+            border-left: 5px solid #0e8b8f;
+            background: linear-gradient(135deg, #f2fbfb, #ffffff);
+        }
+
+        .psf-wrap .architecture-principles-panel h3 {
+            margin: 0 0 8px;
+            color: #0e6f73;
+        }
+
+        .psf-wrap .architecture-principles-panel p {
+            margin: 0;
+            color: #334155;
+            line-height: 1.65;
+        }
+
+        /* Details body */
+        .psf-wrap .details-body {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            padding: 16px 0 0;
+        }
+
+        .psf-wrap .details-body section {
+            background: linear-gradient(145deg, #f8fbfe, #f2f7fb);
+            border: 1px solid #e3edf6;
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .psf-wrap .details-body section:first-child {
+            grid-column: 1 / -1;
+        }
+
+        /* when a body holds exactly two sections the second would sit half-width
+                       with dead space beside it — span it instead */
+        .psf-wrap .details-body section:first-child:nth-last-child(2)~section {
+            grid-column: 1 / -1;
+        }
+
+        .psf-wrap .details-body h4 {
+            margin: 0 0 8px;
+            color: var(--blue);
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        .psf-wrap .details-body p,
+        .psf-wrap .details-body li {
+            font-size: 0.85rem;
+            color: var(--text);
+            line-height: 1.7;
+        }
+
+        /* Model introduction */
+        .psf-wrap .model-introduction {
+            grid-column: 1 / -1;
+            background: linear-gradient(145deg, #f8fbfe, #f2f7fb) !important;
+            border: 1px solid #dfe9f2 !important;
+            border-radius: 12px !important;
+            padding: 16px !important;
+        }
+
+        .psf-wrap .model-introduction h4 {
+            color: var(--blue);
+        }
+
+        .psf-wrap .model-introduction p {
+            margin: 0 0 10px;
+        }
+
+        .psf-wrap .model-introduction p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Diagram */
+        .psf-wrap .illustrative-diagram {
+            grid-column: 1 / -1;
+            background: linear-gradient(145deg, #f8fbff, #eef6fc) !important;
+            border: 1px solid #d7e7f3 !important;
+            overflow: hidden;
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .psf-wrap .illustrative-diagram h4 {
+            margin-bottom: 16px;
+        }
+
+        .psf-wrap .diagram-flow {
+            display: grid;
+            grid-template-columns: minmax(130px, 1fr) auto minmax(130px, 1fr) auto minmax(130px, 1fr) auto minmax(130px, 1fr) auto minmax(130px, 1fr);
+            align-items: stretch;
+            gap: 8px;
+        }
+
+        .psf-wrap .diagram-node {
+            min-height: 112px;
+            padding: 15px 12px;
+            border-radius: 14px;
+            border: 1px solid #cfe1ef;
+            background: linear-gradient(145deg, #ffffff, #f2f8fc);
+            box-shadow: 0 8px 20px rgba(11, 45, 79, .07);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .psf-wrap .diagram-node strong {
+            display: block;
+            color: #0b4776;
+            font-size: .9rem;
+            line-height: 1.3;
+        }
+
+        .psf-wrap .diagram-node span {
+            display: block;
+            margin-top: 7px;
+            color: #61758a;
+            font-size: .72rem;
+            line-height: 1.35;
+        }
+
+        .psf-wrap .diagram-arrow {
+            align-self: center;
+            color: #1769aa;
+            font-size: 1.55rem;
+            font-weight: 900;
+        }
+
+        /* CTA block */
+        .psf-wrap .cta-block {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            background: linear-gradient(135deg, rgba(11, 45, 79, .03) 0%, rgba(245, 158, 11, .06) 100%) !important;
+            border: 1px solid var(--border) !important;
+            border-radius: 14px;
+            padding: 18px 20px;
+        }
+
+        .psf-wrap .cta-copy {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .psf-wrap .cta-label {
+            display: inline-flex;
+            align-items: center;
+            width: fit-content;
+            background: rgba(245, 158, 11, .12);
+            color: var(--accent);
+            font-size: .72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            padding: 4px 8px;
+            border-radius: 999px;
+        }
+
+        .psf-wrap .cta-copy h4 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--navy);
+        }
+
+        .psf-wrap .cta-copy p {
+            margin: 0;
+            font-size: .88rem;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .psf-wrap .btn-apply {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--accent), #ff8a3d);
+            color: #fff;
+            border: none;
+            border-radius: 999px;
+            padding: 10px 20px;
+            font-size: .95rem;
+            font-weight: 700;
+            box-shadow: 0 10px 20px rgba(245, 158, 11, .2);
+            transition: transform .2s ease, box-shadow .2s ease;
+            text-decoration: none;
+        }
+
+        .psf-wrap .btn-apply:hover,
+        .psf-wrap .btn-apply:focus {
+            color: #fff;
+            transform: translateY(-1px);
+            box-shadow: 0 12px 24px rgba(245, 158, 11, .25);
+            text-decoration: none;
+        }
+
+        /* Model cards */
+        .psf-wrap .model-card {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--blue);
+            border-radius: 14px;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }
+
+        .psf-wrap .model-card>summary {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 18px;
+            cursor: pointer;
+            list-style: none;
+            background: linear-gradient(90deg, #fff, #f4f9fd);
+            user-select: none;
+        }
+
+        .psf-wrap .model-card>summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .psf-wrap .model-card[open]>summary {
+            background: #f5f9fd;
+        }
+
+        .psf-wrap .model-badge {
+            background: var(--navy);
+            color: #fff;
+            font-size: .68rem;
+            font-weight: 800;
+            padding: 5px 9px;
+            border-radius: 8px;
+            white-space: nowrap;
+            box-shadow: 0 7px 16px rgba(11, 45, 79, .18);
+        }
+
+        .psf-wrap .model-card .summary-text {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .psf-wrap .model-card .summary-text strong {
+            color: var(--navy);
+            font-size: 1.02rem;
+        }
+
+        .psf-wrap .model-card .summary-text small {
+            color: var(--muted);
+            font-size: .82rem;
+        }
+
+        .psf-wrap .model-card .chevron {
+            font-size: 1.3rem;
+            color: var(--blue);
+            width: 28px;
+            height: 28px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: #f0f6fc;
+            border: 1px solid #d8e3ee;
+            transition: transform .2s ease;
+        }
+
+        .psf-wrap .model-card[open] .chevron {
+            transform: rotate(180deg);
+        }
+
+        /* Step 2 model option cards */
+        .psf-wrap .journey-step[data-step="B"] .model-summary-list {
+            display: grid !important;
+            grid-template-columns: 1fr !important;
+            gap: 10px !important;
+            width: 100% !important;
+            list-style: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        .psf-wrap .journey-step[data-step="B"] .model-summary-list .model-option-card {
+            position: relative !important;
+            display: grid !important;
+            grid-template-columns: 1fr 28px !important;
+            grid-template-areas: "badge arrow" "title arrow" !important;
+            align-items: center !important;
+            min-height: 58px !important;
+            margin: 0 !important;
+            padding: 10px 44px 10px 34px !important;
+            border: 1px solid rgba(109, 40, 183, .22) !important;
+            border-radius: 13px !important;
+            background: linear-gradient(135deg, #ffffff, #f8f3ff) !important;
+            box-shadow: 0 5px 14px rgba(79, 42, 125, .07) !important;
+            color: #3f2d66 !important;
+            cursor: pointer !important;
+            pointer-events: auto !important;
+            transition: none !important;
+        }
+
+        .psf-wrap .journey-step[data-step="B"] .model-summary-list .model-option-card::before {
+            content: "" !important;
+            position: absolute !important;
+            left: 14px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            width: 10px !important;
+            height: 10px !important;
+            border-radius: 50% !important;
+            background: #7c2bc4 !important;
+            box-shadow: 0 0 0 5px rgba(124, 43, 196, .13) !important;
+        }
+
+        .psf-wrap .journey-step[data-step="B"] .model-summary-list .model-option-card::after {
+            content: "›" !important;
+            position: absolute !important;
+            right: 14px !important;
+            top: 50% !important;
+            transform: translateY(-53%) !important;
+            color: #6d28b7 !important;
+            font-size: 2rem !important;
+            font-weight: 900 !important;
+            line-height: 1 !important;
+        }
+
+        .psf-wrap .model-option-title {
+            grid-area: title;
+            display: block;
+            font-weight: 700;
+            font-size: .92rem;
+            line-height: 1.35;
+        }
+
+        .psf-wrap .mandatory-label {
+            grid-area: badge;
+            justify-self: start;
+            display: inline-flex;
+            align-items: center;
+            margin-bottom: 3px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #6d28b7, #8b5cf6);
+            color: #fff;
+            font-size: .62rem;
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: .045em;
+            text-transform: uppercase;
+        }
+
+        .psf-wrap .journey-step[data-step="B"] .model-summary-list .model-option-card.model-link-active {
+            border-color: rgba(109, 40, 183, .55) !important;
+            background: linear-gradient(135deg, #ffffff, #eadcff) !important;
+            box-shadow: 0 10px 24px rgba(109, 40, 183, .16) !important;
+        }
+
+        .psf-wrap .journey-step[data-step="B"] .model-summary-list .model-option-card.model-link-active .model-option-title {
+            color: #5b21b6 !important;
+        }
+
+        .psf-wrap .journey-step[data-step="B"] .model-summary-list .model-link-disabled {
+            color: #4b2f6f !important;
+            cursor: default !important;
+            pointer-events: none !important;
+            background: linear-gradient(135deg, #f8f5fb, #f0edf4) !important;
+            border-color: #d8cfdf !important;
+            box-shadow: none !important;
+        }
+
+        .psf-wrap .journey-step[data-step="B"] .model-summary-list .model-link-disabled::after {
+            content: "" !important;
+        }
+
+        .psf-wrap .active-model-banner {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 16px;
+            padding: 12px 15px;
+            border: 1px solid rgba(109, 40, 183, .24);
+            border-left: 5px solid #6d28b7;
+            border-radius: 11px;
+            background: linear-gradient(135deg, #fbf8ff, #f3ebff);
+            color: #3f2d66;
+        }
+
+        .psf-wrap .journey-step[data-step="B"].model-selected .active-model-banner {
+            display: flex;
+        }
+
+        .psf-wrap .active-model-banner strong {
+            font-size: .95rem;
+            line-height: 1.35;
+            color: #4c2c78;
+        }
+
+        /* Submission sections */
+        .psf-wrap .submission-sections {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+            margin-top: 18px;
+        }
+
+        .psf-wrap .submission-section {
+            padding: 18px;
+            border: 1px solid #dfe9f2;
+            border-radius: 14px;
+            background: linear-gradient(145deg, #f8fbfe, #f2f7fb);
+        }
+
+        .psf-wrap .submission-section h3 {
+            margin: 7px 0 10px;
+            color: #0b2d4f;
+            font-size: 1rem;
+        }
+
+        .psf-wrap .submission-section ul {
+            margin: 0;
+            padding-left: 21px;
+        }
+
+        .psf-wrap .submission-section li {
+            margin: 7px 0;
+            font-size: .86rem;
+            color: var(--text);
+            line-height: 1.7;
+        }
+
+        .psf-wrap .submission-section:last-child {
+            grid-column: 1 / -1;
+        }
+
+        /* Evaluation grid */
+        .psf-wrap .evaluation-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin-top: 18px;
+        }
+
+        .psf-wrap .evaluation-card {
+            position: relative;
+            padding: 18px 18px 18px 58px;
+            border: 1px solid #dfe9f2;
+            border-radius: 14px;
+            background: linear-gradient(145deg, #f8fbfe, #f2f7fb);
+        }
+
+        .psf-wrap .evaluation-number {
+            position: absolute;
+            left: 16px;
+            top: 18px;
+            width: 30px;
+            height: 30px;
+            display: grid;
+            place-items: center;
+            border-radius: 9px;
+            background: #283b9b;
+            color: #fff;
+            font-size: .74rem;
+            font-weight: 900;
+        }
+
+        .psf-wrap .evaluation-card h3 {
+            margin: 0 0 6px;
+            color: #0b2d4f;
+            font-size: 1rem;
+        }
+
+        .psf-wrap .evaluation-card p {
+            margin: 0;
+            color: #52657a;
+            font-size: .9rem;
+            line-height: 1.5;
+        }
+
+        .psf-wrap .evaluation-card:last-child {
+            grid-column: 1 / -1;
+        }
+
+        .psf-wrap .evaluation-section-heading {
+            margin: 26px 0 12px;
+            color: #0b2d4f;
+            font-size: 1.12rem;
+        }
+
+        .psf-wrap .bonus-heading {
+            color: #7c3f00;
+        }
+
+        .psf-wrap .bonus-intro {
+            margin: 0 0 14px;
+            padding: 14px 16px;
+            border-left: 4px solid #d97706;
+            border-radius: 10px;
+            background: #fff8e8;
+            color: #5f4820;
+            font-size: .86rem;
+            line-height: 1.6;
+        }
+
+        .psf-wrap .bonus-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .psf-wrap .bonus-card {
+            position: relative;
+            min-height: 74px;
+            display: flex;
+            align-items: center;
+            padding: 15px 16px 15px 48px;
+            border: 1px solid #ecd3a2;
+            border-radius: 13px;
+            background: linear-gradient(145deg, #fffaf0, #fff5df);
+            color: #5d461d;
+            line-height: 1.45;
+            font-size: .86rem;
+        }
+
+        .psf-wrap .bonus-card::before {
+            content: "★";
+            position: absolute;
+            left: 17px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #d97706;
+            font-size: 1.15rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .psf-wrap .journey-step {
+                padding-left: 26px;
+            }
+
+            .psf-wrap .journey-step::before {
+                left: 0;
+            }
+
+            .psf-wrap .journey-step:not(:last-of-type)::after {
+                left: 7px;
+            }
+
+            .psf-wrap .journey-step>summary {
+                grid-template-columns: 96px 1fr minmax(126px, auto) !important;
+                min-height: 0;
+            }
+
+            .psf-wrap .journey-step .summary-highlights {
+                grid-column: 2 / 3 !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                margin-top: 0 !important;
+            }
+
+            .psf-wrap .journey-step>summary .chevron {
+                grid-column: 3 !important;
+                grid-row: 1 / span 2 !important;
+                min-width: 126px !important;
+                max-width: 142px !important;
+            }
+
+            .psf-wrap .step-navigation {
+                gap: 6px !important;
+                overflow-x: auto !important;
+            }
+
+            .psf-wrap .diagram-flow {
+                grid-template-columns: 1fr;
+            }
+
+            .psf-wrap .diagram-arrow {
+                transform: rotate(90deg);
+                justify-self: center;
+                line-height: 1;
+            }
+
+            .psf-wrap .intro-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .psf-wrap .submission-sections,
+            .psf-wrap .evaluation-grid,
+            .psf-wrap .bonus-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .psf-wrap .submission-section:last-child,
+            .psf-wrap .evaluation-card:last-child {
+                grid-column: auto;
+            }
+        }
+
+        @media (max-width: 650px) {
+            .psf-wrap .journey-step {
+                padding-left: 0;
+                margin: 18px 0;
+            }
+
+            .psf-wrap .journey-step::before,
+            .psf-wrap .journey-step:not(:last-of-type)::after {
+                display: none;
+            }
+
+            .psf-wrap .journey-step>summary {
+                grid-template-columns: 82px 1fr !important;
+                gap: 12px;
+                padding: 15px;
+                border-radius: 17px;
+            }
+
+            .psf-wrap .step-badge {
+                min-height: 66px;
+                font-size: .82rem;
+            }
+
+            .psf-wrap .journey-step .summary-highlights {
+                grid-column: 1 / -1 !important;
+                grid-template-columns: 1fr !important;
+                gap: 10px !important;
+            }
+
+            .psf-wrap .journey-step>summary .chevron {
+                grid-column: 1 / -1 !important;
+                grid-row: auto !important;
+                justify-self: stretch !important;
+                width: 100% !important;
+                max-width: none !important;
+                min-width: 0 !important;
+                margin-top: 6px !important;
+            }
+
+            .psf-wrap .step-navigation {
+                overflow-x: auto !important;
+                grid-template-columns: repeat(7, minmax(125px, 1fr)) !important;
+            }
+
+            .psf-wrap .details-body {
+                grid-template-columns: 1fr;
+            }
+
+            .psf-wrap .details-body section:first-child {
+                grid-column: auto;
+            }
+
+            .psf-wrap .participant-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+
+            .psf-wrap .step-nav-button::before,
+            .psf-wrap .step-nav-button::after {
+                animation: none !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    
+    <div id="global-countdown-bar"
+        style="
+        background: var(--navy);
+        color: #fff;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 0.78rem;
+        padding: 7px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        position: static;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+    ">
+        <span
+            style="display:flex;align-items:center;gap:6px;font-weight:700;text-transform:uppercase;letter-spacing:1px;font-size:0.72rem;color:rgba(255,255,255,0.75);">
+            <i class="fa fa-clock" style="color:var(--accent);"></i> Registration closes in
+        </span>
+        <span style="font-size:0.72rem;color:rgba(255,255,255,0.55);font-weight:600;">
+            Deadline: <strong
+                style="color:#fff;">29 August 2026</strong>
+        </span>
+        <div style="display:flex;gap:6px;align-items:center;">
+            <div
+                style="text-align:center;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:3px 10px;min-width:44px;">
+                <div id="gcd-days" style="font-size:1rem;font-weight:900;line-height:1.1;">--</div>
+                <div
+                    style="font-size:0.55rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.5px;">
+                    Days</div>
+            </div>
+            <div
+                style="text-align:center;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:3px 10px;min-width:44px;">
+                <div id="gcd-hours" style="font-size:1rem;font-weight:900;line-height:1.1;">--</div>
+                <div
+                    style="font-size:0.55rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.5px;">
+                    Hrs</div>
+            </div>
+            <div
+                style="text-align:center;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:3px 10px;min-width:44px;">
+                <div id="gcd-mins" style="font-size:1rem;font-weight:900;line-height:1.1;">--</div>
+                <div
+                    style="font-size:0.55rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.5px;">
+                    Min</div>
+            </div>
+            <div
+                style="text-align:center;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:3px 10px;min-width:44px;">
+                <div id="gcd-secs" style="font-size:1rem;font-weight:900;line-height:1.1;">--</div>
+                <div
+                    style="font-size:0.55rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.5px;">
+                    Sec</div>
+            </div>
+        </div>
+    </div>
+
+    
+    <nav class="site-nav navbar navbar-expand-xl" id="siteNav">
+        <div class="container-fluid px-3">
+            <a class="nav-brand d-inline-flex align-items-center gap-2 text-decoration-none" href="https://sentinel.gujarat.gov.in">
+                <img src="https://sentinel.gujarat.gov.in/public/logos/gujarat police logo.png" alt="Gujarat Police">
+                <span
+                    style="display:flex;flex-direction:column;justify-content:center;line-height:1.15;font-weight:800;font-size:0.88rem;color:#0a1628;">
+                    <span>State Crime</span>
+                    <span>Record Bureau</span>
+                </span>
+            </a>
+
+            <button class="navbar-toggler border-0 ms-auto" type="button" data-bs-toggle="collapse"
+                data-bs-target="#mainNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav mx-auto gap-1">
+
+                    <li class="nav-item">
+                        <a class="nav-link "
+                            href="https://sentinel.gujarat.gov.in/about"><b>About</b></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link "
+                            href="https://sentinel.gujarat.gov.in/phases"><b>Prize Money</b></a>
+                    </li>
+                    <li class="nav-item  nav-hint-wrap ">
+                        <a class="nav-link"
+                            href=" https://sentinel.gujarat.gov.in/login "
+                                                         aria-describedby="resourcesHint" >
+                            <b>Resources</b></a>
+                                                    <span class="nav-hint" id="resourcesHint" role="tooltip">
+                                <i class="fa fa-lock me-1"></i>To get Resources, kindly login / register on our portal
+                            </span>
+                                            </li>
+                    <li class="nav-item">
+                        <a class="nav-link active"
+                            href="https://sentinel.gujarat.gov.in/problems"><b>Problem Statements &amp; Step by Step Guide</b></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link "
+                            href="https://sentinel.gujarat.gov.in/schedule"><b>Schedule &amp; Venue</b></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link "
+                            href="https://sentinel.gujarat.gov.in/faqs"><b>FAQs</b></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link "
+                            href="https://sentinel.gujarat.gov.in/contact"><b>Contact Us</b></a>
+                    </li>
+                </ul>
+
+                
+                <ul class="navbar-nav align-items-center gap-2">
+                                            <li class="nav-item">
+                            <a class="nav-link" href="https://sentinel.gujarat.gov.in/login"><b>Sign In</b></a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link btn-nav-cta btn-nav-register"
+                                href="https://sentinel.gujarat.gov.in/register"><b>Register</b></a>
+                        </li>
+                    
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    
+    
+    
+    <div class="container-fluid px-4 mt-3">
+                                                                        </div>
+
+    
+    <div id="social-sidebar"
+        style="
+    position: fixed;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border-radius: 10px 0 0 10px;
+    overflow: hidden;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.12);
+">
+        
+        <a href="https://x.com/GujaratPolice" target="_blank" title="X (Twitter)"
+            style="display:flex;align-items:center;justify-content:center;width:46px;height:46px;background:#fff;color:#000;font-size:0.95rem;text-decoration:none;border-bottom:1px solid #e2e8f0;transition:all 0.2s;padding:12px;"
+            onmouseover="this.style.background='#f1f5f9';this.style.width='56px'"
+            onmouseout="this.style.background='#fff';this.style.width='46px'">
+            <i class="fab fa-x-twitter"></i>
+        </a>
+        
+        <a href="https://www.instagram.com/gujaratpolice_/" target="_blank" title="Instagram"
+            style="display:flex;align-items:center;justify-content:center;width:46px;height:46px;background:#fff;color:#000;font-size:1rem;text-decoration:none;border-bottom:1px solid #e2e8f0;transition:all 0.2s;padding:12px;"
+            onmouseover="this.style.background='#f1f5f9';this.style.width='56px'"
+            onmouseout="this.style.background='#fff';this.style.width='46px'">
+            <i class="fab fa-instagram"></i>
+        </a>
+        <a href="https://www.facebook.com/dgpgujaratofficial/" target="_blank" title="Facebook"
+            style="display:flex;align-items:center;justify-content:center;width:46px;height:46px;background:#fff;color:#000;font-size:1rem;text-decoration:none;transition:all 0.2s;padding:12px;"
+            onmouseover="this.style.background='#f1f5f9';this.style.width='56px'"
+            onmouseout="this.style.background='#fff';this.style.width='46px'">
+            <i class="fab fa-facebook-f"></i>
+        </a>
+    </div>
+
+    
+    <main class="main-content">
+        <div class="container-fluid px-4">
+                <div class="psf-wrap" style="max-width:1400px;margin:0 auto;padding:32px 12px 70px;">
+
+        <div class="section-label">Gujarat CCTV Hackathon 2026</div>
+        <h1 class="section-heading">Problem Statement &amp; Solution Flow</h1>
+        <p class="section-sub">Integrated Video Management &amp; Analytics Platform — follow the participant journey below
+            to understand the challenge, choose your approach, and submit your solution.</p>
+
+        
+        <div class="journey-header-nav" style="margin-top:24px;">
+            <nav aria-label="Problem statement steps" class="step-navigation">
+                <div class="step-navigation-label">Participant Journey</div>
+                <button class="step-nav-button" data-open-step="A" type="button">
+                    <span class="step-nav-number">Step 1</span>
+                    <span class="step-nav-name">Understand the Background</span>
+                </button>
+                <button class="step-nav-button" data-open-step="B" type="button">
+                    <span class="step-nav-number">Step 2</span>
+                    <span class="step-nav-name">Choose Integration Model</span>
+                </button>
+                <button class="step-nav-button" data-open-step="C" type="button">
+                    <span class="step-nav-number">Step 3</span>
+                    <span class="step-nav-name">Build the Platform</span>
+                </button>
+                <button class="step-nav-button" data-open-step="D" type="button">
+                    <span class="step-nav-number">Step 4</span>
+                    <span class="step-nav-name">Test on CCTV Feeds</span>
+                </button>
+                <button class="step-nav-button" data-open-step="E" type="button">
+                    <span class="step-nav-number">Step 5</span>
+                    <span class="step-nav-name">Prepare &amp; Submit</span>
+                </button>
+                <button class="step-nav-button" data-open-step="F" type="button">
+                    <span class="step-nav-number">Step 6</span>
+                    <span class="step-nav-name">Plan for Scale</span>
+                </button>
+                <button class="step-nav-button" data-open-step="G" type="button">
+                    <span class="step-nav-number">Step 7</span>
+                    <span class="step-nav-name">Evaluation &amp; Recognition</span>
+                </button>
+            </nav>
+        </div>
+
+        
+        <div class="journey-wrapper">
+
+            
+            <details class="journey-step" data-step="A">
+                <summary>
+                    <span class="step-badge">Step 1</span>
+                    <span class="summary-text step-title">
+                        <strong>Understand the Challenge</strong>
+                        <small>Key Challenges</small>
+                        <span class="summary-description">Familiarize yourself with the problem statement, technical
+                            challenges and statewide vision for CCTV integration.</span>
+                    </span>
+                    <ul class="summary-highlights">
+                        <li>Heterogeneous infrastructure</li>
+                        <li>Multiple VMS &amp; vendors</li>
+                        <li>Network, security &amp; interoperability</li>
+                        <li>Analytics &amp; scalability to ~80,000 cameras</li>
+                    </ul>
+                    <span class="details-prompt">Click for more details</span>
+                    <span class="chevron">⌄</span>
+                </summary>
+                <div class="journey-body">
+                    <div class="intro-grid">
+                        <section class="panel">
+                            <h2>Background</h2>
+                            <p>At present, 26 different Government Departments are operating independent CCTV systems across
+                                the State. These systems include both analog and IP-based cameras deployed at geographically
+                                dispersed locations ranging from border districts to areas such as Valsad, Dahod, Somnath,
+                                Jamnagar, and Dwarka.</p>
+                            <p>Each department currently operates a standalone camera ecosystem. Some departments are using
+                                cloud-based storage solutions, while others rely on local storage infrastructure. The video
+                                retention period also varies significantly, with some systems storing footage for 7 days and
+                                others for 15 days or more.</p>
+                            <p>The usage and deployment pattern of cameras differ across departments based on their
+                                operational requirements and functional objectives. For example:</p>
+                            <ul>
+                                <li>Cameras under the Home Department are primarily deployed in public domains for traffic
+                                    monitoring, law &amp; order management, and crime detection.</li>
+                                <li>Food &amp; Civil Supplies Department cameras are mainly installed at godowns, PDS shops,
+                                    and related facilities.</li>
+                                <li>RTO cameras are deployed at offices, testing tracks, checkpoints, and other operational
+                                    locations.</li>
+                            </ul>
+                            <p>The Government intends to integrate these government cameras primarily deployed in the public
+                                domain into a unified video management and analytics ecosystem. Also the proposed solution
+                                should support viewing capabilities for public-facing CCTV cameras installed by societies,
+                                malls, commercial establishments and other private entities, wherever feasible and
+                                permitted.</p>
+                            <p>Moreover, various Government departments already maintain critical databases such as VAHAN,
+                                SARTHI, eGujCop (Gujarat Police's CCTNS platform), AFIS and NAFIS containing records of
+                                arrested persons, stolen vehicles, wanted criminals, missing persons, unidentified dead
+                                bodies and fingerprint data. The proposed CCTV Integration System should be integrated with
+                                these databases to enable automated real-time alerts and proactive monitoring capabilities
+                                for law enforcement agencies.</p>
+                            <p>Therefore the system should be designed with a scalable, modular, and future-ready
+                                architecture to support seamless integration while ensuring secure feed exchange,
+                                standardised integration mechanisms, scalability, and compatibility.</p>
+                        </section>
+                        <aside class="panel">
+                            <h3>Core Goal</h3>
+                            <div class="journey-notice">Propose a secure, scalable, interoperable, technically feasible, and
+                                cost-effective approach that uses existing infrastructure to the maximum practical extent.
+                            </div>
+                        </aside>
+                    </div>
+                    <div class="single-dropdown-body">
+                        <section class="panel">
+                            <h2>Key Challenges</h2>
+                            <div class="participant-grid">
+                                <div><span class="j-tag">01</span>
+                                    <h4>Heterogeneous Infrastructure</h4>
+                                    <p>Different vendors, VMS platforms, AMC periods, storage architectures, camera types,
+                                        formats, and feed-sharing protocols.</p>
+                                </div>
+                                <div><span class="j-tag">02</span>
+                                    <h4>Geographical Dispersion</h4>
+                                    <p>Camera sites are distributed across the State, with distances extending to
+                                        approximately 1,000 kilometers.</p>
+                                </div>
+                                <div><span class="j-tag">03</span>
+                                    <h4>Unified Analytics</h4>
+                                    <p>The solution should support analytics and event handling across onboarded cameras
+                                        through a unified framework.</p>
+                                </div>
+                                <div><span class="j-tag">04</span>
+                                    <h4>Scalability</h4>
+                                    <p>New cameras, departments, systems, and future analytics should be onboarded without
+                                        major redesign.</p>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </details>
+
+            
+            <details class="journey-step" data-step="B">
+                <summary>
+                    <span class="step-badge">Step 2</span>
+                    <span class="summary-text step-title">
+                        <strong>Explore Integration Models</strong>
+                        <small>Choose Your Approach</small>
+                        <span class="summary-description">Evaluate the four reference models or design a hybrid/innovative
+                            architecture that best fits the objectives.</span>
+                    </span>
+                    <ul class="summary-highlights model-summary-list">
+                        <li aria-controls="model-1" aria-expanded="false" class="model-option-card"
+                            data-model-target="model-1" role="button" tabindex="0">
+                            <span class="mandatory-label">Mandatory Model</span>
+                            <span class="model-option-title">Model 1: Registry &amp; GIS Foundation</span>
+                        </li>
+                        <li aria-controls="model-2" aria-expanded="false" class="model-option-card"
+                            data-model-target="model-2" role="button" tabindex="0">
+                            <span class="model-option-title">Model 2: Unified Viewing &amp; Analytics</span>
+                        </li>
+                        <li aria-controls="model-3" aria-expanded="false" class="model-option-card"
+                            data-model-target="model-3" role="button" tabindex="0">
+                            <span class="model-option-title">Model 3: VMS Federation &amp; Middleware</span>
+                        </li>
+                        <li aria-controls="model-4" aria-expanded="false" class="model-option-card"
+                            data-model-target="model-4" role="button" tabindex="0">
+                            <span class="model-option-title">Model 4: Central VMS &amp; AI Platform</span>
+                        </li>
+                        <li aria-controls="model-hybrid" aria-expanded="false" class="model-option-card"
+                            data-model-target="model-hybrid" role="button" tabindex="0">
+                            <span class="model-option-title">Hybrid / Innovative Architecture</span>
+                        </li>
+                    </ul>
+                    <span class="details-prompt">Click for more details</span>
+                    <span class="chevron">⌄</span>
+                </summary>
+                <div class="journey-body direct-model-body">
+                    <div aria-live="polite" class="active-model-banner">
+                        <strong id="active-model-title">Select a model above</strong>
+                    </div>
+                    <div class="single-dropdown-body nested-models">
+                        <div class="journey-notice" style="margin-bottom:14px;"><strong>Important:</strong> Model 1 should
+                            be treated as the common CCTV registry and GIS foundation that may support Models 2, 3, and 4.
+                        </div>
+
+                        <details class="model-card" id="model-1">
+                            <summary>
+                                <span class="model-badge">Model 1</span>
+                                <span class="summary-text">
+                                    <strong>Centralised CCTV Registry &amp; GIS Mapping Model</strong>
+                                    <small>Metadata &amp; Asset Visibility Layer</small>
+                                </span>
+                                <span class="chevron">⌄</span>
+                            </summary>
+                            <div class="details-body">
+                                <section class="model-introduction">
+                                    <h4>Introduction</h4>
+                                    <p>Across the State, multiple departments such as Municipal Corporations, Transport
+                                        Departments, Police, and various institutions have deployed CCTV cameras
+                                        independently. However, there is currently no centralised mechanism to
+                                        systematically identify, map, and manage these assets.</p>
+                                    <p>Under this model, a centralised CCTV registry and GIS-based mapping platform is
+                                        proposed to be developed for onboarding and maintaining camera-related metadata such
+                                        as location, department, camera type, ownership, connectivity status, storage
+                                        details, and other infrastructure information. This model does not involve
+                                        centralised live video streaming or recording.</p>
+                                    <p>The objective of this model is to create a unified inventory and visibility layer for
+                                        planning future integration, identifying monitoring gaps, infrastructure assessment,
+                                        and supporting decision-making. As the foundational model, it must be combined with
+                                        one or more of the other proposed models to enable CCTV feed integration, unified
+                                        viewing, and the generation of video analytics.</p>
+                                </section>
+                                <section>
+                                    <h4>Key Functional Features</h4>
+                                    <ul>
+                                        <li>Bulk import, manual entry, and API-based camera onboarding.</li>
+                                        <li>Interactive GIS map with department, camera type, status, and coverage layers.
+                                        </li>
+                                        <li>Camera health and maintenance-status monitoring.</li>
+                                        <li>Gap-analysis reports for uncovered zones and ageing infrastructure.</li>
+                                        <li>Role-based search, filtering, export, and metadata audit trails.</li>
+                                    </ul>
+                                </section>
+                                <section>
+                                    <h4>Suggested Technology Stack</h4>
+                                    <ul>
+                                        <li>GIS: Leaflet / OpenLayers / PostGIS</li>
+                                        <li>Backend: Node.js or Python (Django/FastAPI)</li>
+                                        <li>Database: PostgreSQL + PostGIS</li>
+                                        <li>Frontend: React.js</li>
+                                        <li>Authentication: Department-wise role-based access control</li>
+                                    </ul>
+                                </section>
+                                <section>
+                                    <h4>Expected Deliverables</h4>
+                                    <ul>
+                                        <li>Working registry portal with GIS map view.</li>
+                                        <li>Bulk and manual camera-onboarding demonstration.</li>
+                                        <li>Sample onboarded camera-metadata dataset.</li>
+                                        <li>Registry API documentation.</li>
+                                        <li>Sample gap-analysis report.</li>
+                                    </ul>
+                                </section>
+                                <section class="illustrative-diagram">
+                                    <h4>Diagram</h4>
+                                    <div class="diagram-flow" role="img"
+                                        aria-label="Model 1 illustrative architecture flow">
+                                        <div class="diagram-node"><strong>Department CCTV Assets</strong><span>Cameras ·
+                                                location · ownership</span></div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>Onboarding &amp; Validation</strong><span>Bulk
+                                                upload · manual entry · APIs</span></div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>Central Registry</strong><span>Standardised CCTV
+                                                metadata</span></div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>PostgreSQL + PostGIS</strong><span>GIS and asset
+                                                data store</span></div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>GIS Dashboard &amp; APIs</strong><span>Map ·
+                                                search · reports · integration</span></div>
+                                    </div>
+                                </section>
+                                <section style="grid-column:1/-1;display:flex;justify-content:flex-end;padding-top:4px;">
+                                                                            <a href="https://sentinel.gujarat.gov.in/login" class="btn-apply"
+                                            style="background:linear-gradient(135deg,#1769aa,#2196f3);box-shadow:0 10px 20px rgba(23,105,170,.25);">Login
+                                            to Apply →</a>
+                                                                    </section>
+                            </div>
+                        </details>
+
+                        <details class="model-card" id="model-2">
+                            <summary>
+                                <span class="model-badge">Model 2</span>
+                                <span class="summary-text">
+                                    <strong>Unified Viewing &amp; Metadata Analytics Model</strong>
+                                    <small>Centralised Viewing with Metadata-Based Analytics</small>
+                                </span>
+                                <span class="chevron">⌄</span>
+                            </summary>
+                            <div class="details-body">
+                                <section class="model-introduction">
+                                    <h4>Introduction</h4>
+                                    <p>Multiple departments currently operate independent CCTV systems through their own
+                                        Video Management Systems (VMS). Central command centres are required to access these
+                                        feeds through multiple separate viewer systems, which increases operational
+                                        complexity and reduces monitoring efficiency.</p>
+                                    <p>Under this model, a unified viewing platform is proposed through which CCTV feeds
+                                        from different departmental systems can be accessed through a single interface
+                                        without disturbing existing infrastructure. Existing departmental VMS/storage
+                                        systems shall continue to operate independently.</p>
+                                    <p>In this model, the proposed unified viewing platform connects directly to each
+                                        departmental CCTV or VMS system through RTSP, ONVIF, vendor SDKs, or available APIs.
+                                        The platform integrates the accessible video streams into a single interface without
+                                        introducing an intermediate middleware or federation layer.</p>
+                                    <p>This model primarily focuses on centralised viewing, operational accessibility, and
+                                        generation of selective metadata/analytics from accessible video streams. Depending
+                                        upon technical feasibility, features such as ANPR-based metadata generation, event
+                                        tagging, camera-wise indexing, and searchable vehicle movement records may also be
+                                        enabled without centralised storage of all video feeds.</p>
+                                </section>
+                                <section>
+                                    <h4>Key Functional Features</h4>
+                                    <ul>
+                                        <li>Feed aggregation through RTSP, ONVIF, or vendor APIs.</li>
+                                        <li>ANPR-based metadata generation.</li>
+                                        <li>Event tagging and camera-wise indexing.</li>
+                                        <li>Searchable vehicle-movement records.</li>
+                                        <li>Configurable video walls and multi-camera grid views.</li>
+                                        <li>Alerts for tagged events and vehicles of interest.</li>
+                                    </ul>
+                                </section>
+                                <section>
+                                    <h4>Suggested Technology Stack</h4>
+                                    <ul>
+                                        <li>Streaming: WebRTC / HLS relay</li>
+                                        <li>Integration: ONVIF / RTSP libraries / vendor SDKs</li>
+                                        <li>AI/ML: ANPR using open-source or custom models</li>
+                                        <li>Backend: Node.js or Python microservices</li>
+                                        <li>Messaging/Search: Kafka, Elasticsearch, PostgreSQL</li>
+                                    </ul>
+                                </section>
+                                <section>
+                                    <h4>Expected Deliverables</h4>
+                                    <ul>
+                                        <li>Unified viewer connected to sample feeds from at least two different systems.
+                                        </li>
+                                        <li>ANPR demonstration on live or recorded feeds.</li>
+                                        <li>Searchable metadata dashboard.</li>
+                                        <li>Architecture note showing that existing departmental systems remain unaffected.
+                                        </li>
+                                    </ul>
+                                </section>
+                                <section class="illustrative-diagram">
+                                    <h4>Diagram</h4>
+                                    <div class="diagram-flow" role="img" aria-label="Model 2 flow">
+                                        <div class="diagram-node"><strong>Departmental VMS Platforms</strong><span>Existing
+                                                systems remain independent</span></div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>RTSP / ONVIF / Vendor APIs</strong><span>Secure
+                                                feed access layer</span></div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>Unified Stream Gateway</strong><span>Relay ·
+                                                transcode · session control</span></div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>Analytics &amp; Metadata</strong><span>ANPR ·
+                                                tagging · indexing · alerts</span></div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>Unified Control-Room
+                                                View</strong><span>Multi-camera viewing and search</span></div>
+                                    </div>
+                                </section>
+                                <section style="grid-column:1/-1;display:flex;justify-content:flex-end;padding-top:4px;">
+                                                                            <a href="https://sentinel.gujarat.gov.in/login" class="btn-apply"
+                                            style="background:linear-gradient(135deg,#1769aa,#2196f3);box-shadow:0 10px 20px rgba(23,105,170,.25);">Login
+                                            to Apply →</a>
+                                                                    </section>
+                            </div>
+                        </details>
+                        <details class="model-card" id="model-3">
+                            <summary>
+                                <span class="model-badge">Model 3</span>
+                                <span class="summary-text">
+                                    <strong>VMS Federation &amp; Middleware Integration Model</strong>
+                                    <small>Interoperability &amp; Cross-System Integration Layer</small>
+                                </span>
+                                <span class="chevron">⌄</span>
+                            </summary>
+                            <div class="details-body">
+                                <section class="model-introduction">
+                                    <h4>Introduction</h4>
+                                    <p>Different departments across the State use heterogeneous CCTV systems supplied by
+                                        multiple vendors, resulting in fragmented monitoring infrastructure and
+                                        interoperability challenges.</p>
+                                    <p>Under this model, a middleware/federation layer is proposed to integrate multiple
+                                        departmental VMS platforms through APIs, SDKs, metadata exchange, event sharing
+                                        mechanisms, or standard protocols. The objective is to enable interoperability,
+                                        cross-platform communication, centralized event correlation, and unified operational
+                                        workflows without replacing existing departmental systems.</p>
+                                    <p>This model allows departments to retain their own infrastructure and operational
+                                        control while enabling higher-level integration, metadata sharing, federated
+                                        analytics, and coordinated monitoring capabilities at the central level.</p>
+                                    <p>Unlike Model 2, the proposed solution does not connect directly to each departmental
+                                        CCTV or VMS system. Instead, the middleware or federation layer acts as the common
+                                        integration platform, communicates with multiple existing VMS platforms, and exposes
+                                        a single unified interface for downstream applications, dashboards, and AI services.
+                                    </p>
+                                </section>
+                                <section>
+                                    <h4>Key Functional Features</h4>
+                                    <ul>
+                                        <li>Adapter/plugin architecture for multiple VMS vendors.</li>
+                                        <li>Metadata exchange bus for camera and event information.</li>
+                                        <li>Cross-system event-correlation engine.</li>
+                                        <li>Unified workflow and alert dashboard.</li>
+                                        <li>Extensible connector framework for onboarding future vendors.</li>
+                                    </ul>
+                                </section>
+                                <section>
+                                    <h4>Suggested Technology Stack</h4>
+                                    <ul>
+                                        <li>Middleware: Node.js / Java (Spring Boot)</li>
+                                        <li>Messaging: Kafka / RabbitMQ</li>
+                                        <li>API Gateway: Kong / NGINX</li>
+                                        <li>Database: PostgreSQL and Redis</li>
+                                        <li>Frontend: React.js</li>
+                                    </ul>
+                                </section>
+                                <section>
+                                    <h4>Expected Deliverables</h4>
+                                    <ul>
+                                        <li>Working middleware demo federating at least two different systems.</li>
+                                        <li>Unified event-correlation dashboard.</li>
+                                        <li>Adapter/plugin architecture documentation.</li>
+                                        <li>Sample federated analytics report.</li>
+                                    </ul>
+                                </section>
+                                <section class="illustrative-diagram">
+                                    <h4>Diagram</h4>
+                                    <div class="diagram-flow" role="img" aria-label="Model 3 flow">
+                                        <div class="diagram-node"><strong>Multiple Vendor
+                                                VMS</strong><span>Department-controlled source systems</span></div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>Adapters / Connectors</strong><span>API · SDK ·
+                                                ONVIF · protocol translation</span></div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>Federation
+                                                Middleware</strong><span>Authentication · routing · orchestration</span>
+                                        </div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>Event &amp; Metadata Bus</strong><span>Kafka /
+                                                RabbitMQ · correlation</span></div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>Unified Dashboard</strong><span>Cross-system
+                                                monitoring and workflows</span></div>
+                                    </div>
+                                </section>
+                                <section style="grid-column:1/-1;display:flex;justify-content:flex-end;padding-top:4px;">
+                                                                            <a href="https://sentinel.gujarat.gov.in/login" class="btn-apply"
+                                            style="background:linear-gradient(135deg,#1769aa,#2196f3);box-shadow:0 10px 20px rgba(23,105,170,.25);">Login
+                                            to Apply →</a>
+                                                                    </section>
+                            </div>
+                        </details>
+
+                        <details class="model-card" id="model-4">
+                            <summary>
+                                <span class="model-badge">Model 4</span>
+                                <span class="summary-text">
+                                    <strong>Central VMS Model</strong>
+                                    <small>Fully Centralised Monitoring &amp; Analytics Platform</small>
+                                </span>
+                                <span class="chevron">⌄</span>
+                            </summary>
+                            <div class="details-body">
+                                <section class="model-introduction">
+                                    <h4>Introduction</h4>
+                                    <p>Under this model, a single consolidated Central VMS (Video Management System) is
+                                        proposed to be developed for integration of CCTV cameras across various departments
+                                        onto one unified platform. The Central VMS shall enable centralised monitoring,
+                                        management, recording, storage, playback, and advanced analytics through a common
+                                        system interface.</p>
+                                    <p>This model aims to create a fully integrated statewide platform capable of supporting
+                                        centralised analytics, AI-based processing, vehicle tracking, event detection, and
+                                        cross-departmental monitoring through a unified operational framework.</p>
+                                    <p>Implementation of this model would require robust infrastructure, including scalable
+                                        storage, high-bandwidth connectivity, centralised compute resources, redundancy
+                                        mechanisms, cybersecurity controls, and scalable architecture capable of supporting
+                                        large-scale video ingestion and real-time processing.</p>
+                                </section>
+                                <section>
+                                    <h4>Key Functional Features</h4>
+                                    <ul>
+                                        <li>Centralised feed ingestion.</li>
+                                        <li>Tiered hot, warm, and cold storage.</li>
+                                        <li>ANPR, face recognition, crowd/vehicle counting, and anomaly detection.</li>
+                                        <li>Statewide vehicle tracking and route reconstruction.</li>
+                                        <li>Integration readiness for VAHAN, SARTHI, eGujCop, AFIS, and NAFIS.</li>
+                                        <li>Redundancy, disaster recovery, encryption, network segmentation, and RBAC.</li>
+                                    </ul>
+                                </section>
+                                <section>
+                                    <h4>Suggested Technology Stack</h4>
+                                    <ul>
+                                        <li>VMS: Custom or extended open-source platform</li>
+                                        <li>Storage: S3-compatible distributed object storage / Ceph</li>
+                                        <li>Streaming &amp; inference: Kafka plus GPU-based analytics</li>
+                                        <li>Database: PostgreSQL / TimescaleDB</li>
+                                        <li>Orchestration: Kubernetes</li>
+                                        <li>Networking: High-bandwidth backbone with regional edge support</li>
+                                    </ul>
+                                </section>
+                                <section>
+                                    <h4>Expected Deliverables</h4>
+                                    <ul>
+                                        <li>Working centralised VMS prototype using sample multi-department feeds.</li>
+                                        <li>ANPR and multi-location vehicle-tracking demonstration.</li>
+                                        <li>Scalability and load-test report for approximately 80,000 cameras.</li>
+                                        <li>Disaster-recovery and redundancy design.</li>
+                                        <li>Security architecture document.</li>
+                                    </ul>
+                                </section>
+                                <section class="illustrative-diagram">
+                                    <h4>Diagram</h4>
+                                    <div class="diagram-flow" role="img" aria-label="Model 4 flow">
+                                        <div class="diagram-node"><strong>Statewide CCTV Sources</strong><span>Government
+                                                and eligible integrated feeds</span></div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>Central Ingestion Layer</strong><span>Streaming
+                                                gateway · load balancing</span></div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>Central VMS Platform</strong><span>Monitoring ·
+                                                recording · playback</span></div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>Storage &amp; AI
+                                                Analytics</strong><span>Distributed storage · GPU inference</span></div>
+                                        <div class="diagram-arrow">→</div>
+                                        <div class="diagram-node"><strong>Command Centre &amp;
+                                                Integrations</strong><span>Alerts · GIS · authorised databases</span></div>
+                                    </div>
+                                </section>
+                                <section style="grid-column:1/-1;display:flex;justify-content:flex-end;padding-top:4px;">
+                                                                            <a href="https://sentinel.gujarat.gov.in/login" class="btn-apply"
+                                            style="background:linear-gradient(135deg,#1769aa,#2196f3);box-shadow:0 10px 20px rgba(23,105,170,.25);">Login
+                                            to Apply →</a>
+                                                                    </section>
+                            </div>
+                        </details>
+
+                        <details class="model-card" id="model-hybrid">
+                            <summary>
+                                <span class="model-badge">Hybrid</span>
+                                <span class="summary-text">
+                                    <strong>Hybrid / Innovative Architecture</strong>
+                                    <small>Customised or Combined Integration Approach</small>
+                                </span>
+                                <span class="chevron">⌄</span>
+                            </summary>
+                            <div class="details-body">
+                                <section class="model-introduction">
+                                    <h4>Introduction</h4>
+                                    <p>The four integration models described above are indicative reference models intended
+                                        to guide participating companies in understanding possible approaches for CCTV
+                                        integration.</p>
+                                    <p>Participating companies may propose a hybrid solution that combines suitable elements
+                                        from two or more models, or may submit a fully innovative and customised
+                                        architecture, provided the proposed solution addresses the stated functional,
+                                        interoperability, security, scalability, analytics, and implementation requirements.
+                                    </p>
+                                </section>
+                                <section style="grid-column:1/-1;display:flex;justify-content:flex-end;padding-top:4px;">
+                                                                            <a href="https://sentinel.gujarat.gov.in/login" class="btn-apply"
+                                            style="background:linear-gradient(135deg,#1769aa,#2196f3);box-shadow:0 10px 20px rgba(23,105,170,.25);">Login
+                                            to Apply →</a>
+                                                                    </section>
+                            </div>
+                        </details>
+
+                    </div>
+                </div>
+            </details>
+
+            
+            <details class="journey-step" data-step="C">
+                <summary>
+                    <span class="step-badge">Step 3</span>
+                    <span class="summary-text step-title">
+                        <strong>Choose your challenge</strong>
+                        <small>Expected Solution Approach</small>
+                        <span class="summary-description">Using your selected reference solution model, design and build a
+                            deployment-ready
+                            solution that continuously processes the CCTV feeds provided through the hackathon
+                            portal. Your solution should demonstrate how live video streams are integrated with a
+                            searchable database of watchlist records (such as stolen vehicles, wanted persons,
+                            missing persons, blacklisted vehicles, suspect watchlists, or other entities of interest),
+                            enabling continuous AI-powered analysis and automated alert generation whenever a
+                            match is detected.
+                            Participants are expected to design the complete integration workflow, including the
+                            database structure, matching logic, alerting mechanism, and user interface. Teams
+                            should create and use representative datasets to demonstrate their solution. During the
+                            evaluation, teams may be required to identify specified vehicles or other entities from
+                            the CCTV feeds and generate accurate, real-time alerts. </span>
+                    </span>
+                    <ul class="summary-highlights">
+                        <li>Overall Architecture</li>
+                        <li>Integration Strategy</li>
+                        <li>AI &amp; Video Analytics</li>
+                        <li>Cybersecurity Architecture</li>
+                        <li>Deployment Architecture</li>
+                        <li>Infrastructure Sizing</li>
+                        <li>Cost-Benefit Analysis</li>
+                        <li>Department-wise Information Requirements</li>
+                        <li>Scalability Strategy</li>
+                        <li>Future Roadmap</li>
+                    </ul>
+                    <span class="details-prompt">Click for more details</span>
+                    <span class="chevron">⌄</span>
+                </summary>
+                <div class="journey-body">
+                    <section class="panel architecture-principles-panel">
+                        <h3>Architecture Principles</h3>
+                        <p>The proposed solution shall adopt an open, modular, scalable, secure, standards-based, and
+                            vendor-neutral architecture. The solution shall avoid vendor lock-in and enable seamless
+                            integration, interoperability, replacement, upgrade, and future expansion of cameras, Video
+                            Management Systems (VMS), analytics engines, storage platforms, AI modules, and other technology
+                            components through documented standard APIs, open protocols, SDKs, and modular adapter-based
+                            frameworks. The architecture should be technology-agnostic, support heterogeneous multi-vendor
+                            environments, and facilitate future enhancements without requiring significant redesign of the
+                            overall system.</p>
+                    </section>
+                    <div class="details-body">
+                        <section>
+                            <h4>Permitted Approach</h4>
+                            Participants may adopt any one of the following approaches, provided the solution
+                            addresses the challenge objectives of integrating diverse CCTV systems, correlating
+                            live video feeds with watchlist databases, and generating AI-powered real-time alerts
+                            for law enforcement.
+                            <ul>
+                                <li>Any one of the five reference solution models provided in the official
+                                    Problem Statement.</li>
+                                <li>A hybrid architecture combining features from two or more reference
+                                    solution models. </li>
+                                <li>A fully customised architecture designed to meet the challenge requirements. </li>
+                            </ul>
+                        </section>
+                    </div>
+                </div>
+            </details>
+
+            
+            <details class="journey-step" data-step="D">
+                <summary>
+                    <span class="step-badge">Step 4</span>
+                    <span class="summary-text step-title">
+                        <strong>Technical Evaluation / Test Case</strong>
+                        <small>Live Challenge</small>
+                        <span class="summary-description">Integrate approximately 50 heterogeneous cameras, track a
+                            designated vehicle and deliver real-time insights, alerts and GIS visualisation.</span>
+                    </span>
+                    <ul class="summary-highlights">
+                        <li>Onboard ~50 cameras</li>
+                        <li>Integrate live feeds</li>
+                        <li>Track vehicle</li>
+                        <li>Generate alerts &amp; history</li>
+                        <li>Visualise on GIS</li>
+                        <li>Route, movement history &amp; searchable events</li>
+                    </ul>
+                    <span class="details-prompt">Click for more details</span>
+                    <span class="chevron">⌄</span>
+                </summary>
+                <div class="journey-body">
+                    <div class="details-body">
+                        <section>
+                            <h4>Test Scenario</h4>
+                            After completing the registration, participants will be able to access the details,
+                            resources, and live camera feeds from approximately 50 geographically distributed
+                            cameras through the <strong>Resources page</strong> of the website for the technical evaluation.
+                            <ul>
+                                <li> The cameras are deployed across different departments and use various
+                                    technologies, formats, VMS platforms, and storage mechanisms. </li>
+                                <li> Teams must onboard the available cameras onto one integrated platform. </li>
+                                <li> The solution must enable centralised monitoring and AI-powered video
+                                    analytics. </li>
+                                <li> During the evaluation, participants will be provided with a designated vehicle
+                                    registration number. The solution must demonstrate its capability to identify,
+                                    trace, and present the movement of the corresponding vehicle across the
+                                    integrated CCTV network as it appears at different camera locations and times. </li>
+                                <li> The solution should also demonstrate continuous cross-referencing of live
+                                    CCTV feeds with a representative watchlist database and generate automated
+                                    real-time alerts upon detecting a match. Participants may use their own
+                                    representative watchlist database for this demonstration.
+                                </li>
+                            </ul>
+                        </section>
+                        <section>
+                            <h4>Expected Output</h4>
+                            <ul>
+                                <li>Demonstration of the solution's capability to identify and trace the designated
+                                    vehicle across the integrated CCTV network using the vehicle registration
+                                    number provided during the evaluation.</li>
+                                <li>Complete route traversed by the designated vehicle, including timestamped and
+                                    location-wise movement history.</li>
+                                <li> Demonstration of a working watchlist database integrated with the solution,
+                                    showcasing continuous cross-referencing between live CCTV feeds and
+                                    representative watchlist records, along with automated real-time alert
+                                    generation upon detecting a match. Participants may create and use their own
+                                    representative watchlist database for this demonstration.</li>
+                                <li>Evidence of successful CCTV integration, AI-powered video analytics,
+                                    interoperability, scalability, and end-to-end system performance.
+                                </li>
+                            </ul>
+                        </section>
+                    </div>
+                </div>
+            </details>
+
+            
+            <details class="journey-step" data-step="E">
+                <summary>
+                    <span class="step-badge">Step 5</span>
+                    <span class="summary-text step-title">
+                        <strong>Prepare &amp; Submit</strong>
+                        <small>Deliverables</small>
+                        <span class="summary-description">Submit the prototype, documentation, architecture details and any
+                            additional inputs as per hackathon guidelines.</span>
+                    </span>
+                    <ul class="summary-highlights">
+                        <li>Solution Presentation</li>
+                        <li>High-Level Design Document</li>
+                        <li>Own-Feed Demonstration</li>
+                        <li>Government-Feed Demonstration</li>
+                        <li>Video &amp; Output Report</li>
+                        <li>Submission Links</li>
+                    </ul>
+                    <span class="details-prompt">Click for more details</span>
+                    <span class="chevron">⌄</span>
+                </summary>
+                <div class="journey-body">
+                    <section class="panel">
+                        <h2>Submission Requirements</h2>
+                        <div class="submission-sections">
+                            <section class="submission-section">
+                                <span class="j-tag">Documents</span>
+                                <h3>1. Solution Presentation (PPT/PDF)</h3>
+                                <ul>
+                                    <li>Proposed solution model (Reference Model 1–5, Hybrid, or Customised
+                                        Architecture) with justification.</li>
+                                    <li>Solution overview, objectives, and key innovations.</li>
+                                    <li>High-level system architecture and end-to-end workflow.</li>
+                                    <li>AI-powered video analytics approach, including detection, recognition, and
+                                        event analytics.</li>
+                                    <li>Methodology for correlating live CCTV feeds with watchlist databases and
+                                        generating automated real-time alerts.</li>
+                                    <li>Key technologies, frameworks, and tools used.</li>
+                                    <li>Scalability, interoperability, security, and deployment considerations.</li>
+                                    <li>Expected operational benefits and impact on policing and public safety.</li>
+                                </ul>
+                            </section>
+                            <section class="submission-section">
+                                <span class="j-tag">Documents</span>
+                                <h3>2. Technical Proposal — High-Level Design (HLD)</h3>
+                                <ul>
+                                    <li>Overall solution architecture, including high-level architecture diagrams and
+                                        component interactions.</li>
+                                    <li>Approach for integrating heterogeneous CCTV cameras, NVRs, and Video
+                                        Management Systems (VMS) into a unified platform.</li>
+                                    <li>Architecture for ingesting, processing, and managing live video streams from
+                                        geographically dispersed camera locations.</li>
+                                    <li>Approach for integrating live CCTV feeds with watchlist databases (e.g., stolen
+                                        vehicles, wanted persons, missing persons, blacklisted vehicles, suspect
+                                        watchlists) and continuously correlating video analytics results to generate
+                                        real-time alerts.</li>
+                                    <li>AI-powered video analytics approach, including technologies such as
+                                        Automatic Number Plate Recognition (ANPR), Facial Recognition Systems
+                                        (FRS), object detection, person and vehicle tracking, and other intelligent
+                                        analytics proposed by the team.</li>
+                                    <li>Alert generation and notification workflow, including prioritisation,
+                                        visualisation, and user interaction.</li>
+                                    <li>Scalability, interoperability, security, and performance considerations for
+                                        statewide deployment and future expansion to approximately 80,000 cameras.</li>
+                                    <li>Technical prerequisites, assumptions, and information required from
+                                        participating departments to assess camera integration feasibility and ensure
+                                        seamless interoperability.</li>
+                                </ul>
+                            </section>
+                            <section class="submission-section">
+                                <span class="j-tag">Demonstrations</span>
+                                <h3>3. Demonstration on Participant's Own Feed</h3>
+                                Submit a screen-recorded demonstration (maximum 2–3 minutes) showcasing your
+                                solution operating on CCTV cameras or video footage of your choice.
+                                The demonstration should clearly illustrate:
+                                <ul>
+                                    <li>Onboarding and processing of live or recorded CCTV feeds.</li>
+                                    <li>AI-powered detection and analytics (such as ANPR, Facial Recognition, or
+                                    other proposed capabilities).</li>
+                                    <li>Correlation of detected entities with a representative watchlist database (e.g.,
+                                    stolen vehicles, wanted persons, missing persons, blacklisted vehicles, or
+                                    suspect watchlists).</li>
+                                    <li>Automatic generation of real-time alerts and visualisation upon successful
+                                    detection and database matching.</li>
+                                </ul>
+                                The demonstration must showcase a fullUy functional working solution. Mock-ups,
+                                animations, simulated interfaces, or concept videos without an operational backend
+                                will not be considered.
+                            </section>
+                            <section class="submission-section">
+                                <span class="j-tag">Demonstrations</span>
+                                <h3>4. Live Demonstration on Government-Provided CCTV Feed</h3>
+                                <ul>
+                                    <li>Onboard the Government-provided feed(s) onto the proposed platform.</li>
+                                    <li>Demonstrate successful onboarding and live or recorded viewing.</li>
+                                    <li>Demonstrate available video-analytics output on the provided feed.</li>
+                                    <li>Submit a screen-recorded video along with an output report showing detected vehicles
+                                        or number plates with corresponding timestamps.</li>
+                                </ul>
+                            </section>
+                            <section class="submission-section">
+                                <span class="j-tag">How to Submit</span>
+                                <h3>Submission Method</h3>
+                                <ul>
+                                    <li>Unlisted YouTube link, with video visibility set to Unlisted.</li>
+                                    <li>Google Drive or OneDrive link with access enabled for "Anyone with the link —
+                                        Viewer".</li>
+                                    <li>Participants may additionally provide a URL to their hosted platform along with test
+                                        login credentials for the screening committee.</li>
+                                    <li>Participants may also provide a GitHub or GitLab repository link containing the
+                                        platform source code or relevant components.</li>
+                                </ul>
+                            </section>
+                        </div>
+                    </section>
+                </div>
+            </details>
+
+            
+            <details class="journey-step" data-step="F">
+                <summary>
+                    <span class="step-badge">Step 6</span>
+                    <span class="summary-text step-title">
+                        <strong>Plan for Scale</strong>
+                        <small>Scalability Requirement</small>
+                        <span class="summary-description">Present your strategy to scale the solution securely and reliably
+                            to approximately 80,000 cameras across Gujarat.</span>
+                    </span>
+                    <ul class="summary-highlights">
+                        <li>Hardware &amp; Software Requirements</li>
+                        <li>Network &amp; Bandwidth Planning</li>
+                        <li>Storage &amp; Retention Strategy</li>
+                        <li>AI Processing Capacity</li>
+                        <li>Disaster Recovery Strategy</li>
+                        <li>Statewide Rollout Plan</li>
+                    </ul>
+                    <span class="details-prompt">Click for more details</span>
+                    <span class="chevron">⌄</span>
+                </summary>
+                <div class="journey-body">
+                    <div class="details-body">
+                        <section>
+                            <h4>Participants should explain</h4>
+                            <ul>
+                                <li>Central, regional, and edge-compute requirements.</li>
+                                <li>GPU or accelerator requirements for video analytics.</li>
+                                <li>Expected network bandwidth and low-bandwidth strategies.</li>
+                                <li>Hot, warm, and cold storage assumptions based on retention periods.</li>
+                                <li>Load balancing, horizontal scaling, monitoring, logging, and health checks.</li>
+                                <li>High availability, backup, disaster recovery, and cybersecurity controls.</li>
+                                <li>Estimated implementation and operational costs.</li>
+                            </ul>
+                        </section>
+                    </div>
+                </div>
+            </details>
+
+            
+            <details class="journey-step" data-step="G">
+                <summary>
+                    <span class="step-badge">Step 7</span>
+                    <span class="summary-text step-title">
+                        <strong>Evaluation &amp; Recognition</strong>
+                        <small>Get Evaluated &amp; Recognised</small>
+                        <span class="summary-description">Solutions will be evaluated qualitatively across multiple
+                            dimensions. Innovative solutions may earn special recognition.</span>
+                    </span>
+                    <ul class="summary-highlights">
+                        <li>Successful Test Case</li>
+                        <li>PPT/PDF Presentation</li>
+                        <li>Solution Architecture</li>
+                        <li>Working Demonstration</li>
+                        <li>Analytics Quality</li>
+                        <li>Scalability &amp; PoC Readiness</li>
+                        <li>Bonus Consideration</li>
+                    </ul>
+                    <span class="details-prompt">Click for more details</span>
+                    <span class="chevron">⌄</span>
+                </summary>
+                <div class="journey-body">
+                    <section class="panel">
+                        <h2>Evaluation Framework</h2>
+                        <p>All eligible submissions will first be assessed against the common evaluation areas. Bonus
+                            consideration may then be awarded for meaningful capabilities demonstrated beyond the mandatory
+                            requirements.</p>
+                        <h3 class="evaluation-section-heading">A. Common Evaluation Areas</h3>
+                        <div class="evaluation-grid">
+                            <div class="evaluation-card"><span class="evaluation-number">01</span>
+                                <h3>Successful Test Case</h3>
+                                <p>Successful onboarding and operation of the solution on the Government-provided CCTV feed,
+                                    including live or recorded viewing and the required analytics output.</p>
+                            </div>
+                            <div class="evaluation-card"><span class="evaluation-number">02</span>
+                                <h3>Solution Presentation</h3>
+                                <p>Clarity and completeness of the submitted PPT or PDF, including problem understanding,
+                                    proposed model, justification, solution overview, and key features.</p>
+                            </div>
+                            <div class="evaluation-card"><span class="evaluation-number">03</span>
+                                <h3>Solution Architecture</h3>
+                                <p>Technical soundness, feasibility, security, interoperability, and clarity of the proposed
+                                    High-Level Design and architecture diagrams.</p>
+                            </div>
+                            <div class="evaluation-card"><span class="evaluation-number">04</span>
+                                <h3>Working Platform and Demonstration</h3>
+                                <p>Maturity of the actual working platform demonstrated through the participant's own feed
+                                    and the Government-provided feed.</p>
+                            </div>
+                            <div class="evaluation-card"><span class="evaluation-number">05</span>
+                                <h3>Video Analytics Output</h3>
+                                <p>Quality and usefulness of ANPR, vehicle or person detection, intrusion detection, object
+                                    detection, timestamps, and output reports.</p>
+                            </div>
+                            <div class="evaluation-card"><span class="evaluation-number">06</span>
+                                <h3>Scalability and PoC Readiness</h3>
+                                <p>Readiness to scale toward approximately 80,000 cameras and preparedness for the on-site
+                                    proof-of-concept.</p>
+                            </div>
+                            <div class="evaluation-card"><span class="evaluation-number">07</span>
+                                <h3>Submission Completeness</h3>
+                                <p>Completeness, accessibility, and consistency of all required documents, videos, reports,
+                                    links, credentials, and supporting technical information.</p>
+                            </div>
+                        </div>
+                        <h3 class="evaluation-section-heading bonus-heading">B. Bonus Consideration</h3>
+                        <p class="bonus-intro">Bonus consideration may be given for additional capabilities that are
+                            relevant, functional, and demonstrated as part of the working solution. Bonus features will not
+                            compensate for failure to meet any mandatory submission or test requirement.</p>
+                        <div class="bonus-grid">
+                            <div class="bonus-card">Innovative hybrid or customised architecture with clear operational
+                                value.</div>
+                            <div class="bonus-card">Advanced cross-camera vehicle movement tracking or multi-camera
+                                correlation.</div>
+                            <div class="bonus-card">Additional reliable analytics beyond the mandatory ANPR requirement.
+                            </div>
+                            <div class="bonus-card">Strong edge-processing, bandwidth-optimisation, or low-connectivity
+                                operation.</div>
+                            <div class="bonus-card">Enhanced cybersecurity, privacy protection, auditability, or role-based
+                                access controls.</div>
+                            <div class="bonus-card">Operational dashboards, automated alerts, health monitoring, or
+                                integration-ready APIs.</div>
+                        </div>
+                    </section>
+                </div>
+            </details>
+
+        </div>
+    </div>
+        </div>
+    </main>
+
+    
+    <footer class="site-footer">
+        <div class="container-fluid px-4">
+            <div class="row g-5">
+                <div class="col-lg-4 col-md-6">
+
+                    <p style="text-align: justify;">Gujarat Police Innovation Hackathon 2026 — A flagship initiative to
+                        harness technology for
+                        public
+                        safety and law enforcement excellence across Gujarat.</p>
+                    <p style="font-size:0.84rem;margin-top:10px;margin-bottom:4px;">
+                        <i class="fa fa-map-marker-alt" style="color:var(--accent);margin-right:6px;"></i>
+                        <a href="https://maps.app.goo.gl/fBjjP1JX1fbXqNRH7" target="_blank" rel="noopener"
+                            style="color:rgba(255,255,255,0.75);">i-Hub Gujarat</a>
+                    </p>
+                    <div class="footer-social d-flex gap-2 mt-3">
+                        <a href="https://x.com/GujaratPolice"><i class="fab fa-x-twitter"></i></a>
+                        <a href="https://www.facebook.com/dgpgujaratofficial/"><i class="fab fa-facebook"></i></a>
+                        
+                        
+                        <a href="https://www.instagram.com/gujaratpolice_/"><i class="fab fa-instagram"></i></a>
+                    </div>
+                </div>
+
+                <div class="col-lg-2 col-md-6 col-6">
+                    <h6>Quick Links</h6>
+                    <ul>
+                        <li><i class="fa fa-chevron-right"></i><a href="https://sentinel.gujarat.gov.in">Home</a></li>
+                        <li><i class="fa fa-chevron-right"></i><a href="https://sentinel.gujarat.gov.in/problems">Problem
+                                Statements</a></li>
+                                                    <li><i class="fa fa-chevron-right"></i><a href="https://sentinel.gujarat.gov.in/register">Register</a>
+                            </li>
+                            <li><i class="fa fa-chevron-right"></i><a href="https://sentinel.gujarat.gov.in/login">Sign In</a></li>
+                                                <li><i class="fa fa-chevron-right"></i><a href="https://sentinel.gujarat.gov.in/faqs">FAQs</a></li>
+                    </ul>
+                </div>
+
+                <div class="col-lg-3 col-md-6 col-6">
+                    <h6>Important Dates</h6>
+                    <ul>
+                        <li><i class="fa fa-calendar-check"></i><span>Registration Open:
+                                4 August 2026</span></li>
+                        <li><i class="fa fa-calendar-check"></i><span>Last Date:
+                                29 August 2026</span></li>
+                        <li><i class="fa fa-calendar-check"></i><span>Shortlisting:
+                                30 August 2026</span></li>
+                        <li><i class="fa fa-calendar-check"></i><span>Event:
+                                1–2 September 2026</span></li>
+                        <li><i class="fa fa-calendar-check"></i><span>Results:
+                                2 September 2026</span></li>
+                    </ul>
+                </div>
+
+                <div class="col-lg-3 col-md-6">
+                    <h6>Contact</h6>
+                    <ul>
+                        <li><i
+                                class="fa fa-map-marker-alt"></i><span>State Crime Record Bureau (SCRB), Next to Police Bhawan Sector - 18 Gandhinagar, Gujarat - 382009</span>
+                        </li>
+                        <li><i class="fa fa-phone"></i><a
+                                href="tel:+91 95370 89982">+91 95370 89982</a>
+                        </li>
+                        <li><i class="fa fa-envelope"></i><a
+                                href="mailto:sentinel.hackathon@gujarat.gov.in">sentinel.hackathon@gujarat.gov.in</a>
+                        </li>
+                        <li><i class="fa fa-globe"></i><a href="https://gujhome.gujarat.gov.in"
+                                target="_blank">https://gujhome.gujarat.gov.in</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="scrb-banner-bar mt-4 py-2.5 text-center"
+            style="background: #ffffff; color: #000000; width: 100%; border-radius: 0;">
+            <span
+                style="font-weight: 800; font-size: 1.25rem; color: #000000; letter-spacing: 0.5px; display: inline-flex; align-items: center; justify-content: center; gap: 10px;">
+                <i class="fa fa-shield-alt" style="color: var(--accent); font-size: 1.15rem;"></i> State Crime Record
+                Bureau
+            </span>
+        </div>
+
+        <div class="container-fluid px-4">
+            <div class="footer-bottom d-flex justify-content-between flex-wrap gap-2 pt-1 pb-3"
+                style="margin-top: 0; padding-top: 2px;">
+                <span>© 2026 Gujarat Police Innovation Hackathon. All Rights Reserved. | Government of Gujarat</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://sentinel.gujarat.gov.in/public/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Navbar scroll effect
+        const nav = document.getElementById('siteNav');
+        window.addEventListener('scroll', () => {
+            nav.classList.toggle('scrolled', window.scrollY > 20);
+        });
+    </script>
+    
+    <script>
+        (function() {
+            let deadlineStr =
+                '2026-08-29';
+            const monthMap = {
+                January: '01',
+                February: '02',
+                March: '03',
+                April: '04',
+                May: '05',
+                June: '06',
+                July: '07',
+                August: '08',
+                September: '09',
+                October: '10',
+                November: '11',
+                December: '12'
+            };
+            deadlineStr = deadlineStr.replace(
+                /(\d{1,2})\s+([A-Za-z]+),?\s+(\d{4})/,
+                (_, d, m, y) => `${y}-${monthMap[m] || '08'}-${d.padStart(2,'0')}T23:59:59`
+            );
+            let deadline = new Date(deadlineStr).getTime();
+            if (isNaN(deadline)) deadline = new Date('2026-08-31T23:59:59').getTime();
+
+            function gcdTick() {
+                const diff = deadline - Date.now();
+                const ids = ['gcd-days', 'gcd-hours', 'gcd-mins', 'gcd-secs'];
+                if (diff <= 0) {
+                    ids.forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.textContent = '00';
+                    });
+                    return;
+                }
+                const vals = [
+                    Math.floor(diff / 86400000),
+                    Math.floor((diff % 86400000) / 3600000),
+                    Math.floor((diff % 3600000) / 60000),
+                    Math.floor((diff % 60000) / 1000)
+                ];
+                ids.forEach((id, i) => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = String(vals[i]).padStart(2, '0');
+                });
+            }
+            gcdTick();
+            setInterval(gcdTick, 1000);
+        })();
+    </script>
+        <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            var steps = Array.from(document.querySelectorAll("details.journey-step"));
+            var models = Array.from(document.querySelectorAll(".journey-step[data-step='B'] details.model-card"));
+            var modelLinks = Array.from(document.querySelectorAll(".model-summary-list [data-model-target]"));
+
+            function closeOtherSteps(activeStep) {
+                steps.forEach(function(step) {
+                    if (step !== activeStep) step.open = false;
+                });
+            }
+
+            function closeOtherModels(activeModel) {
+                models.forEach(function(model) {
+                    if (model !== activeModel) model.open = false;
+                });
+                modelLinks.forEach(function(link) {
+                    var isActive = activeModel && link.dataset.modelTarget === activeModel.id;
+                    link.classList.toggle("model-link-active", Boolean(isActive));
+                    link.setAttribute("aria-expanded", isActive ? "true" : "false");
+                });
+            }
+            steps.forEach(function(step) {
+                step.addEventListener("toggle", function() {
+                    if (step.open) {
+                        closeOtherSteps(step);
+                    } else if (step.dataset.step === "B") {
+                        closeOtherModels(null);
+                    }
+                });
+            });
+            models.forEach(function(model) {
+                model.addEventListener("toggle", function() {
+                    if (model.open) {
+                        closeOtherModels(model);
+                    } else {
+                        var al = modelLinks.find(function(l) {
+                            return l.dataset.modelTarget === model.id;
+                        });
+                        if (al) {
+                            al.classList.remove("model-link-active");
+                            al.setAttribute("aria-expanded", "false");
+                        }
+                    }
+                });
+            });
+
+            function openSelectedModel(link) {
+                var step = link.closest("details.journey-step");
+                var model = document.getElementById(link.dataset.modelTarget);
+                if (!step || !model) return;
+                closeOtherSteps(step);
+                step.open = true;
+                closeOtherModels(model);
+                model.open = true;
+                window.setTimeout(function() {
+                    model.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start"
+                    });
+                }, 80);
+            }
+            modelLinks.forEach(function(link) {
+                link.setAttribute("aria-expanded", "false");
+                link.addEventListener("click", function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openSelectedModel(link);
+                });
+                link.addEventListener("keydown", function(e) {
+                    if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openSelectedModel(link);
+                    }
+                });
+            });
+            document.querySelectorAll(".summary-highlights:not(.model-summary-list)").forEach(function(list) {
+                list.addEventListener("click", function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+            });
+        });
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            var step2 = document.querySelector('details.journey-step[data-step="B"]');
+            if (!step2) return;
+            var options = Array.from(step2.querySelectorAll(".model-option-card[data-model-target]"));
+            var cards = Array.from(step2.querySelectorAll(".model-card"));
+            var activeTitle = document.getElementById("active-model-title");
+            var labels = {
+                "model-1": "Model 1: Registry & GIS Foundation",
+                "model-2": "Model 2: Unified Viewing & Analytics",
+                "model-3": "Model 3: VMS Federation & Middleware",
+                "model-4": "Model 4: Central VMS & AI Platform",
+                "model-hybrid": "Hybrid / Innovative Architecture"
+            };
+
+            function showOnlyModel(targetId) {
+                var selected = document.getElementById(targetId);
+                if (!selected) return;
+                cards.forEach(function(card) {
+                    card.classList.toggle("selected-model", card === selected);
+                    card.open = card === selected;
+                });
+                options.forEach(function(opt) {
+                    var active = opt.dataset.modelTarget === targetId;
+                    opt.classList.toggle("model-link-active", active);
+                    opt.setAttribute("aria-expanded", active ? "true" : "false");
+                });
+                if (activeTitle) activeTitle.textContent = labels[targetId] || targetId;
+                step2.classList.add("model-selected");
+                step2.open = true;
+                window.setTimeout(function() {
+                    var body = step2.querySelector(".journey-body");
+                    if (body) body.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start"
+                    });
+                }, 60);
+            }
+            options.forEach(function(opt) {
+                opt.addEventListener("click", function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showOnlyModel(opt.dataset.modelTarget);
+                });
+                opt.addEventListener("keydown", function(e) {
+                    if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        showOnlyModel(opt.dataset.modelTarget);
+                    }
+                });
+            });
+            step2.addEventListener("toggle", function() {
+                if (!step2.open) {
+                    step2.classList.remove("model-selected");
+                    cards.forEach(function(c) {
+                        c.classList.remove("selected-model");
+                        c.open = false;
+                    });
+                    options.forEach(function(o) {
+                        o.classList.remove("model-link-active");
+                        o.setAttribute("aria-expanded", "false");
+                    });
+                    if (activeTitle) activeTitle.textContent = "Select a model above";
+                }
+            });
+        });
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            var steps = Array.from(document.querySelectorAll("details.journey-step"));
+            var navButtons = Array.from(document.querySelectorAll(".step-nav-button"));
+
+            function setActiveStep(step) {
+                navButtons.forEach(function(btn) {
+                    var active = step && btn.dataset.openStep === step.dataset.step;
+                    btn.classList.toggle("active", Boolean(active));
+                    btn.setAttribute("aria-pressed", active ? "true" : "false");
+                });
+            }
+
+            navButtons.forEach(function(btn) {
+                btn.setAttribute("aria-pressed", "false");
+                btn.addEventListener("click", function(e) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    var step = document.querySelector('details.journey-step[data-step="' + btn
+                        .dataset.openStep + '"]');
+                    if (!step) return;
+                    steps.forEach(function(s) {
+                        s.open = s === step;
+                    });
+                    setActiveStep(step);
+                    window.setTimeout(function() {
+                        step.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start"
+                        });
+                    }, 60);
+                }, true);
+            });
+
+            steps.forEach(function(step) {
+                step.addEventListener("toggle", function() {
+                    if (step.open) {
+                        steps.forEach(function(other) {
+                            if (other !== step) other.open = false;
+                        });
+                        setActiveStep(step);
+                    } else {
+                        var anyOpen = steps.find(function(s) {
+                            return s.open;
+                        });
+                        setActiveStep(anyOpen || null);
+                    }
+                });
+            });
+
+            var observer = new IntersectionObserver(function(entries) {
+                var visible = entries
+                    .filter(function(e) {
+                        return e.isIntersecting;
+                    })
+                    .sort(function(a, b) {
+                        return b.intersectionRatio - a.intersectionRatio;
+                    });
+                if (visible.length) setActiveStep(visible[0].target);
+            }, {
+                rootMargin: "-20% 0px -55% 0px",
+                threshold: [0.1, 0.3, 0.6]
+            });
+
+            steps.forEach(function(step) {
+                observer.observe(step);
+            });
+        });
+    </script>
+
+    </div><!-- end hc-wrap -->
+
+    
+    <button id="acc-toggle" onclick="document.getElementById('acc-panel').classList.toggle('open')"
+        aria-label="Accessibility options" title="Accessibility">
+        <i class="fa fa-universal-access" style="font-size:1.1rem;"></i>
+        <span>A11Y</span>
+    </button>
+
+    <div id="acc-panel" role="region" aria-label="Accessibility toolbar">
+        <div class="acc-title"><i class="fa fa-universal-access"></i> Accessibility</div>
+
+        
+        <div style="font-size:0.7rem;color:var(--muted);margin-bottom:6px;font-weight:600;">FONT SIZE</div>
+        <div class="acc-font-row">
+            <button class="acc-btn" id="acc-a-plus" onclick="accFontSize(1)" title="Increase font size"><i
+                    class="fa fa-plus"></i> A+</button>
+            <button class="acc-btn" id="acc-a-minus" onclick="accFontSize(-1)" title="Decrease font size"><i
+                    class="fa fa-minus"></i> A-</button>
+        </div>
+
+        
+        <div style="font-size:0.7rem;color:var(--muted);margin:10px 0 6px;font-weight:600;">DISPLAY</div>
+        <button class="acc-btn" id="acc-contrast-btn" onclick="accToggle('acc-contrast','acc-contrast-btn')">
+            <i class="fa fa-adjust"></i> High Contrast
+        </button>
+
+        
+        <button class="acc-btn" id="acc-dyslexia-btn" onclick="accToggle('acc-dyslexia','acc-dyslexia-btn')">
+            <i class="fa fa-font"></i> Dyslexia Font
+        </button>
+
+        
+        <div style="font-size:0.7rem;color:var(--muted);margin:10px 0 6px;font-weight:600;">AUDIO</div>
+        <button class="acc-btn" id="acc-tts-btn" onclick="accTTS()">
+            <i class="fa fa-volume-up"></i> <span id="acc-tts-label">Listen to Page</span>
+        </button>
+
+        
+        <button class="acc-btn" onclick="accReset()"
+            style="margin-top:10px;border-color:#ef4444;color:#ef4444;background:#fef2f2;">
+            <i class="fa fa-undo"></i> Reset All
+        </button>
+    </div>
+
+    <script>
+        // ── Font size ──
+        let accFontLevel = parseInt(localStorage.getItem('acc-font') || '0');
+        applyFont();
+
+        function applyFont() {
+            document.documentElement.style.fontSize = (16 + accFontLevel * 2) + 'px';
+            localStorage.setItem('acc-font', accFontLevel);
+        }
+
+        function accFontSize(dir) {
+            accFontLevel = Math.max(-3, Math.min(5, accFontLevel + dir));
+            applyFont();
+        }
+
+        // ── Toggle class on body ──
+        function accToggle(bodyClass, btnId) {
+            document.body.classList.toggle(bodyClass);
+            const btn = document.getElementById(btnId);
+            btn.classList.toggle('active');
+            localStorage.setItem(bodyClass, document.body.classList.contains(bodyClass) ? '1' : '0');
+            console.log('Toggled', bodyClass, 'active:', btn.classList.contains('active'));
+        }
+
+        // ── Restore persisted states ──
+        if (localStorage.getItem('acc-contrast') === '1') {
+            document.body.classList.add('acc-contrast');
+            document.getElementById('acc-contrast-btn').classList.add('active');
+        }
+        if (localStorage.getItem('acc-dyslexia') === '1') {
+            document.body.classList.add('acc-dyslexia');
+            document.getElementById('acc-dyslexia-btn').classList.add('active');
+        }
+
+        // ── Text-to-Speech ──
+        let ttsUtterance = null;
+
+        function accTTS() {
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+                document.getElementById('acc-tts-label').textContent = 'Listen to Page';
+                document.getElementById('acc-tts-btn').classList.remove('active');
+                return;
+            }
+            const text = document.querySelector('main').innerText.replace(/\s+/g, ' ').trim();
+            ttsUtterance = new SpeechSynthesisUtterance(text);
+            ttsUtterance.lang = 'en-IN';
+            ttsUtterance.rate = 0.95;
+            ttsUtterance.onend = () => {
+                document.getElementById('acc-tts-label').textContent = 'Listen to Page';
+                document.getElementById('acc-tts-btn').classList.remove('active');
+            };
+            window.speechSynthesis.speak(ttsUtterance);
+            document.getElementById('acc-tts-label').textContent = 'Stop Listening';
+            document.getElementById('acc-tts-btn').classList.add('active');
+        }
+
+        // ── Reset all ──
+        function accReset() {
+            accFontLevel = 0;
+            applyFont();
+            ['acc-contrast', 'acc-dyslexia'].forEach(c => {
+                document.body.classList.remove(c);
+                localStorage.removeItem(c);
+            });
+            document.getElementById('acc-contrast').classList.remove('active');
+            document.getElementById('acc-dyslexia-btn').classList.remove('active');
+            if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+            document.getElementById('acc-tts-label').textContent = 'Listen to Page';
+            document.getElementById('acc-tts-btn').classList.remove('active');
+        }
+
+        // ── Close panel on outside click ──
+        document.addEventListener('click', e => {
+            const panel = document.getElementById('acc-panel');
+            const toggle = document.getElementById('acc-toggle');
+            if (!panel.contains(e.target) && !toggle.contains(e.target)) {
+                panel.classList.remove('open');
+            }
+        });
+    </script>
+
+    
+    
+    
+    <style>
+        #chatbot-btn {
+            position: fixed;
+            bottom: 28px;
+            left: 28px;
+            z-index: 1100;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0a1628, #0f2d5e);
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(10, 22, 40, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            transition: all 0.25s;
+        }
+
+        #chatbot-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 28px rgba(10, 22, 40, 0.5);
+        }
+
+        .chat-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #FF6B00;
+            font-size: 0.58rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #fff;
+            color: #fff;
+        }
+
+        #chatbot-box {
+            position: fixed;
+            bottom: 96px;
+            left: 28px;
+            z-index: 1100;
+            width: 360px;
+            max-width: calc(100vw - 40px);
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.18);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+
+        #chatbot-box.open {
+            display: flex;
+            animation: chatSlideUp 0.25s ease;
+        }
+
+        @keyframes chatSlideUp {
+            from {
+                opacity: 0;
+                transform: translateY(16px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #0a1628, #0f2d5e);
+            color: #fff;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chat-header-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(255, 107, 0, 0.25);
+            border: 2px solid rgba(255, 107, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .chat-header-info {
+            flex: 1;
+        }
+
+        .chat-header-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+        }
+
+        .chat-header-sub {
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .chat-close-btn {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 4px;
+            transition: color 0.2s;
+        }
+
+        .chat-close-btn:hover {
+            color: #fff;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px;
+            max-height: 320px;
+            min-height: 180px;
+            background: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .chat-messages::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+
+        .cmsg {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .cmsg.user {
+            flex-direction: row-reverse;
+        }
+
+        .cmsg-bubble {
+            max-width: 82%;
+            padding: 9px 13px;
+            border-radius: 14px;
+            font-size: 0.81rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .cmsg.bot .cmsg-bubble {
+            background: #fff;
+            color: #0f172a;
+            border: 1px solid #e2e8f0;
+            border-bottom-left-radius: 4px;
+        }
+
+        .cmsg.user .cmsg-bubble {
+            background: linear-gradient(135deg, #0f2d5e, #1a3a6b);
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+
+        .cmsg-avatar {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: #0f2d5e;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            flex-shrink: 0;
+        }
+
+        .cmsg.user .cmsg-avatar {
+            background: #FF6B00;
+        }
+
+        .chat-suggestions {
+            padding: 8px 12px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            background: #f8fafc;
+        }
+
+        .chat-chip {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 4px 11px;
+            font-size: 0.73rem;
+            color: #0f2d5e;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .chat-chip:hover {
+            background: #0f2d5e;
+            color: #fff;
+            border-color: #0f2d5e;
+        }
+
+        .chat-input-wrap {
+            padding: 10px 12px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            border-top: 1px solid #e2e8f0;
+            background: #fff;
+        }
+
+        .chat-text-input {
+            flex: 1;
+            border: 1px solid #e2e8f0;
+            border-radius: 24px;
+            padding: 7px 14px;
+            font-size: 0.83rem;
+            outline: none;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .chat-text-input:focus {
+            border-color: #0f2d5e;
+        }
+
+        .chat-send-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: #0f2d5e;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.82rem;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .chat-send-btn:hover {
+            background: #0a1628;
+            transform: scale(1.05);
+        }
+
+        .typing-wrap {
+            display: flex;
+            gap: 4px;
+            padding: 6px 10px;
+        }
+
+        .typing-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #94a3b8;
+            animation: tdot 1.2s infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s
+        }
+
+        @keyframes tdot {
+
+            0%,
+            60%,
+            100% {
+                transform: translateY(0)
+            }
+
+            30% {
+                transform: translateY(-6px)
+            }
+        }
+
+        .cmsg-bubble a {
+            color: #FF6B00;
+            font-weight: 600;
+        }
+
+        .cmsg.user .cmsg-bubble a {
+            color: #ffd0a8;
+        }
+
+        @media(max-width:480px) {
+            #chatbot-box {
+                width: calc(100vw - 20px);
+                left: 10px;
+            }
+
+            #chatbot-btn {
+                bottom: 16px;
+                left: 16px;
+            }
+        }
+    </style>
+
+    <button id="chatbot-btn" onclick="gpChatToggle()" title="AI Hackathon Assistant">
+        <i class="fa fa-robot" id="gp-chat-icon"></i>
+        <span class="chat-badge">AI</span>
+    </button>
+
+    <div id="chatbot-box">
+        <div class="chat-header">
+            <div class="chat-header-avatar"><i class="fa fa-robot"></i></div>
+            <div class="chat-header-info">
+                <div class="chat-header-title">AI Hackathon Assistant</div>
+                <div class="chat-header-sub">🟢 Online — Ask me anything</div>
+            </div>
+            <button class="chat-close-btn" onclick="gpChatToggle()"><i class="fa fa-times"></i></button>
+        </div>
+
+        <div class="chat-messages" id="gpChatMsgs">
+            <div class="cmsg bot">
+                <div class="cmsg-avatar"><i class="fa fa-robot"></i></div>
+                <div class="cmsg-bubble">👋 Hello! I'm your <strong>Gujarat Police Hackathon Assistant</strong>.
+
+                    How can I help you today?</div>
+            </div>
+        </div>
+
+        <div class="chat-suggestions" id="gpChatChips">
+            <span class="chat-chip" onclick="gpSendChip(this)">Which problem should I choose?</span>
+            <span class="chat-chip" onclick="gpSendChip(this)">Explain problem in simple language</span>
+            <span class="chat-chip" onclick="gpSendChip(this)">How to register?</span>
+            <span class="chat-chip" onclick="gpSendChip(this)">Important dates</span>
+            <span class="chat-chip" onclick="gpSendChip(this)">Prize details</span>
+            <span class="chat-chip" onclick="gpSendChip(this)">Show me FAQs</span>
+            <span class="chat-chip" onclick="gpSendChip(this)">Technology stack</span>
+            <span class="chat-chip" onclick="gpSendChip(this)">Registration fee</span>
+        </div>
+
+        <div class="chat-input-wrap">
+            <input type="text" class="chat-text-input" id="gpChatInput" placeholder="Type your question..."
+                onkeydown="if(event.key==='Enter') gpSendMsg()">
+            <button class="chat-send-btn" onclick="gpSendMsg()">
+                <i class="fa fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const _gpCsrf = '590BC001Vh25cvISly18ik9JDUASCUOISaWFZ3Ix';
+
+        function gpChatToggle() {
+            const box = document.getElementById('chatbot-box');
+            const icon = document.getElementById('gp-chat-icon');
+            box.classList.toggle('open');
+            icon.className = box.classList.contains('open') ? 'fa fa-times' : 'fa fa-robot';
+            if (box.classList.contains('open')) document.getElementById('gpChatInput').focus();
+        }
+
+        function gpSendChip(el) {
+            document.getElementById('gpChatInput').value = el.textContent;
+            document.getElementById('gpChatChips').style.display = 'none';
+            gpSendMsg();
+        }
+
+        async function gpSendMsg() {
+            const input = document.getElementById('gpChatInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+            gpAppendMsg(msg, 'user');
+            input.value = '';
+            const typing = gpAppendTyping();
+            try {
+                const res = await fetch('https://sentinel.gujarat.gov.in/chatbot', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': _gpCsrf
+                    },
+                    body: JSON.stringify({
+                        message: msg
+                    })
+                });
+                const data = await res.json();
+                typing.remove();
+                gpAppendMsg(data.reply, 'bot');
+            } catch (e) {
+                typing.remove();
+                gpAppendMsg('Sorry, something went wrong. Please try again.', 'bot');
+            }
+        }
+
+        function gpAppendMsg(text, role) {
+            const msgs = document.getElementById('gpChatMsgs');
+            const div = document.createElement('div');
+            div.className = 'cmsg ' + role;
+            const av = document.createElement('div');
+            av.className = 'cmsg-avatar';
+            av.innerHTML = role === 'bot' ? '<i class="fa fa-robot"></i>' : '<i class="fa fa-user"></i>';
+            const bub = document.createElement('div');
+            bub.className = 'cmsg-bubble';
+            if (role === 'user') {
+                bub.textContent = text;
+            } else {
+                bub.textContent = text;
+            }
+            div.appendChild(av);
+            div.appendChild(bub);
+            msgs.appendChild(div);
+            msgs.scrollTop = msgs.scrollHeight;
+            return div;
+        }
+
+        function gpAppendTyping() {
+            const msgs = document.getElementById('gpChatMsgs');
+            const div = document.createElement('div');
+            div.className = 'cmsg bot';
+            div.innerHTML =
+                '<div class="cmsg-avatar"><i class="fa fa-robot"></i></div><div class="cmsg-bubble"><div class="typing-wrap"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>';
+            msgs.appendChild(div);
+            msgs.scrollTop = msgs.scrollHeight;
+            return div;
+        }
+    </script>
+    <script>
+        // Back-button guard: if this page is served from bfcache after logout,
+        // force a reload so the server auth check runs and redirects to /login.
+        window.addEventListener('pageshow', function(e) {
+            if (e.persisted) {
+                window.location.reload();
+            }
+        });
+    </script>
+
+</body>
+
+</html>
