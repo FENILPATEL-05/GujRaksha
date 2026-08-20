@@ -1,4 +1,4 @@
-const db = require('../db/pool');
+import db from '../db/pool.js';
 
 class GapAnalysisService {
   generateReport() {
@@ -68,4 +68,4 @@ class GapAnalysisService {
   }
 }
 
-module.exports = new GapAnalysisService();
+export default new GapAnalysisService();

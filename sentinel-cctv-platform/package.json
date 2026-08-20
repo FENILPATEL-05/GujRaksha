@@ -2,6 +2,7 @@
   "name": "gujraksha-cctv-platform",
   "version": "1.0.0",
   "description": "GujRaksha - Gujarat Industrial CCTV Asset Registry & Spatial GIS Platform",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "NODE_ENV=production node server.js",

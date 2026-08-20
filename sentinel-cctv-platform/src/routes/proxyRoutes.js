@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import http from 'http';
+import https from 'https';
+
 const router = express.Router();
-const http = require('http');
-const https = require('https');
 
 router.get('/proxy-stream', (req, res) => {
   const targetUrl = req.query.url;
@@ -30,4 +31,4 @@ router.get('/proxy-stream', (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

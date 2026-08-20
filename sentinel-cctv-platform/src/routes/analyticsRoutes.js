@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import gapAnalysisService from '../services/gapAnalysisService.js';
+import { authenticateToken } from '../middleware/auth.js';
+
 const router = express.Router();
-const gapAnalysisService = require('../services/gapAnalysisService');
-const { authenticateToken } = require('../middleware/auth');
 
 router.get('/gap-analysis', authenticateToken, (req, res, next) => {
   try {
@@ -15,4 +16,4 @@ router.get('/gap-analysis', authenticateToken, (req, res, next) => {
   }
 });
 
-module.exports = router;
+export default router;

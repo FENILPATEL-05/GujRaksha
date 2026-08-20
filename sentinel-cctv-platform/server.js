@@ -4,10 +4,18 @@
  * Proprietary & Confidential — Unauthorized copying or distribution is strictly prohibited.
  */
 
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+import cameraRoutes from './src/routes/cameraRoutes.js';
+import onboardingRoutes from './src/routes/onboardingRoutes.js';
+import analyticsRoutes from './src/routes/analyticsRoutes.js';
+import proxyRoutes from './src/routes/proxyRoutes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,11 +26,6 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // REST API Routes
-const cameraRoutes = require('./src/routes/cameraRoutes');
-const onboardingRoutes = require('./src/routes/onboardingRoutes');
-const analyticsRoutes = require('./src/routes/analyticsRoutes');
-const proxyRoutes = require('./src/routes/proxyRoutes');
-
 app.use('/api/v1/cameras', cameraRoutes);
 app.use('/api/v1/onboarding', onboardingRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
@@ -43,7 +46,7 @@ async function startServer() {
   if (!isProd) {
     // Single Port Dev Setup using Vite Middleware
     try {
-      const { createServer: createViteServer } = require('vite');
+      const { createServer: createViteServer } = await import('vite');
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: 'spa'

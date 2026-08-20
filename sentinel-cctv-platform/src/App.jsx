@@ -6,6 +6,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { LoginPage } from './components/LoginPage';
 import { Header } from './components/Header';
 import { MapView } from './components/MapView';
 import { FloatingFilterBar } from './components/FloatingFilterBar';
@@ -20,6 +22,7 @@ import { ExportModal } from './components/ExportModal';
 import { ToastContainer } from './components/Toast';
 
 export function AppContent() {
+  const { isAuthenticated, isAdmin } = useAuth();
   const [activeView, setActiveView] = useState('map'); // 'map' or 'registry'
   const [cameras, setCameras] = useState([]);
   const [filters, setFilters] = useState({
@@ -62,8 +65,17 @@ export function AppContent() {
   }, [filters]);
 
   useEffect(() => {
-    fetchCameras();
-  }, [fetchCameras]);
+    if (isAuthenticated) {
+      fetchCameras();
+    }
+  }, [fetchCameras, isAuthenticated]);
+
+  // Force viewer role to map view only
+  useEffect(() => {
+    if (!isAdmin && activeView === 'registry') {
+      setActiveView('map');
+    }
+  }, [isAdmin, activeView]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -83,6 +95,11 @@ export function AppContent() {
       addToast(err.message, 'error', 'Sync Network Error');
     }
   };
+
+  // If not authenticated, show login page
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
 
   return (
     <>
@@ -115,10 +132,10 @@ export function AppContent() {
           <FloatingCameraTray
             cameras={cameras}
             onCameraSelect={(cam) => setSelectedCameraForStream(cam)}
-            onEditCamera={(cam) => setSelectedCameraForEdit(cam)}
+            onEditCamera={(cam) => isAdmin && setSelectedCameraForEdit(cam)}
           />
         </div>
-      ) : (
+      ) : isAdmin ? (
         <CameraRegistryPage
           cameras={cameras}
           filters={filters}
@@ -128,43 +145,48 @@ export function AppContent() {
           onExportCsv={() => setIsExportOpen(true)}
           onAddCamera={() => setIsOnboardOpen(true)}
         />
-      )}
+      ) : null}
 
       <StreamModal
         camera={selectedCameraForStream}
         onClose={() => setSelectedCameraForStream(null)}
         onEditCamera={(cam) => {
+          if (!isAdmin) return;
           setSelectedCameraForStream(null);
           setSelectedCameraForEdit(cam);
         }}
       />
 
-      <OnboardingModal
-        isOpen={isOnboardOpen}
-        onClose={() => setIsOnboardOpen(false)}
-        onRegisterSuccess={fetchCameras}
-        addToast={addToast}
-      />
+      {isAdmin && (
+        <>
+          <OnboardingModal
+            isOpen={isOnboardOpen}
+            onClose={() => setIsOnboardOpen(false)}
+            onRegisterSuccess={fetchCameras}
+            addToast={addToast}
+          />
 
-      <EditModal
-        camera={selectedCameraForEdit}
-        onClose={() => setSelectedCameraForEdit(null)}
-        onSaveSuccess={fetchCameras}
-        addToast={addToast}
-      />
+          <EditModal
+            camera={selectedCameraForEdit}
+            onClose={() => setSelectedCameraForEdit(null)}
+            onSaveSuccess={fetchCameras}
+            addToast={addToast}
+          />
 
-      <GapAnalysisModal
-        isOpen={isGapOpen}
-        onClose={() => setIsGapOpen(false)}
-        cameras={cameras}
-      />
+          <GapAnalysisModal
+            isOpen={isGapOpen}
+            onClose={() => setIsGapOpen(false)}
+            cameras={cameras}
+          />
 
-      <ExportModal
-        isOpen={isExportOpen}
-        onClose={() => setIsExportOpen(false)}
-        cameras={cameras}
-        addToast={addToast}
-      />
+          <ExportModal
+            isOpen={isExportOpen}
+            onClose={() => setIsExportOpen(false)}
+            cameras={cameras}
+            addToast={addToast}
+          />
+        </>
+      )}
 
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
     </>
@@ -174,7 +196,9 @@ export function AppContent() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </ThemeProvider>
   );
 }

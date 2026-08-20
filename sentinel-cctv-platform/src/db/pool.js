@@ -1,6 +1,6 @@
-const fs = require('fs');
-const path = require('path');
-const config = require('../config/env');
+import fs from 'fs';
+import path from 'path';
+import config from '../config/env.js';
 
 class CameraDataStore {
   constructor() {
@@ -152,4 +152,4 @@ class CameraDataStore {
   }
 }
 
-module.exports = new CameraDataStore();
+export default new CameraDataStore();

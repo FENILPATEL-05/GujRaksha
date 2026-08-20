@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import onboardingService from '../services/onboardingService.js';
+import { authenticateToken } from '../middleware/auth.js';
+
 const router = express.Router();
-const onboardingService = require('../services/onboardingService');
-const { authenticateToken } = require('../middleware/auth');
 
 router.post('/bulk-csv', authenticateToken, (req, res, next) => {
   try {
@@ -37,4 +38,4 @@ router.post('/sync-gov-feeds', authenticateToken, async (req, res, next) => {
   }
 });
 
-module.exports = router;
+export default router;

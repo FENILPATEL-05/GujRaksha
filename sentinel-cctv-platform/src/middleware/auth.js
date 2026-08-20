@@ -1,6 +1,6 @@
-const config = require('../config/env');
+import config from '../config/env.js';
 
-const authenticateToken = (req, res, next) => {
+export const authenticateToken = (req, res, next) => {
   // Enterprise RBAC Context Injector (Demo Mode accepts bearer or populates default STATE_ADMIN role)
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -15,7 +15,7 @@ const authenticateToken = (req, res, next) => {
   next();
 };
 
-const authorizeRoles = (...allowedRoles) => {
+export const authorizeRoles = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user || !allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
@@ -26,5 +26,3 @@ const authorizeRoles = (...allowedRoles) => {
     next();
   };
 };
-
-module.exports = { authenticateToken, authorizeRoles };

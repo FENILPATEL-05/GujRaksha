@@ -1,4 +1,4 @@
-const db = require('../db/pool');
+import db from '../db/pool.js';
 
 class CameraService {
   getCameras(filters) {
@@ -53,4 +53,4 @@ class CameraService {
   }
 }
 
-module.exports = new CameraService();
+export default new CameraService();

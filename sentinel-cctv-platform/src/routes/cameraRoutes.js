@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import cameraService from '../services/cameraService.js';
+import { authenticateToken } from '../middleware/auth.js';
+
 const router = express.Router();
-const cameraService = require('../services/cameraService');
-const { authenticateToken } = require('../middleware/auth');
 
 router.get('/', authenticateToken, (req, res, next) => {
   try {
@@ -73,4 +74,4 @@ router.delete('/:id', authenticateToken, (req, res, next) => {
   }
 });
 
-module.exports = router;
+export default router;

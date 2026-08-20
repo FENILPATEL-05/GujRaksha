@@ -1,4 +1,4 @@
-const db = require('../db/pool');
+import db from '../db/pool.js';
 
 class OnboardingService {
   processBulkCsv(rawText) {
@@ -169,4 +169,4 @@ class OnboardingService {
   }
 }
 
-module.exports = new OnboardingService();
+export default new OnboardingService();
