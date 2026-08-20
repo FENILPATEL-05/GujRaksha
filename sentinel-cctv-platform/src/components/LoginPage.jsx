@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LogoBadge } from './Logo';
-import { Eye, EyeOff, ShieldCheck, LogIn } from 'lucide-react';
+import { Eye, EyeOff, ShieldCheck, LogIn, Radar } from 'lucide-react';
 
 export const LoginPage = () => {
   const { login } = useAuth();
