@@ -44,105 +44,92 @@ export const CameraRegistryPage = ({
 
   return (
     <div className="table-view" style={{ display: 'block' }}>
-      {/* Page Header & Actions */}
-      <div className="table-toolbar">
+      {/* Page Header Title */}
+      <div className="table-header-row">
         <div>
           <h2>Camera Registry</h2>
-          <div className="sub">Complete statewide inventory — search, sort and manage every registered device.</div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <button className="btn" onClick={onExportCsv} title="Export CSV, JSON, GeoJSON Reports">
-            <FileSpreadsheet size={15} strokeWidth={2.2} /> Export Report
-          </button>
-          <button className="btn btn-primary" onClick={onAddCamera} title="Onboard New Camera Node">
-            <Plus size={15} strokeWidth={2.4} /> Add Camera
-          </button>
+          <div className="sub">Complete statewide inventory — search, sort and manage every registered device ({totalItems} total).</div>
         </div>
       </div>
 
-      {/* Search & Filter Controls Bar */}
-      <div className="floating filter-bar" style={{ position: 'static', transform: 'none', minWidth: '100%', marginBottom: '18px' }}>
-        <div className="search-box">
-          <Search size={15} strokeWidth={2.2} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
-          <input
-            type="text"
-            placeholder="Search ID, Location, District, VMS..."
-            value={filters.search}
-            onChange={(e) => {
-              onFilterChange('search', e.target.value);
-              setCurrentPage(1);
-            }}
-          />
-        </div>
+      {/* Unified Single-Row Search, Filter & Action Toolbar */}
+      <div className="table-unified-toolbar">
+        {/* Left Side: Search & Dropdown Filters */}
+        <div className="toolbar-filters-group">
+          <div className="search-box">
+            <Search size={15} strokeWidth={2.2} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Search ID, Location, District, VMS..."
+              value={filters.search}
+              onChange={(e) => {
+                onFilterChange('search', e.target.value);
+                setCurrentPage(1);
+              }}
+            />
+          </div>
 
-        <select
-          className="filter-select"
-          value={filters.department}
-          onChange={(e) => {
-            onFilterChange('department', e.target.value);
-            setCurrentPage(1);
-          }}
-        >
-          <option value="ALL">All Departments (26)</option>
-          <option value="HOME">Home Dept / Gujarat Police</option>
-          <option value="TRANSPORT">Transport Dept / RTO Gujarat</option>
-          <option value="CIVIL_SUPPLIES">Food & Civil Supplies</option>
-          <option value="PORTS">Gujarat Maritime Board / Ports</option>
-          <option value="PRIVATE_FEED">Private Commercial Feeder</option>
-        </select>
-
-        <select
-          className="filter-select"
-          value={filters.district}
-          onChange={(e) => {
-            onFilterChange('district', e.target.value);
-            setCurrentPage(1);
-          }}
-        >
-          <option value="ALL">All Districts</option>
-          <option value="Gandhinagar">Gandhinagar</option>
-          <option value="Ahmedabad">Ahmedabad</option>
-          <option value="Surat">Surat</option>
-          <option value="Rajkot">Rajkot</option>
-          <option value="Vadodara">Vadodara</option>
-          <option value="Junagadh">Junagadh</option>
-          <option value="Gir Somnath">Gir Somnath</option>
-          <option value="Navsari">Navsari</option>
-          <option value="Patan">Patan</option>
-          <option value="Kutch">Kutch</option>
-        </select>
-
-        <select
-          className="filter-select"
-          value={filters.status}
-          onChange={(e) => {
-            onFilterChange('status', e.target.value);
-            setCurrentPage(1);
-          }}
-        >
-          <option value="ALL">All Statuses</option>
-          <option value="ACTIVE">ACTIVE / Online</option>
-          <option value="MAINTENANCE">MAINTENANCE</option>
-          <option value="OFFLINE">OFFLINE</option>
-        </select>
-
-        {/* Per Page Select */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-          <span>Per Page:</span>
           <select
             className="filter-select"
-            style={{ minWidth: '70px' }}
-            value={itemsPerPage}
+            value={filters.department}
             onChange={(e) => {
-              setItemsPerPage(Number(e.target.value));
+              onFilterChange('department', e.target.value);
               setCurrentPage(1);
             }}
           >
-            <option value={10}>10</option>
-            <option value={20}>20</option>
-            <option value={50}>50</option>
+            <option value="ALL">All Departments (26)</option>
+            <option value="HOME">Home Dept / Gujarat Police</option>
+            <option value="TRANSPORT">Transport Dept / RTO Gujarat</option>
+            <option value="CIVIL_SUPPLIES">Food & Civil Supplies</option>
+            <option value="PORTS">Gujarat Maritime Board / Ports</option>
+            <option value="PRIVATE_FEED">Private Commercial Feeder</option>
           </select>
+
+          <select
+            className="filter-select"
+            value={filters.district}
+            onChange={(e) => {
+              onFilterChange('district', e.target.value);
+              setCurrentPage(1);
+            }}
+          >
+            <option value="ALL">All Districts</option>
+            <option value="Gandhinagar">Gandhinagar</option>
+            <option value="Ahmedabad">Ahmedabad</option>
+            <option value="Surat">Surat</option>
+            <option value="Rajkot">Rajkot</option>
+            <option value="Vadodara">Vadodara</option>
+            <option value="Junagadh">Junagadh</option>
+            <option value="Gir Somnath">Gir Somnath</option>
+            <option value="Navsari">Navsari</option>
+            <option value="Patan">Patan</option>
+            <option value="Kutch">Kutch</option>
+          </select>
+
+          <select
+            className="filter-select"
+            value={filters.status}
+            onChange={(e) => {
+              onFilterChange('status', e.target.value);
+              setCurrentPage(1);
+            }}
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="ACTIVE">ACTIVE / Online</option>
+            <option value="MAINTENANCE">MAINTENANCE</option>
+            <option value="OFFLINE">OFFLINE</option>
+          </select>
+        </div>
+
+        {/* Right Side: Export & Add Camera Button in the same line */}
+        <div className="toolbar-actions-group">
+          <button className="btn" onClick={onExportCsv} title="Export CSV, JSON, GeoJSON Reports">
+            <FileSpreadsheet size={15} strokeWidth={2.2} /> Export Report
+          </button>
+          
+          <button className="btn btn-primary" onClick={onAddCamera} title="Onboard New Camera Node">
+            <Plus size={15} strokeWidth={2.4} /> Add Camera
+          </button>
         </div>
       </div>
 
@@ -281,22 +268,32 @@ export const CameraRegistryPage = ({
         </table>
       </div>
 
-      {/* Pagination Controls Footer */}
-      {totalPages > 1 && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '14px 18px',
-          background: 'var(--panel-bg)',
-          borderRadius: '12px',
-          border: '1px solid var(--panel-border)',
-          marginTop: '16px'
-        }}>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-            Showing records <b>{startIndex + 1}</b> to <b>{Math.min(startIndex + itemsPerPage, totalItems)}</b> of <b>{totalItems}</b>
+      {/* Pagination & Rows-Per-Page Footer */}
+      <div className="table-pagination-footer">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+            Showing records <b>{totalItems === 0 ? 0 : startIndex + 1}</b> to <b>{Math.min(startIndex + itemsPerPage, totalItems)}</b> of <b>{totalItems}</b>
           </div>
 
+          <div className="per-page-wrapper">
+            <span>Rows per page:</span>
+            <select
+              className="filter-select per-page-select"
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+        </div>
+
+        {totalPages > 1 && (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
               className="btn btn-sm"
@@ -325,8 +322,8 @@ export const CameraRegistryPage = ({
               Next <ChevronRight size={14} strokeWidth={2} />
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

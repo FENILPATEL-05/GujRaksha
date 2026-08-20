@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Video, ChevronDown, ChevronUp, SquarePen } from 'lucide-react';
 
 export const FloatingCameraTray = ({ cameras, onCameraSelect, onEditCamera }) => {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <div className={`floating camera-list-panel ${!isOpen ? 'collapsed' : ''}`} style={{ maxHeight: isOpen ? '420px' : '48px' }}>
