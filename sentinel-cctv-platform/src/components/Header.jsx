@@ -10,7 +10,10 @@ import { useAuth } from '../context/AuthContext';
 import { LogoBadge } from './Logo';
 import {
   MapPin,
-  Table,
+  Camera,
+  Building2,
+  LayoutGrid,
+  Car,
   Moon,
   Sun,
   RefreshCw,
@@ -22,7 +25,7 @@ import {
   Eye
 } from 'lucide-react';
 
-export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap }) => {
+export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, departmentCount = 26 }) => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout, isAdmin } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
@@ -71,12 +74,32 @@ export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap }) => 
             <MapPin size={15} strokeWidth={2} /> GIS Map
           </button>
           {isAdmin && (
-            <button
-              className={activeView === 'registry' ? 'active' : ''}
-              onClick={() => onViewChange('registry')}
-            >
-              <Table size={15} strokeWidth={2} /> Table Registry
-            </button>
+            <>
+              <button
+                className={activeView === 'registry' ? 'active' : ''}
+                onClick={() => onViewChange('registry')}
+              >
+                <Camera size={15} strokeWidth={2} /> Cameras
+              </button>
+              <button
+                className={activeView === 'departments' ? 'active' : ''}
+                onClick={() => onViewChange('departments')}
+              >
+                <Building2 size={15} strokeWidth={2} /> Departments ({departmentCount})
+              </button>
+              <button
+                className={activeView === 'videowall' ? 'active' : ''}
+                onClick={() => onViewChange('videowall')}
+              >
+                <LayoutGrid size={15} strokeWidth={2} /> Video Wall
+              </button>
+              <button
+                className={activeView === 'anpr' ? 'active' : ''}
+                onClick={() => onViewChange('anpr')}
+              >
+                <Car size={15} strokeWidth={2} /> ANPR & Watchlist
+              </button>
+            </>
           )}
         </div>
       </div>

@@ -18,8 +18,7 @@ export const IncidentRadarPanel = ({
   incidents,
   onLocate,
   onOpenStream,
-  onDismiss,
-  onTriggerDemo
+  onDismiss
 }) => {
   // Default is Closed as requested
   const [isOpen, setIsOpen] = useState(false);
@@ -99,13 +98,6 @@ export const IncidentRadarPanel = ({
 
           <div className="threat-header-actions">
             <button
-              className="btn-trigger-demo"
-              onClick={onTriggerDemo}
-              title="Simulate Random Detection Incident"
-            >
-              <Zap size={12} strokeWidth={2.5} /> <span>Simulate</span>
-            </button>
-            <button
               className="btn-close-sidebar"
               onClick={() => setIsOpen(false)}
               title="Close Threat Sidebar"
@@ -124,9 +116,6 @@ export const IncidentRadarPanel = ({
               </div>
               <div className="empty-title">Perimeter Secure</div>
               <p>No active security anomalies or ANPR hotlist hits detected on statewide GIS feeds.</p>
-              <button className="btn btn-sm btn-primary" onClick={onTriggerDemo} style={{ marginTop: '10px' }}>
-                <Zap size={13} strokeWidth={2.2} /> Trigger Demo Alert
-              </button>
             </div>
           ) : (
             <div className="incident-cards-list">

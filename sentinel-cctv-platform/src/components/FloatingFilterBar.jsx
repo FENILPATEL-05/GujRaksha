@@ -1,7 +1,7 @@
 import React from 'react';
 import { Search, FileSpreadsheet } from 'lucide-react';
 
-export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv }) => {
+export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv, departments = [] }) => {
   return (
     <div className="floating filter-bar">
       <div className="search-box">
@@ -20,12 +20,12 @@ export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv }) => {
         value={filters.department}
         onChange={(e) => onFilterChange('department', e.target.value)}
       >
-        <option value="ALL">All Departments</option>
-        <option value="HOME">Police / Home Dept</option>
-        <option value="TRANSPORT">RTO / Transport</option>
-        <option value="CIVIL_SUPPLIES">Civil Supplies</option>
-        <option value="PORTS">Maritime Ports</option>
-        <option value="PRIVATE_FEED">Private Feeder</option>
+        <option value="ALL">All Departments ({departments.length || '26+'})</option>
+        {departments.map((d) => (
+          <option key={d.code} value={d.code}>
+            {d.name}
+          </option>
+        ))}
       </select>
 
       <select

@@ -13,6 +13,9 @@ import cameraRoutes from './src/routes/cameraRoutes.js';
 import onboardingRoutes from './src/routes/onboardingRoutes.js';
 import analyticsRoutes from './src/routes/analyticsRoutes.js';
 import proxyRoutes from './src/routes/proxyRoutes.js';
+import departmentRoutes from './src/routes/departmentRoutes.js';
+import watchlistRoutes from './src/routes/watchlistRoutes.js';
+import anprRoutes from './src/routes/anprRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +30,9 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // REST API Routes
 app.use('/api/v1/cameras', cameraRoutes);
+app.use('/api/v1/departments', departmentRoutes);
+app.use('/api/v1/watchlist', watchlistRoutes);
+app.use('/api/v1/anpr', anprRoutes);
 app.use('/api/v1/onboarding', onboardingRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/proxy-stream', proxyRoutes);

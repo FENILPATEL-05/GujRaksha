@@ -4,191 +4,122 @@ import { useTheme } from '../context/ThemeContext';
 import { IncidentRadarPanel } from './IncidentRadarPanel';
 import { Plus, Minus, Crosshair, Radio, ShieldAlert } from 'lucide-react';
 
-const VEHICLE_PLATES = [
-  'GJ-01-ER-9821',
-  'GJ-05-BX-4412',
-  'GJ-03-KM-7719',
-  'GJ-27-AA-1008',
-  'GJ-06-TR-5531',
-  'GJ-18-BB-9901',
-  'GJ-10-DF-3342',
-  'GJ-12-AZ-8810',
-  'GJ-02-PQ-6504',
-  'GJ-21-LM-4478'
-];
-
-const INCIDENT_TEMPLATES = [
-  {
-    type: 'ANPR_HOTLIST',
-    title: 'Hotlisted Vehicle Detected',
-    descFn: (plate) => `${plate} (Black Scorpio) · Suspected Stolen Vehicle (FIR #284/2026)`,
-    severity: 'CRITICAL'
-  },
-  {
-    type: 'ANPR_HOTLIST',
-    title: 'Commercial Overload Violation',
-    descFn: (plate) => `${plate} (Freight Logistics) · Weighbridge bypass trigger`,
-    severity: 'HIGH'
-  },
-  {
-    type: 'ANPR_HOTLIST',
-    title: 'Stolen Two-Wheeler Tracked',
-    descFn: (plate) => `${plate} (Pulsar 220) · Police Cordon ANPR Match (99.1%)`,
-    severity: 'HIGH'
-  },
-  {
-    type: 'PERIMETER_BREACH',
-    title: 'Perimeter Intrusion Detected',
-    descFn: () => 'Restricted industrial security zone boundary crossed',
-    severity: 'CRITICAL'
-  },
-  {
-    type: 'TRAFFIC_VIOLATION',
-    title: 'Wrong-Way Speeding Anomaly',
-    descFn: (plate) => `${plate} driving against traffic flow at 85+ km/h`,
-    severity: 'HIGH'
-  },
-  {
-    type: 'CROWD_ANOMALY',
-    title: 'Dense Crowd Surge Detected',
-    descFn: () => 'Abnormal crowd density spike near public transit gate',
-    severity: 'WARNING'
-  },
-  {
-    type: 'SMOKE_FIRE',
-    title: 'Thermal Sensor Early Warning',
-    descFn: () => 'Thermal anomaly threshold crossed in industrial sector',
-    severity: 'CRITICAL'
-  }
-];
-
-export const MapView = ({ cameras, onCameraSelect }) => {
+export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, onClearTrackVehicle }) => {
   const mapRef = useRef(null);
   const leafletMap = useRef(null);
   const tileLayerRef = useRef(null);
   const markersLayer = useRef(null);
+  const trajectoryLayer = useRef(null);
   const markersMapRef = useRef({});
   const { theme } = useTheme();
 
-  // Active Real-Time Incidents State
+  // Active Real-Time Incidents State (Fed directly from Real-Time AI / Watchlist Engine)
   const [incidents, setIncidents] = useState([]);
+  const [trajectoryData, setTrajectoryData] = useState(null);
 
-  // Create a new realistic alert for a random camera
-  const createRandomAlert = useCallback((targetCam = null) => {
-    if (!cameras || cameras.length === 0) return null;
-
-    const cam = targetCam || cameras[Math.floor(Math.random() * cameras.length)];
-    const tpl = INCIDENT_TEMPLATES[Math.floor(Math.random() * INCIDENT_TEMPLATES.length)];
-    const plate = VEHICLE_PLATES[Math.floor(Math.random() * VEHICLE_PLATES.length)];
-
-    return {
-      id: `inc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      type: tpl.type,
-      title: tpl.title,
-      vehicleNo: tpl.type === 'ANPR_HOTLIST' || tpl.type === 'TRAFFIC_VIOLATION' ? plate : null,
-      description: tpl.descFn(plate),
-      severity: tpl.severity,
-      cameraId: cam.id,
-      cameraCode: cam.camera_code,
-      cameraName: cam.name,
-      district: cam.district || 'Gujarat',
-      createdAt: Date.now(),
-      timeAgo: 'Just now',
-      isNew: true,
-      camera: cam
-    };
+  // Fetch initial real active alerts from database
+  const fetchActiveAlerts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/v1/anpr/alerts');
+      const json = await res.json();
+      if (json.success && json.data) {
+        const formatted = json.data.map(alert => ({
+          ...alert,
+          timeAgo: formatTimeAgo(alert.createdAt),
+          camera: cameras.find(c => c.id === alert.cameraId) || {
+            id: alert.cameraId,
+            name: alert.cameraName,
+            camera_code: alert.cameraCode,
+            district: alert.district,
+            latitude: alert.latitude,
+            longitude: alert.longitude
+          }
+        }));
+        setIncidents(formatted);
+      }
+    } catch (err) {
+      console.error('Error fetching real active alerts:', err);
+    }
   }, [cameras]);
 
-  // Initial demo alerts setup
+  // Connect to Live Server-Sent Events (SSE) Stream for Instant Push Alerts
   useEffect(() => {
-    if (cameras.length > 0 && incidents.length === 0) {
-      const cam1 = cameras.find(c => (c.district || '').toLowerCase().includes('ahmedabad')) || cameras[0];
-      const cam2 = cameras.find(c => (c.district || '').toLowerCase().includes('gandhinagar')) || cameras[1] || cameras[0];
+    fetchActiveAlerts();
 
-      const initialAlerts = [];
-      const alert1 = createRandomAlert(cam1);
-      if (alert1) initialAlerts.push(alert1);
+    let eventSource;
+    try {
+      eventSource = new EventSource('/api/v1/anpr/alerts/live');
+      
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data && data.type === 'ANPR_HOTLIST') {
+            const cam = cameras.find(c => c.id === data.cameraId) || {
+              id: data.cameraId,
+              name: data.cameraName,
+              camera_code: data.cameraCode,
+              district: data.district,
+              latitude: data.latitude,
+              longitude: data.longitude
+            };
 
-      if (cam2 && cam2.id !== cam1.id) {
-        const alert2 = createRandomAlert(cam2);
-        if (alert2) {
-          alert2.timeAgo = '24s ago';
-          alert2.createdAt = Date.now() - 24000;
-          alert2.isNew = false;
-          initialAlerts.push(alert2);
+            const incomingAlert = {
+              ...data,
+              timeAgo: 'Just now',
+              camera: cam,
+              isNew: true
+            };
+
+            setIncidents(prev => [incomingAlert, ...prev.filter(a => a.id !== incomingAlert.id)]);
+
+            // Auto-pan to camera location on real incoming alert
+            if (leafletMap.current && cam.latitude && cam.longitude) {
+              leafletMap.current.flyTo([cam.latitude, cam.longitude], 14, {
+                duration: 1.2,
+                easeLinearity: 0.25
+              });
+            }
+          }
+        } catch (e) {
+          // ignore non-json keep-alive
         }
-      }
+      };
 
-      setIncidents(initialAlerts);
+      eventSource.onerror = () => {
+        // SSE fallback
+      };
+    } catch (err) {
+      console.error('SSE Error:', err);
     }
-  }, [cameras, createRandomAlert]);
-
-  // Dynamic Periodic Alert Engine (Cycles & Rotates alerts across Gujarat every 14 seconds)
-  useEffect(() => {
-    if (!cameras || cameras.length === 0) return;
-
-    const rotationTimer = setInterval(() => {
-      setIncidents(prev => {
-        // Drop oldest if we have 3 or more active alerts
-        const currentList = prev.length >= 3 ? prev.slice(0, 2) : prev;
-        
-        // Pick a camera not already in active alerts
-        const activeCamIds = new Set(currentList.map(a => a.cameraId));
-        const availableCams = cameras.filter(c => !activeCamIds.has(c.id));
-        const chosenCam = availableCams.length > 0
-          ? availableCams[Math.floor(Math.random() * availableCams.length)]
-          : cameras[Math.floor(Math.random() * cameras.length)];
-
-        const newAlert = createRandomAlert(chosenCam);
-        if (!newAlert) return prev;
-
-        return [newAlert, ...currentList.map(a => ({ ...a, isNew: false }))];
-      });
-    }, 14000);
-
-    // Update relative time strings every 4 seconds
-    const timeUpdateTimer = setInterval(() => {
-      setIncidents(prev => prev.map(inc => {
-        const elapsedSec = Math.floor((Date.now() - inc.createdAt) / 1000);
-        let timeAgoStr = 'Just now';
-        if (elapsedSec >= 60) {
-          timeAgoStr = `${Math.floor(elapsedSec / 60)}m ago`;
-        } else if (elapsedSec > 5) {
-          timeAgoStr = `${elapsedSec}s ago`;
-        }
-        return { ...inc, timeAgo: timeAgoStr };
-      }));
-    }, 4000);
 
     return () => {
-      clearInterval(rotationTimer);
-      clearInterval(timeUpdateTimer);
+      if (eventSource) eventSource.close();
     };
-  }, [cameras, createRandomAlert]);
+  }, [fetchActiveAlerts, cameras]);
 
-  // Trigger manual simulated detection incident
-  const handleTriggerDemoIncident = useCallback(() => {
-    if (!cameras || cameras.length === 0) return;
+  // Helper for human-readable relative time
+  function formatTimeAgo(timestamp) {
+    if (!timestamp) return 'Just now';
+    const elapsedSec = Math.floor((Date.now() - timestamp) / 1000);
+    if (elapsedSec < 10) return 'Just now';
+    if (elapsedSec < 60) return `${elapsedSec}s ago`;
+    const mins = Math.floor(elapsedSec / 60);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    return `${hours}h ago`;
+  }
 
-    const randomCam = cameras[Math.floor(Math.random() * cameras.length)];
-    const newAlert = createRandomAlert(randomCam);
-    if (!newAlert) return;
+  // Periodic relative time updater (every 5 seconds)
+  useEffect(() => {
+    const timeUpdateTimer = setInterval(() => {
+      setIncidents(prev => prev.map(inc => ({
+        ...inc,
+        timeAgo: formatTimeAgo(inc.createdAt)
+      })));
+    }, 5000);
 
-    setIncidents(prev => [newAlert, ...prev.slice(0, 2)]);
-
-    // Auto-fly to camera location on manual simulate click
-    if (leafletMap.current && randomCam.latitude && randomCam.longitude) {
-      leafletMap.current.flyTo([randomCam.latitude, randomCam.longitude], 14, {
-        duration: 1.3,
-        easeLinearity: 0.25
-      });
-
-      setTimeout(() => {
-        const marker = markersMapRef.current[randomCam.id];
-        if (marker) marker.openPopup();
-      }, 1350);
-    }
-  }, [cameras, createRandomAlert]);
+    return () => clearInterval(timeUpdateTimer);
+  }, []);
 
   // Locate and Fly to Camera on Map
   const handleLocateIncident = (incident) => {
@@ -238,6 +169,7 @@ export const MapView = ({ cameras, onCameraSelect }) => {
 
       L.control.zoom({ position: 'topright' }).addTo(leafletMap.current);
       markersLayer.current = L.layerGroup().addTo(leafletMap.current);
+      trajectoryLayer.current = L.layerGroup().addTo(leafletMap.current);
     }
 
     // Dynamic Light / Dark Tile Layer Switching
@@ -398,6 +330,97 @@ export const MapView = ({ cameras, onCameraSelect }) => {
     if (leafletMap.current) leafletMap.current.invalidateSize();
   }, [cameras, incidents, onCameraSelect]);
 
+  // Render Vehicle Trajectory Route on GIS Map
+  useEffect(() => {
+    if (!leafletMap.current || !trajectoryLayer.current) return;
+    trajectoryLayer.current.clearLayers();
+
+    if (!activeTrackVehicle) {
+      setTrajectoryData(null);
+      return;
+    }
+
+    const fetchRoute = async () => {
+      try {
+        const res = await fetch(`/api/v1/anpr/trajectory/${encodeURIComponent(activeTrackVehicle)}`);
+        const json = await res.json();
+        if (json.success && json.data && json.data.waypoints.length > 0) {
+          const data = json.data;
+          setTrajectoryData(data);
+
+          const waypoints = data.waypoints;
+          const latlngs = waypoints.map(w => [w.latitude, w.longitude]);
+
+          // Draw Glowing Polyline Path
+          const routeLine = L.polyline(latlngs, {
+            color: '#f43f5e',
+            weight: 5,
+            dashArray: '10, 8',
+            opacity: 0.95,
+            lineJoin: 'round'
+          }).addTo(trajectoryLayer.current);
+
+          // Draw Numbered Waypoint Pins along the Path
+          waypoints.forEach((wp) => {
+            const isStart = wp.sequence === 1;
+            const isEnd = wp.sequence === waypoints.length;
+
+            const waypointHtml = `
+              <div class="cam-pin alarm-active critical" style="width: 32px; height: 32px;" title="Checkpoint #${wp.sequence}: ${wp.camera_name}">
+                <div class="alarm-tight-pulse"></div>
+                <div class="core alarm-core" style="font-family: var(--font-mono); font-size: 11px; font-weight: 800; color: #fff;">
+                  ${wp.sequence}
+                </div>
+              </div>
+            `;
+
+            const icon = L.divIcon({
+              html: waypointHtml,
+              className: 'custom-leaflet-marker has-alarm',
+              iconSize: [32, 32],
+              iconAnchor: [16, 16]
+            });
+
+            const marker = L.marker([wp.latitude, wp.longitude], {
+              icon,
+              zIndexOffset: 2000 + wp.sequence
+            });
+
+            const popupContent = `
+              <div class="tactical-popup">
+                <div class="popup-head" style="border-left: 3px solid #f43f5e;">
+                  <h4>Checkpoint #${wp.sequence} — ${wp.camera_name}</h4>
+                  <div class="badge-row">
+                    <span class="threat-severity-badge critical">SEQUENCE STEP ${wp.sequence}</span>
+                  </div>
+                </div>
+                <div class="popup-grid">
+                  <div><span>Tracked Vehicle</span><b>${data.vehicle_plate}</b></div>
+                  <div><span>Camera Node</span><b>${wp.camera_code || wp.camera_id}</b></div>
+                  <div><span>Timestamp</span><b>${new Date(wp.timestamp).toLocaleTimeString()}</b></div>
+                  <div><span>Speed Logged</span><b>${wp.speed_kmh} km/h</b></div>
+                </div>
+              </div>
+            `;
+
+            marker.bindPopup(popupContent);
+            trajectoryLayer.current.addLayer(marker);
+          });
+
+          // Zoom smoothly to fit entire route
+          leafletMap.current.fitBounds(routeLine.getBounds(), {
+            padding: [80, 80],
+            maxZoom: 15
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching vehicle trajectory:', err);
+      }
+    };
+
+    fetchRoute();
+  }, [activeTrackVehicle]);
+
   const handleZoomIn = () => {
     if (leafletMap.current) leafletMap.current.zoomIn();
   };
@@ -416,13 +439,60 @@ export const MapView = ({ cameras, onCameraSelect }) => {
     <main className="map-hero-workspace">
       <div id="gis-map" ref={mapRef}></div>
 
+      {/* Floating Active Vehicle Trajectory HUD Banner (Model 2 Test Case) */}
+      {trajectoryData && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '72px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            background: 'var(--panel-bg)',
+            border: '1px solid var(--danger)',
+            borderRadius: '12px',
+            padding: '10px 18px',
+            backdropFilter: 'blur(14px)',
+            boxShadow: '0 8px 30px rgba(244,63,94,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span className="alarm-pulse-dot"></span>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--danger)', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                🚨 ACTIVE VEHICLE ROUTE TRAJECTORY TRACED
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                <span className="plate-number" style={{ background: '#000', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>
+                  {trajectoryData.vehicle_plate}
+                </span>
+                <span>·</span>
+                <span style={{ color: 'var(--text-secondary)' }}>
+                  {trajectoryData.total_spotted} Checkpoint Hits along Gujarat Highway Corridor
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            className="btn btn-sm"
+            onClick={onClearTrackVehicle}
+            style={{ background: 'var(--danger)', color: '#fff', fontSize: '11px', padding: '5px 12px', fontWeight: 700 }}
+          >
+            ✕ Exit Route Mode
+          </button>
+        </div>
+      )}
+
       {/* Real-time AI Threat & ANPR Incident Dispatch Radar */}
       <IncidentRadarPanel
         incidents={incidents}
         onLocate={handleLocateIncident}
         onOpenStream={handleOpenStreamIncident}
         onDismiss={handleDismissIncident}
-        onTriggerDemo={handleTriggerDemoIncident}
       />
 
       {/* Map Custom Controls */}

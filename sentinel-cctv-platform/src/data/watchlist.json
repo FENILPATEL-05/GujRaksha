@@ -1,0 +1,15 @@
+[
+  {
+    "id": "wl-1787303333857",
+    "vehicle_plate": "GJ-01-AA-1234",
+    "vehicle_type": "SUV / Sedan",
+    "category": "STOLEN_VEHICLE",
+    "fir_number": "FIR01",
+    "police_station": "ahmedabad",
+    "owner_name": "Under Investigation",
+    "priority": "CRITICAL",
+    "status": "ACTIVE",
+    "description": "Flagged in statewide CCTV police watchlist.",
+    "created_at": "2026-08-21T09:08:53.857Z"
+  }
+]

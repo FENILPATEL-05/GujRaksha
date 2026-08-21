@@ -17,40 +17,12 @@ import {
   ExternalLink,
   Power
 } from 'lucide-react';
+import { LiveCCTVFeed } from './LiveCCTVFeed';
 
 export const StreamModal = ({ camera, onClose, onEditCamera }) => {
-  const [streamType, setStreamType] = useState('video');
-  const [hasError, setHasError] = useState(false);
-
-  const rawStreamUrl = camera ? (camera.stream_url || `https://live.sentinelgujarat.in/stream/${camera.id.replace('gov-feed-', '')}`) : '';
-  const isRtsp = rawStreamUrl.toLowerCase().startsWith('rtsp://');
-
-  useEffect(() => {
-    setHasError(false);
-    if (!camera) return;
-    if (isRtsp) {
-      setStreamType('rtsp');
-    } else if (rawStreamUrl.includes(':5000') || rawStreamUrl.includes(':8080') || rawStreamUrl.includes('mjpeg')) {
-      setStreamType('mjpeg');
-    } else {
-      setStreamType('video');
-    }
-  }, [camera, rawStreamUrl, isRtsp]);
+  const rawStreamUrl = camera ? (camera.stream_url || `http://live.sentinelgujarat.in/stream/${camera.id.replace('gov-feed-', '')}`) : '';
 
   if (!camera) return null;
-
-  const handleVideoError = () => {
-    setStreamType('mjpeg');
-  };
-
-  const handleImageError = () => {
-    setHasError(true);
-  };
-
-  const handleProxyClick = () => {
-    const proxyUrl = `/api/v1/proxy-stream?url=${encodeURIComponent(rawStreamUrl)}`;
-    window.open(proxyUrl, '_blank');
-  };
 
   return (
     <div className="modal-overlay">
@@ -63,64 +35,7 @@ export const StreamModal = ({ camera, onClose, onEditCamera }) => {
           <div className="stream-modal-layout">
             {/* Left: Stream Monitor Screen */}
             <div className="stream-screen">
-              <div className="stream-noise"></div>
-              <div className="stream-scan"></div>
-              <div className="stream-vignette"></div>
-              <div className="stream-crosshair"></div>
-
-              <div className="stream-badges">
-                <div className="rec-badge"><span className="rec-dot"></span> LIVE</div>
-              </div>
-
-              <div className="stream-camtag">{camera.camera_code || camera.id}</div>
-              <div className="stream-timestamp">{new Date().toLocaleTimeString()}</div>
-
-              {streamType === 'rtsp' && (
-                <div style={{ position: 'relative', zIndex: 2, padding: '30px 16px', textAlign: 'center' }}>
-                  <Network size={36} strokeWidth={1.6} style={{ color: 'var(--accent)', marginBottom: '8px' }} />
-                  <h4 style={{ fontSize: '14px', color: 'var(--text-primary)', marginBottom: '4px' }}>Local RTSP Network Feed Connected</h4>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', maxWidth: '420px', margin: '0 auto 8px' }}>
-                    Web browsers cannot decode native <code>rtsp://</code> socket protocols directly in HTML5 tags.
-                  </div>
-                  <div style={{ background: 'var(--input-bg)', padding: '8px', borderRadius: '6px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)', border: '1px solid var(--panel-border)', marginBottom: '8px', wordBreak: 'break-all' }}>
-                    {rawStreamUrl}
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--success)', background: 'rgba(52,211,153,0.15)', padding: '4px 10px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <CheckCircle2 size={13} strokeWidth={2} /> Connected to Police RTSP Gateway Relay
-                  </div>
-                </div>
-              )}
-
-              {streamType === 'video' && !hasError && (
-                <video
-                  controls
-                  autoPlay
-                  muted
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000', position: 'relative', zIndex: 1 }}
-                  src={rawStreamUrl}
-                  onError={handleVideoError}
-                />
-              )}
-
-              {streamType === 'mjpeg' && !hasError && (
-                <img
-                  style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000', position: 'relative', zIndex: 1 }}
-                  src={rawStreamUrl}
-                  onError={handleImageError}
-                  alt="Live Camera Feed"
-                />
-              )}
-
-              {hasError && (
-                <div style={{ position: 'relative', zIndex: 2, padding: '30px 16px', color: 'var(--danger)', textAlign: 'center' }}>
-                  <AlertTriangle size={32} strokeWidth={1.8} style={{ marginBottom: '6px' }} />
-                  <div style={{ fontWeight: 700, fontSize: '13px' }}>Live stream source requiring direct gateway proxy or authentication.</div>
-                  <div style={{ fontSize: '11px', marginTop: '4px', color: 'var(--text-secondary)' }}>Source URL: {rawStreamUrl}</div>
-                  <button className="btn btn-sm" style={{ marginTop: '10px' }} onClick={handleProxyClick}>
-                    <ShieldAlert size={13} strokeWidth={2} /> Launch Stream Proxy Gateway
-                  </button>
-                </div>
-              )}
+              <LiveCCTVFeed camera={camera} isMuted={true} isDetailed={true} />
             </div>
 
             {/* Right: Metadata Grid + PTZ Controls */}

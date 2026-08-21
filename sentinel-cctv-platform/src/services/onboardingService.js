@@ -112,58 +112,19 @@ class OnboardingService {
 
   async syncGovernmentLiveFeeds() {
     try {
-      const res = await globalThis.fetch('https://live.sentinelgujarat.in/api/cameras');
-      const text = await res.text();
-      
-      let data = {};
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        console.warn('Live API returned non-JSON response, using cached real dataset.');
-      }
-
-      const rawFeeds = data.cameras || [];
-      if (rawFeeds.length === 0) {
-        const existing = db.getAll({});
-        return { success: true, count: existing.length, cameras: existing };
-      }
-
-      const synced = [];
-      rawFeeds.forEach(item => {
-        const meta = this.resolveLocationMetadata(item.location || item.name);
-        const camType = this.resolveCameraType(item.id, item.name, item.location);
-        
-        const record = {
-          id: `gov-feed-${item.id}`,
-          camera_code: `GJ-GOV-${String(item.id).padStart(3, '0')}`,
-          name: `${item.name} (${item.location || 'Government Feed'})`,
-          department_id: 'HOME',
-          department_name: 'Home Department / Police',
-          district: meta.district,
-          latitude: parseFloat(meta.lat.toFixed(4)),
-          longitude: parseFloat(meta.lng.toFixed(4)),
-          ownership_type: 'GOVERNMENT',
-          camera_type: camType,
-          vms_vendor: `Live Sentinel Feeder (${(item.codec || 'H264').toUpperCase()}/${(item.container || 'MP4').toUpperCase()})`,
-          stream_url: `https://live.sentinelgujarat.in/stream/${item.id}`,
-          status: (item.status || 'live').toUpperCase() === 'LIVE' ? 'ACTIVE' : 'OFFLINE'
-        };
-
-        synced.push(db.create(record));
-      });
-
-      return {
-        success: true,
-        count: synced.length,
-        cameras: synced
-      };
-    } catch (err) {
-      console.warn('Sync warning:', err.message);
+      // Use local registry as primary authoritative source
       const existing = db.getAll({});
       return {
         success: true,
         count: existing.length,
         cameras: existing
+      };
+    } catch (err) {
+      console.error('Government live feeds sync error:', err.message);
+      return {
+        success: false,
+        count: 0,
+        cameras: []
       };
     }
   }

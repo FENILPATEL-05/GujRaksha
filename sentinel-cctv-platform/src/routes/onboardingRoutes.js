@@ -30,7 +30,7 @@ router.post('/sync-gov-feeds', authenticateToken, async (req, res, next) => {
     const result = await onboardingService.syncGovernmentLiveFeeds();
     res.json({
       success: true,
-      message: `Successfully synchronized ${result.count} live government feeds from https://live.sentinelgujarat.in/`,
+      message: `Successfully synchronized ${result.count} live government feeds from http://live.sentinelgujarat.in/`,
       data: result
     });
   } catch (err) {

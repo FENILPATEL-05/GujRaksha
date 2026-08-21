@@ -4,6 +4,31 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// GET lightweight camera directory for AI Inference pipeline (no auth required for edge nodes)
+router.get('/sync-list', (req, res, next) => {
+  try {
+    const result = cameraService.getCameras({});
+    const list = result.cameras || [];
+    res.json({
+      success: true,
+      total_cameras: list.length,
+      data: list.map(c => ({
+        id: c.id,
+        camera_code: c.camera_code,
+        name: c.name,
+        district: c.district,
+        department_name: c.department_name,
+        stream_url: c.stream_url,
+        status: c.status,
+        latitude: c.latitude,
+        longitude: c.longitude
+      }))
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/', authenticateToken, (req, res, next) => {
   try {
     const filters = {

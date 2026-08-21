@@ -137,3 +137,30 @@ CREATE TABLE IF NOT EXISTS camera_audit_logs (
 2. **Spatial Vector Tile Caching**: Frequently requested map bounding boxes cached at Redis edge nodes.
 3. **Stateless Node.js Services**: Microservices deployed in Kubernetes with Horizontal Pod Autoscalers (HPA) auto-scaling based on CPU/Memory load.
 4. **Low Bandwidth Edge Readiness**: Local regional edge nodes aggregate camera metadata and send lightweight status telemetry heartbeats back to central platform.
+
+---
+
+## 5. Model 1 as the Common CCTV Registry & GIS Foundation for Models 2, 3 & 4
+
+According to the official **Gujarat CCTV Hackathon 2026 Problem Statement**:
+> *"Important: Model 1 should be treated as the common CCTV registry and GIS foundation that may support Models 2, 3, and 4."*
+
+GujRaksha is purpose-built to serve as this unified foundation layer:
+
+### A. Supporting Model 2 (Unified Viewing & Metadata Analytics)
+- **Direct Stream Gateway Readiness**: GujRaksha stores the exact streaming protocol (`RTSP`, `HLS`, `MJPEG`, `WebRTC`) and credentials for each camera asset.
+- **Built-in Video Modal & Stream Proxy Gateway**: Provides instantaneous stream playback and transcoding via `/api/v1/proxy-stream`.
+- **ANPR Metadata Integration**: Pre-integrated AI Threat Radar for real-time plate hits and event indexing.
+
+### B. Supporting Model 3 (VMS Federation & Middleware Integration)
+- **Multi-Vendor VMS Taxonomy**: Standardized cataloging of VMS vendors (Hikvision, Dahua, Matrix, Honeywell, Milestone, etc.).
+- **Event Bus Schema Alignment**: Standardized incident taxonomy (`ANPR_HOTLIST`, `PERIMETER_BREACH`, `TRAFFIC_VIOLATION`, `CROWD_ANOMALY`) ready for Kafka/RabbitMQ federation buses.
+- **Department Partitioning**: Native segregation and RBAC permissions across all 26 Government Departments.
+
+### C. Supporting Model 4 (Central VMS & Statewide AI Platform)
+- **Spatial Route Reconstruction**: PostGIS `GIST` indexes enable high-speed geodesic path tracking of suspect vehicles across multiple cameras and timestamps along state highway corridors.
+- **Database Watchlist Linkage**: Built-in data structures ready for automated cross-referencing with state and national law enforcement databases:
+  - **VAHAN / SARTHI**: Stolen vehicles, blacklisted vehicles, RC/DL verification.
+  - **eGujCop (CCTNS)**: Arrested persons, wanted criminals, missing persons, active FIRs.
+  - **AFIS / NAFIS**: Biometric & criminal fingerprint records.
+

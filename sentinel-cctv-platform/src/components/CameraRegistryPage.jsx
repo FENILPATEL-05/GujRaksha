@@ -7,9 +7,12 @@ import {
   ChevronDown,
   Play,
   SquarePen,
+  Trash2,
   ChevronLeft,
   ChevronRight,
-  Plus
+  Plus,
+  SlidersHorizontal,
+  X
 } from 'lucide-react';
 
 export const CameraRegistryPage = ({
@@ -18,12 +21,15 @@ export const CameraRegistryPage = ({
   onFilterChange,
   onCameraSelect,
   onEditCamera,
+  onDeleteCamera,
   onExportCsv,
-  onAddCamera
+  onAddCamera,
+  departments = []
 }) => {
   const [expandedCameraId, setExpandedCameraId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
 
   // Pagination calculation
   const totalItems = cameras.length;
@@ -42,22 +48,31 @@ export const CameraRegistryPage = ({
     }
   };
 
-  return (
-    <div className="table-view" style={{ display: 'block' }}>
-      {/* Page Header Title */}
-      <div className="table-header-row">
-        <div>
-          <h2>Camera Registry</h2>
-          <div className="sub">Complete statewide inventory — search, sort and manage every registered device ({totalItems} total).</div>
-        </div>
-      </div>
+  let activeFilterCount = 0;
+  if (filters.department && filters.department !== 'ALL') activeFilterCount++;
+  if (filters.district && filters.district !== 'ALL') activeFilterCount++;
+  if (filters.status && filters.status !== 'ALL') activeFilterCount++;
 
+  const handleResetFilters = () => {
+    onFilterChange('department', 'ALL');
+    onFilterChange('district', 'ALL');
+    onFilterChange('status', 'ALL');
+    setCurrentPage(1);
+  };
+
+  return (
+    <div className="table-view">
       {/* Unified Single-Row Search, Filter & Action Toolbar */}
       <div className="table-unified-toolbar">
-        {/* Left Side: Search & Dropdown Filters */}
+        {/* Title */}
+        <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 800, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "6px" }}>
+          Cameras
+        </h2>
+
+        {/* Left Side: Search & Popover Filter Button */}
         <div className="toolbar-filters-group">
           <div className="search-box">
-            <Search size={15} strokeWidth={2.2} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+            <Search size={14} strokeWidth={2.2} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
             <input
               type="text"
               placeholder="Search ID, Location, District, VMS..."
@@ -67,67 +82,148 @@ export const CameraRegistryPage = ({
                 setCurrentPage(1);
               }}
             />
+            {filters.search && (
+              <X
+                size={13}
+                style={{ cursor: 'pointer', color: 'var(--text-dim)' }}
+                onClick={() => {
+                  onFilterChange('search', '');
+                  setCurrentPage(1);
+                }}
+              />
+            )}
           </div>
 
-          <select
-            className="filter-select"
-            value={filters.department}
-            onChange={(e) => {
-              onFilterChange('department', e.target.value);
-              setCurrentPage(1);
-            }}
-          >
-            <option value="ALL">All Departments (26)</option>
-            <option value="HOME">Home Dept / Gujarat Police</option>
-            <option value="TRANSPORT">Transport Dept / RTO Gujarat</option>
-            <option value="CIVIL_SUPPLIES">Food & Civil Supplies</option>
-            <option value="PORTS">Gujarat Maritime Board / Ports</option>
-            <option value="PRIVATE_FEED">Private Commercial Feeder</option>
-          </select>
+          {/* Single Filter Popover Button */}
+          <div style={{ position: 'relative', zIndex: 1000 }}>
+            <button
+              className="btn"
+              onClick={() => setShowFilterMenu(!showFilterMenu)}
+              style={{
+                height: '36px',
+                padding: '0 13px',
+                gap: '6px',
+                fontSize: '12px',
+                background: activeFilterCount > 0 ? 'rgba(34, 211, 238, 0.15)' : 'rgba(30, 41, 59, 0.55)',
+                borderColor: activeFilterCount > 0 ? 'var(--accent)' : 'rgba(255, 255, 255, 0.1)',
+                color: activeFilterCount > 0 ? 'var(--accent)' : 'var(--text-primary)'
+              }}
+              title="Open Camera Filters"
+            >
+              <SlidersHorizontal size={13} strokeWidth={2.2} />
+              <span>Filter</span>
+              {activeFilterCount > 0 && (
+                <span style={{
+                  background: 'var(--accent)',
+                  color: '#000',
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  padding: '1px 5px',
+                  borderRadius: '10px'
+                }}>
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
 
-          <select
-            className="filter-select"
-            value={filters.district}
-            onChange={(e) => {
-              onFilterChange('district', e.target.value);
-              setCurrentPage(1);
-            }}
-          >
-            <option value="ALL">All Districts</option>
-            <option value="Gandhinagar">Gandhinagar</option>
-            <option value="Ahmedabad">Ahmedabad</option>
-            <option value="Surat">Surat</option>
-            <option value="Rajkot">Rajkot</option>
-            <option value="Vadodara">Vadodara</option>
-            <option value="Junagadh">Junagadh</option>
-            <option value="Gir Somnath">Gir Somnath</option>
-            <option value="Navsari">Navsari</option>
-            <option value="Patan">Patan</option>
-            <option value="Kutch">Kutch</option>
-          </select>
+            {showFilterMenu && (
+              <>
+                <div
+                  style={{ position: 'fixed', inset: 0, zIndex: 999 }}
+                  onClick={() => setShowFilterMenu(false)}
+                />
+                <div className="filter-popover-dropdown">
+                <div className="filter-popover-header">
+                  <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <SlidersHorizontal size={12} style={{ color: 'var(--accent)' }} /> Filter Options
+                  </div>
+                  {activeFilterCount > 0 && (
+                    <button className="filter-popover-reset" onClick={handleResetFilters}>
+                      Reset All
+                    </button>
+                  )}
+                </div>
 
-          <select
-            className="filter-select"
-            value={filters.status}
-            onChange={(e) => {
-              onFilterChange('status', e.target.value);
-              setCurrentPage(1);
-            }}
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="ACTIVE">ACTIVE / Online</option>
-            <option value="MAINTENANCE">MAINTENANCE</option>
-            <option value="OFFLINE">OFFLINE</option>
-          </select>
+                <div className="filter-popover-field">
+                  <label className="filter-popover-label">Department</label>
+                  <select
+                    className="filter-popover-select"
+                    value={filters.department}
+                    onChange={(e) => {
+                      onFilterChange('department', e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <option value="ALL">All Departments ({departments.length || '26+'})</option>
+                    {departments.map((d) => (
+                      <option key={d.code} value={d.code}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="filter-popover-field">
+                  <label className="filter-popover-label">District</label>
+                  <select
+                    className="filter-popover-select"
+                    value={filters.district}
+                    onChange={(e) => {
+                      onFilterChange('district', e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <option value="ALL">All Districts</option>
+                    <option value="Gandhinagar">Gandhinagar</option>
+                    <option value="Ahmedabad">Ahmedabad</option>
+                    <option value="Surat">Surat</option>
+                    <option value="Rajkot">Rajkot</option>
+                    <option value="Vadodara">Vadodara</option>
+                    <option value="Junagadh">Junagadh</option>
+                    <option value="Gir Somnath">Gir Somnath</option>
+                    <option value="Navsari">Navsari</option>
+                    <option value="Patan">Patan</option>
+                    <option value="Kutch">Kutch</option>
+                  </select>
+                </div>
+
+                <div className="filter-popover-field">
+                  <label className="filter-popover-label">Status</label>
+                  <select
+                    className="filter-popover-select"
+                    value={filters.status}
+                    onChange={(e) => {
+                      onFilterChange('status', e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="ACTIVE">ACTIVE / Online</option>
+                    <option value="MAINTENANCE">MAINTENANCE</option>
+                    <option value="OFFLINE">OFFLINE</option>
+                  </select>
+                </div>
+
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => setShowFilterMenu(false)}
+                  style={{ marginTop: '4px', width: '100%', justifyContent: 'center' }}
+                >
+                  Apply Filters
+                </button>
+              </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Right Side: Export & Add Camera Button in the same line */}
         <div className="toolbar-actions-group">
-          <button className="btn" onClick={onExportCsv} title="Export CSV, JSON, GeoJSON Reports">
-            <FileSpreadsheet size={15} strokeWidth={2.2} /> Export Report
+          <button className="btn" onClick={onExportCsv} title="Export CSV, JSON, GeoJSON Reports" style={{ padding: '7px 12px', gap: '5px' }}>
+            <FileSpreadsheet size={14} strokeWidth={2.2} /> Export Report
           </button>
           
-          <button className="btn btn-primary" onClick={onAddCamera} title="Onboard New Camera Node">
+          <button className="btn btn-primary" onClick={onAddCamera} title="Onboard New Camera Node" style={{ padding: '7px 14px', gap: '6px' }}>
             <Plus size={15} strokeWidth={2.4} /> Add Camera
           </button>
         </div>
@@ -216,6 +312,19 @@ export const CameraRegistryPage = ({
                           >
                             <SquarePen size={13} strokeWidth={2} />
                           </button>
+
+                          {onDeleteCamera && (
+                            <button
+                              title="Delete Camera Asset"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeleteCamera(cam);
+                              }}
+                              style={{ color: 'var(--danger)' }}
+                            >
+                              <Trash2 size={13} strokeWidth={2} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -285,7 +394,6 @@ export const CameraRegistryPage = ({
                 setCurrentPage(1);
               }}
             >
-              <option value={10}>10</option>
               <option value={20}>20</option>
               <option value={50}>50</option>
               <option value={100}>100</option>

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Camera, X, Check, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
 
-export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast }) => {
+export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, departments = [] }) => {
   const [activeTab, setActiveTab] = useState('manual');
   const [bulkResult, setBulkResult] = useState(null);
   const [form, setForm] = useState({
     name: '',
-    department_id: 'HOME',
+    department_id: departments.length > 0 ? departments[0].code : 'HOME',
     district: '',
     taluka: '',
     latitude: '',
@@ -24,17 +24,23 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast }
   const handleManualSubmit = async (e) => {
     e.preventDefault();
     try {
+      const selectedDeptObj = departments.find(d => d.code === form.department_id);
+      const payload = {
+        ...form,
+        department_name: selectedDeptObj ? selectedDeptObj.name : `${form.department_id} Department`
+      };
+
       const res = await fetch('/api/v1/cameras', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.success) {
         addToast('New Camera Successfully Onboarded into Registry!', 'success', 'Camera Registered');
         setForm({
           name: '',
-          department_id: 'HOME',
+          department_id: departments.length > 0 ? departments[0].code : 'HOME',
           district: '',
           taluka: '',
           latitude: '',
@@ -115,11 +121,11 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast }
                     value={form.department_id}
                     onChange={(e) => setForm({ ...form, department_id: e.target.value })}
                   >
-                    <option value="HOME">Home Dept / Gujarat Police</option>
-                    <option value="TRANSPORT">Transport Dept / RTO Gujarat</option>
-                    <option value="CIVIL_SUPPLIES">Food & Civil Supplies</option>
-                    <option value="PORTS">Gujarat Maritime Board / Ports</option>
-                    <option value="PRIVATE_FEED">Private Commercial Feeder</option>
+                    {departments.map((d) => (
+                      <option key={d.code} value={d.code}>
+                        {d.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

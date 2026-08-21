@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SquarePen, X, Trash2, Save } from 'lucide-react';
 
-export const EditModal = ({ camera, onClose, onSaveSuccess, addToast }) => {
+export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, departments = [] }) => {
   const [form, setForm] = useState({
     name: '',
     department_id: 'HOME',
@@ -41,10 +41,16 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const selectedDeptObj = departments.find(d => d.code === form.department_id);
+      const payload = {
+        ...form,
+        department_name: selectedDeptObj ? selectedDeptObj.name : `${form.department_id} Department`
+      };
+
       const res = await fetch(`/api/v1/cameras/${camera.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.success) {
@@ -108,11 +114,11 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast }) => {
                   value={form.department_id}
                   onChange={(e) => setForm({ ...form, department_id: e.target.value })}
                 >
-                  <option value="HOME">Home Dept / Gujarat Police</option>
-                  <option value="TRANSPORT">Transport Dept / RTO Gujarat</option>
-                  <option value="CIVIL_SUPPLIES">Food & Civil Supplies</option>
-                  <option value="PORTS">Gujarat Maritime Board / Ports</option>
-                  <option value="PRIVATE_FEED">Private Commercial Feeder</option>
+                  {departments.map((d) => (
+                    <option key={d.code} value={d.code}>
+                      {d.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
