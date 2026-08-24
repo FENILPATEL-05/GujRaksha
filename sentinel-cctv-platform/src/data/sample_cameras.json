@@ -13,12 +13,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://192.168.1.96:5000/",
+    "stream_url": "rtsp://localhost:8554/stream/1",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.780Z",
-    "updated_at": "2026-08-21T09:52:38.180Z"
+    "updated_at": "2026-08-21T09:52:38.180Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/1",
+      "whep": "http://localhost:8889/stream/1/whep",
+      "hls": "http://localhost/live/stream/1/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/1",
+    "whep_url": "http://localhost:8889/stream/1/whep",
+    "hls_url": "http://localhost/live/stream/1/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-2",
@@ -34,12 +49,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://192.168.1.96:5000/",
+    "stream_url": "rtsp://localhost:8554/stream/2",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.781Z",
-    "updated_at": "2026-08-21T09:52:41.349Z"
+    "updated_at": "2026-08-21T09:52:41.349Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/2",
+      "whep": "http://localhost:8889/stream/2/whep",
+      "hls": "http://localhost/live/stream/2/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/2",
+    "whep_url": "http://localhost:8889/stream/2/whep",
+    "hls_url": "http://localhost/live/stream/2/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-3",
@@ -55,12 +85,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "DOME_INDOOR",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://192.168.1.96:5000/",
+    "stream_url": "rtsp://localhost:8554/stream/3",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.787Z",
-    "updated_at": "2026-08-21T09:52:44.383Z"
+    "updated_at": "2026-08-21T09:52:44.383Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/3",
+      "whep": "http://localhost:8889/stream/3/whep",
+      "hls": "http://localhost/live/stream/3/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/3",
+    "whep_url": "http://localhost:8889/stream/3/whep",
+    "hls_url": "http://localhost/live/stream/3/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-4",
@@ -76,12 +121,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://192.168.1.96:5000/",
+    "stream_url": "rtsp://localhost:8554/stream/4",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.787Z",
-    "updated_at": "2026-08-21T09:52:47.782Z"
+    "updated_at": "2026-08-21T09:52:47.782Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/4",
+      "whep": "http://localhost:8889/stream/4/whep",
+      "hls": "http://localhost/live/stream/4/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/4",
+    "whep_url": "http://localhost:8889/stream/4/whep",
+    "hls_url": "http://localhost/live/stream/4/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-5",
@@ -97,12 +157,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "FIXED_BULLET",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://192.168.1.96:5000/",
+    "stream_url": "rtsp://localhost:8554/stream/5",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.787Z",
-    "updated_at": "2026-08-21T09:52:53.679Z"
+    "updated_at": "2026-08-21T09:52:53.679Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/5",
+      "whep": "http://localhost:8889/stream/5/whep",
+      "hls": "http://localhost/live/stream/5/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/5",
+    "whep_url": "http://localhost:8889/stream/5/whep",
+    "hls_url": "http://localhost/live/stream/5/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-6",
@@ -118,12 +193,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
     "vms_vendor": "Live Sentinel Feeder (AVI/AVI)",
-    "stream_url": "http://192.168.1.96:5000/",
+    "stream_url": "rtsp://localhost:8554/stream/6",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.787Z",
-    "updated_at": "2026-08-21T09:52:56.581Z"
+    "updated_at": "2026-08-21T09:52:56.581Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/6",
+      "whep": "http://localhost:8889/stream/6/whep",
+      "hls": "http://localhost/live/stream/6/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/6",
+    "whep_url": "http://localhost:8889/stream/6/whep",
+    "hls_url": "http://localhost/live/stream/6/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-7",
@@ -139,12 +229,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "DOME_INDOOR",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://192.168.1.96:5000/",
+    "stream_url": "rtsp://localhost:8554/stream/7",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.788Z",
-    "updated_at": "2026-08-21T09:52:59.531Z"
+    "updated_at": "2026-08-21T09:52:59.531Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/7",
+      "whep": "http://localhost:8889/stream/7/whep",
+      "hls": "http://localhost/live/stream/7/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/7",
+    "whep_url": "http://localhost:8889/stream/7/whep",
+    "hls_url": "http://localhost/live/stream/7/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-8",
@@ -160,12 +265,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://192.168.1.96:5000/",
+    "stream_url": "rtsp://localhost:8554/stream/8",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.788Z",
-    "updated_at": "2026-08-21T09:53:02.893Z"
+    "updated_at": "2026-08-21T09:53:02.893Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/8",
+      "whep": "http://localhost:8889/stream/8/whep",
+      "hls": "http://localhost/live/stream/8/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/8",
+    "whep_url": "http://localhost:8889/stream/8/whep",
+    "hls_url": "http://localhost/live/stream/8/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-9",
@@ -181,12 +301,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "ANPR_SPECIAL",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://192.168.1.96:5000/",
+    "stream_url": "rtsp://localhost:8554/stream/9",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.788Z",
-    "updated_at": "2026-08-21T09:53:06.016Z"
+    "updated_at": "2026-08-21T09:53:06.016Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/9",
+      "whep": "http://localhost:8889/stream/9/whep",
+      "hls": "http://localhost/live/stream/9/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/9",
+    "whep_url": "http://localhost:8889/stream/9/whep",
+    "hls_url": "http://localhost/live/stream/9/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-10",
@@ -202,12 +337,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://192.168.1.96:5000/",
+    "stream_url": "rtsp://localhost:8554/stream/10",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.788Z",
-    "updated_at": "2026-08-21T09:53:10.040Z"
+    "updated_at": "2026-08-21T09:53:10.040Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/10",
+      "whep": "http://localhost:8889/stream/10/whep",
+      "hls": "http://localhost/live/stream/10/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/10",
+    "whep_url": "http://localhost:8889/stream/10/whep",
+    "hls_url": "http://localhost/live/stream/10/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-11",
@@ -223,12 +373,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "DOME_INDOOR",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/11",
+    "stream_url": "rtsp://localhost:8554/stream/11",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.788Z",
-    "updated_at": "2026-08-20T12:36:17.788Z"
+    "updated_at": "2026-08-20T12:36:17.788Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/11",
+      "whep": "http://localhost:8889/stream/11/whep",
+      "hls": "http://localhost/live/stream/11/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/11",
+    "whep_url": "http://localhost:8889/stream/11/whep",
+    "hls_url": "http://localhost/live/stream/11/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-12",
@@ -244,12 +409,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "ANPR_SPECIAL",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/12",
+    "stream_url": "rtsp://localhost:8554/stream/12",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.789Z",
-    "updated_at": "2026-08-20T12:36:17.789Z"
+    "updated_at": "2026-08-20T12:36:17.789Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/12",
+      "whep": "http://localhost:8889/stream/12/whep",
+      "hls": "http://localhost/live/stream/12/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/12",
+    "whep_url": "http://localhost:8889/stream/12/whep",
+    "hls_url": "http://localhost/live/stream/12/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-13",
@@ -265,12 +445,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "FIXED_BULLET",
     "vms_vendor": "Live Sentinel Feeder (H264/MKV)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/13",
+    "stream_url": "rtsp://localhost:8554/stream/13",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.789Z",
-    "updated_at": "2026-08-20T12:36:17.789Z"
+    "updated_at": "2026-08-20T12:36:17.789Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/13",
+      "whep": "http://localhost:8889/stream/13/whep",
+      "hls": "http://localhost/live/stream/13/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/13",
+    "whep_url": "http://localhost:8889/stream/13/whep",
+    "hls_url": "http://localhost/live/stream/13/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-14",
@@ -286,12 +481,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
     "vms_vendor": "Live Sentinel Feeder (H264/MKV)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/14",
+    "stream_url": "rtsp://localhost:8554/stream/14",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.789Z",
-    "updated_at": "2026-08-20T12:36:17.789Z"
+    "updated_at": "2026-08-20T12:36:17.789Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/14",
+      "whep": "http://localhost:8889/stream/14/whep",
+      "hls": "http://localhost/live/stream/14/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/14",
+    "whep_url": "http://localhost:8889/stream/14/whep",
+    "hls_url": "http://localhost/live/stream/14/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-15",
@@ -307,12 +517,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "DOME_INDOOR",
     "vms_vendor": "Live Sentinel Feeder (H264/MKV)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/15",
+    "stream_url": "rtsp://localhost:8554/stream/15",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.789Z",
-    "updated_at": "2026-08-20T12:36:17.789Z"
+    "updated_at": "2026-08-20T12:36:17.789Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/15",
+      "whep": "http://localhost:8889/stream/15/whep",
+      "hls": "http://localhost/live/stream/15/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/15",
+    "whep_url": "http://localhost:8889/stream/15/whep",
+    "hls_url": "http://localhost/live/stream/15/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-16",
@@ -328,12 +553,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
     "vms_vendor": "Live Sentinel Feeder (H264/MKV)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/16",
+    "stream_url": "rtsp://localhost:8554/stream/16",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.789Z",
-    "updated_at": "2026-08-20T12:36:17.789Z"
+    "updated_at": "2026-08-20T12:36:17.789Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/16",
+      "whep": "http://localhost:8889/stream/16/whep",
+      "hls": "http://localhost/live/stream/16/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/16",
+    "whep_url": "http://localhost:8889/stream/16/whep",
+    "hls_url": "http://localhost/live/stream/16/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-17",
@@ -349,12 +589,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "FIXED_BULLET",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/17",
+    "stream_url": "rtsp://localhost:8554/stream/17",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.789Z",
-    "updated_at": "2026-08-20T12:36:17.789Z"
+    "updated_at": "2026-08-20T12:36:17.789Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/17",
+      "whep": "http://localhost:8889/stream/17/whep",
+      "hls": "http://localhost/live/stream/17/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/17",
+    "whep_url": "http://localhost:8889/stream/17/whep",
+    "hls_url": "http://localhost/live/stream/17/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-18",
@@ -370,12 +625,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/18",
+    "stream_url": "rtsp://localhost:8554/stream/18",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.790Z",
-    "updated_at": "2026-08-20T12:36:17.790Z"
+    "updated_at": "2026-08-20T12:36:17.790Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/18",
+      "whep": "http://localhost:8889/stream/18/whep",
+      "hls": "http://localhost/live/stream/18/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/18",
+    "whep_url": "http://localhost:8889/stream/18/whep",
+    "hls_url": "http://localhost/live/stream/18/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-19",
@@ -391,12 +661,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "DOME_INDOOR",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/19",
+    "stream_url": "rtsp://localhost:8554/stream/19",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.790Z",
-    "updated_at": "2026-08-20T12:36:17.790Z"
+    "updated_at": "2026-08-20T12:36:17.790Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/19",
+      "whep": "http://localhost:8889/stream/19/whep",
+      "hls": "http://localhost/live/stream/19/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/19",
+    "whep_url": "http://localhost:8889/stream/19/whep",
+    "hls_url": "http://localhost/live/stream/19/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-20",
@@ -412,12 +697,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "ANPR_SPECIAL",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/20",
+    "stream_url": "rtsp://localhost:8554/stream/20",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.790Z",
-    "updated_at": "2026-08-20T12:36:17.790Z"
+    "updated_at": "2026-08-20T12:36:17.790Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/20",
+      "whep": "http://localhost:8889/stream/20/whep",
+      "hls": "http://localhost/live/stream/20/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/20",
+    "whep_url": "http://localhost:8889/stream/20/whep",
+    "hls_url": "http://localhost/live/stream/20/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-21",
@@ -433,12 +733,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "FIXED_BULLET",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/21",
+    "stream_url": "rtsp://localhost:8554/stream/21",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.790Z",
-    "updated_at": "2026-08-20T12:36:17.790Z"
+    "updated_at": "2026-08-20T12:36:17.790Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/21",
+      "whep": "http://localhost:8889/stream/21/whep",
+      "hls": "http://localhost/live/stream/21/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/21",
+    "whep_url": "http://localhost:8889/stream/21/whep",
+    "hls_url": "http://localhost/live/stream/21/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-22",
@@ -454,12 +769,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "ANPR_SPECIAL",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/22",
+    "stream_url": "rtsp://localhost:8554/stream/22",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.790Z",
-    "updated_at": "2026-08-20T12:36:17.790Z"
+    "updated_at": "2026-08-20T12:36:17.790Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/22",
+      "whep": "http://localhost:8889/stream/22/whep",
+      "hls": "http://localhost/live/stream/22/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/22",
+    "whep_url": "http://localhost:8889/stream/22/whep",
+    "hls_url": "http://localhost/live/stream/22/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-23",
@@ -475,12 +805,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "DOME_INDOOR",
     "vms_vendor": "Live Sentinel Feeder (AVI/AVI)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/23",
+    "stream_url": "rtsp://localhost:8554/stream/23",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.790Z",
-    "updated_at": "2026-08-20T12:36:17.790Z"
+    "updated_at": "2026-08-20T12:36:17.790Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/23",
+      "whep": "http://localhost:8889/stream/23/whep",
+      "hls": "http://localhost/live/stream/23/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/23",
+    "whep_url": "http://localhost:8889/stream/23/whep",
+    "hls_url": "http://localhost/live/stream/23/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-24",
@@ -496,12 +841,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "ANPR_SPECIAL",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/24",
+    "stream_url": "rtsp://localhost:8554/stream/24",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.790Z",
-    "updated_at": "2026-08-20T12:36:17.790Z"
+    "updated_at": "2026-08-20T12:36:17.790Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/24",
+      "whep": "http://localhost:8889/stream/24/whep",
+      "hls": "http://localhost/live/stream/24/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/24",
+    "whep_url": "http://localhost:8889/stream/24/whep",
+    "hls_url": "http://localhost/live/stream/24/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-25",
@@ -517,12 +877,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "FIXED_BULLET",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/25",
+    "stream_url": "rtsp://localhost:8554/stream/25",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.791Z",
-    "updated_at": "2026-08-20T12:36:17.791Z"
+    "updated_at": "2026-08-20T12:36:17.791Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/25",
+      "whep": "http://localhost:8889/stream/25/whep",
+      "hls": "http://localhost/live/stream/25/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/25",
+    "whep_url": "http://localhost:8889/stream/25/whep",
+    "hls_url": "http://localhost/live/stream/25/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-26",
@@ -538,12 +913,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/26",
+    "stream_url": "rtsp://localhost:8554/stream/26",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.791Z",
-    "updated_at": "2026-08-20T12:36:17.791Z"
+    "updated_at": "2026-08-20T12:36:17.791Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/26",
+      "whep": "http://localhost:8889/stream/26/whep",
+      "hls": "http://localhost/live/stream/26/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/26",
+    "whep_url": "http://localhost:8889/stream/26/whep",
+    "hls_url": "http://localhost/live/stream/26/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-27",
@@ -559,12 +949,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "DOME_INDOOR",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/27",
+    "stream_url": "rtsp://localhost:8554/stream/27",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.791Z",
-    "updated_at": "2026-08-20T12:36:17.791Z"
+    "updated_at": "2026-08-20T12:36:17.791Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/27",
+      "whep": "http://localhost:8889/stream/27/whep",
+      "hls": "http://localhost/live/stream/27/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/27",
+    "whep_url": "http://localhost:8889/stream/27/whep",
+    "hls_url": "http://localhost/live/stream/27/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-28",
@@ -580,12 +985,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "ANPR_SPECIAL",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/28",
+    "stream_url": "rtsp://localhost:8554/stream/28",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.791Z",
-    "updated_at": "2026-08-20T12:36:17.791Z"
+    "updated_at": "2026-08-20T12:36:17.791Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/28",
+      "whep": "http://localhost:8889/stream/28/whep",
+      "hls": "http://localhost/live/stream/28/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/28",
+    "whep_url": "http://localhost:8889/stream/28/whep",
+    "hls_url": "http://localhost/live/stream/28/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-29",
@@ -601,12 +1021,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "FIXED_BULLET",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/29",
+    "stream_url": "rtsp://localhost:8554/stream/29",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.792Z",
-    "updated_at": "2026-08-20T12:36:17.792Z"
+    "updated_at": "2026-08-20T12:36:17.792Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/29",
+      "whep": "http://localhost:8889/stream/29/whep",
+      "hls": "http://localhost/live/stream/29/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/29",
+    "whep_url": "http://localhost:8889/stream/29/whep",
+    "hls_url": "http://localhost/live/stream/29/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-30",
@@ -622,12 +1057,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/30",
+    "stream_url": "rtsp://localhost:8554/stream/30",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.792Z",
-    "updated_at": "2026-08-20T12:36:17.792Z"
+    "updated_at": "2026-08-20T12:36:17.792Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/30",
+      "whep": "http://localhost:8889/stream/30/whep",
+      "hls": "http://localhost/live/stream/30/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/30",
+    "whep_url": "http://localhost:8889/stream/30/whep",
+    "hls_url": "http://localhost/live/stream/30/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-1787137548382",
@@ -643,12 +1093,27 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "ANPR_SPECIAL",
     "vms_vendor": "Local RTSP Stream",
-    "stream_url": "http://192.168.1.96:5000/",
+    "stream_url": "rtsp://localhost:8554/stream/1787137548382",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-19",
     "created_at": "2026-08-19T11:05:48.382Z",
-    "updated_at": "2026-08-21T08:46:11.589Z"
+    "updated_at": "2026-08-21T08:46:11.589Z",
+    "codec": "H.264",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/1787137548382",
+      "whep": "http://localhost:8889/stream/1787137548382/whep",
+      "hls": "http://localhost/live/stream/1787137548382/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/1787137548382",
+    "whep_url": "http://localhost:8889/stream/1787137548382/whep",
+    "hls_url": "http://localhost/live/stream/1787137548382/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.264",
+      "bitrate": "4Mbps"
+    }
   },
   {
     "id": "gov-feed-31",
@@ -664,11 +1129,26 @@
     "ownership_type": "GOVERNMENT",
     "camera_type": "PTZ",
     "vms_vendor": "Live Sentinel Feeder (H264/MP4)",
-    "stream_url": "http://live.sentinelgujarat.in/stream/31",
+    "stream_url": "rtsp://localhost:8554/stream/31",
     "retention_days": 15,
     "status": "ACTIVE",
     "installation_date": "2026-08-20",
     "created_at": "2026-08-20T12:36:17.792Z",
-    "updated_at": "2026-08-20T12:36:17.792Z"
+    "updated_at": "2026-08-20T12:36:17.792Z",
+    "codec": "H.265",
+    "urls": {
+      "rtsp": "rtsp://localhost:8554/stream/31",
+      "whep": "http://localhost:8889/stream/31/whep",
+      "hls": "http://localhost/live/stream/31/index.m3u8"
+    },
+    "rtsp_url": "rtsp://localhost:8554/stream/31",
+    "whep_url": "http://localhost:8889/stream/31/whep",
+    "hls_url": "http://localhost/live/stream/31/index.m3u8",
+    "stream_properties": {
+      "resolution": "1920x1080",
+      "fps": 30,
+      "codec": "H.265",
+      "bitrate": "4Mbps"
+    }
   }
 ]

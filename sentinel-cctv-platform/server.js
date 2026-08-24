@@ -10,12 +10,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import cameraRoutes from './src/routes/cameraRoutes.js';
+import cameraService from './src/services/cameraService.js';
 import onboardingRoutes from './src/routes/onboardingRoutes.js';
 import analyticsRoutes from './src/routes/analyticsRoutes.js';
 import proxyRoutes from './src/routes/proxyRoutes.js';
 import departmentRoutes from './src/routes/departmentRoutes.js';
 import watchlistRoutes from './src/routes/watchlistRoutes.js';
 import anprRoutes from './src/routes/anprRoutes.js';
+import anprEngineService from './src/services/anprEngineService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,6 +38,52 @@ app.use('/api/v1/anpr', anprRoutes);
 app.use('/api/v1/onboarding', onboardingRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/proxy-stream', proxyRoutes);
+
+// Camera Ingest Catalogue API (Protocol Section 1)
+app.get('/api/ingest', (req, res, next) => {
+  try {
+    const result = cameraService.getCameras({});
+    const list = result.cameras || [];
+    const host = req.hostname || 'localhost';
+    res.json({
+      success: true,
+      total_cameras: list.length,
+      cameras: list.map(c => {
+        const cleanId = (c.id || '').replace('gov-feed-', '');
+        return {
+          id: c.id,
+          camera_code: c.camera_code,
+          name: c.name,
+          district: c.district,
+          codec: c.codec || 'H.264',
+          status: c.status || 'ACTIVE',
+          location: {
+            latitude: c.latitude,
+            longitude: c.longitude,
+            district: c.district,
+            address: c.address || ''
+          },
+          stream_properties: c.stream_properties || {
+            resolution: '1920x1080',
+            fps: 30,
+            codec: c.codec || 'H.264'
+          },
+          urls: c.urls || {
+            rtsp: `rtsp://${host}:8554/stream/${cleanId}`,
+            whep: `http://${host}:8889/stream/${cleanId}/whep`,
+            hls: `http://${host}/live/stream/${cleanId}/index.m3u8`
+          },
+          rtsp_url: c.rtsp_url || `rtsp://${host}:8554/stream/${cleanId}`,
+          whep_url: c.whep_url || `http://${host}:8889/stream/${cleanId}/whep`,
+          hls_url: c.hls_url || `http://${host}/live/stream/${cleanId}/index.m3u8`,
+          stream_url: c.stream_url || `rtsp://${host}:8554/stream/${cleanId}`
+        };
+      })
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // Health Check API
 app.get('/api/health', (req, res) => {
@@ -78,7 +126,27 @@ async function startServer() {
     console.log('🚀 GUJRAKSHA CCTV PLATFORM');
     console.log(`📡 Single Unified Server running on http://localhost:${PORT}`);
     console.log('🗺️  GIS Control Center & React Platform Active');
+    console.log('⚡ Native ANPR Engine Automated Background Service Active');
     console.log('=======================================================');
+
+    // Trigger initial background ANPR engine telemetry scan
+    setTimeout(async () => {
+      try {
+        const result = await anprEngineService.runInferenceOnAllCameras();
+        console.log('✓ Automatic ANPR background scan initialized:', result.output ? result.output.trim() : 'Active');
+      } catch (err) {
+        console.warn('⚠️ ANPR background worker warning:', err.message);
+      }
+    }, 1500);
+
+    // Periodic automatic background scan every 30 seconds
+    setInterval(async () => {
+      try {
+        await anprEngineService.runInferenceOnAllCameras();
+      } catch (err) {
+        // Silent catch for background loop
+      }
+    }, 30000);
   });
 }
 

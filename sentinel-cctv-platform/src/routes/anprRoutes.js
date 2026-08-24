@@ -84,4 +84,19 @@ router.post("/ingest", (req, res, next) => {
   }
 });
 
+// POST Trigger Native C++ ANPR Inference on All Cameras
+router.post("/run-engine-all", async (req, res, next) => {
+  try {
+    const { default: anprEngineService } = await import("../services/anprEngineService.js");
+    const result = await anprEngineService.runInferenceOnAllCameras();
+    res.json({
+      success: true,
+      message: "⚡ Native C++ ANPR Inference executed across all platform cameras!",
+      data: result
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
