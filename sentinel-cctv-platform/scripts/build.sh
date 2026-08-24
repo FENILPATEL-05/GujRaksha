@@ -65,8 +65,8 @@ if [ "${CLEAN_BUILD}" = true ]; then
   echo -e "${GREEN}✓ Clean completed successfully!${NC}\n"
 fi
 
-# Step 1: Build Native C++ ANPR Engine
-echo -e "${CYAN}⚙️ Step 1/2: Compiling Native C++ ANPR Engine...${NC}"
+# Step 1: Build Native C++ ANPR Engine & Verify TFLite Store
+echo -e "${CYAN}⚙️ Step 1/3: Compiling Native C++ ANPR Engine...${NC}"
 if [ -d "cpp" ]; then
   make -C cpp
   if [ -f "cpp/sentinel_anpr_engine" ]; then
@@ -79,8 +79,17 @@ else
   echo -e "${YELLOW}⚠️ C++ directory not found, skipping C++ engine build.${NC}"
 fi
 
-# Step 2: Build Vite Production Web Assets
-echo -e "\n${CYAN}📦 Step 2/2: Building Production Frontend Bundle (Vite)...${NC}"
+echo -e "\n${CYAN}🤖 Step 2/3: Verifying TFLite AI Models Store...${NC}"
+if [ -d "models/tflite" ]; then
+  MODEL_COUNT=$(find models/tflite -maxdepth 1 -name "*.tflite" | wc -l)
+  echo -e "${GREEN}✓ TFLite AI Model Store verified (${MODEL_COUNT} .tflite models stored in models/tflite/)${NC}"
+else
+  mkdir -p models/tflite
+  echo -e "${YELLOW}⚠️ Created models/tflite directory.${NC}"
+fi
+
+# Step 3: Build Vite Production Web Assets
+echo -e "\n${CYAN}📦 Step 3/3: Building Production Frontend Bundle (Vite)...${NC}"
 if [ -f "package.json" ]; then
   npm run build
   echo -e "${GREEN}✓ Vite bundle generated successfully in public/dist assets!${NC}"

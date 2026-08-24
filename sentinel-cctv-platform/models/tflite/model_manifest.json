@@ -1,0 +1,14 @@
+{
+  "platform": "GujRaksha CCTV AI Engine",
+  "model_directory": "models/tflite",
+  "models": {
+    "plate_detector": {
+      "filename": "plate_detector.tflite",
+      "task": "LICENSE_PLATE_DETECTION"
+    },
+    "plate_ocr": {
+      "filename": "plate_ocr.tflite",
+      "task": "LICENSE_PLATE_OCR"
+    }
+  }
+}
