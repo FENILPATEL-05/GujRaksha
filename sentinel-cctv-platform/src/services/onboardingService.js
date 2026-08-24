@@ -25,23 +25,34 @@ class OnboardingService {
       const lat = parseFloat(record.latitude || record.lat);
       const lng = parseFloat(record.longitude || record.lng || record.lon);
       const dept = record.department || record.department_id || 'HOME';
-      const district = record.district || 'Gandhinagar';
+      const district = record.district || 'Ahmedabad';
 
       if (isNaN(lat) || isNaN(lng)) {
         errors.push(`Row ${index + 2}: Invalid GPS coordinates (Lat: ${record.latitude}, Lng: ${record.longitude})`);
       } else {
         validCameras.push({
           name: name,
+          camera_code: record.camera_code || record.code || '',
           latitude: lat,
           longitude: lng,
           department_id: dept.toUpperCase(),
           department_name: record.department_name || `${dept} Department`,
           district: district,
-          ownership_type: (record.ownership || 'GOVERNMENT').toUpperCase(),
-          camera_type: (record.camera_type || 'FIXED_BULLET').toUpperCase(),
-          vms_vendor: record.vms_vendor || 'Hikvision',
+          taluka: record.taluka || '',
+          address: record.address || '',
+          ownership_type: (record.ownership || record.ownership_type || 'GOVERNMENT').toUpperCase(),
+          camera_type: (record.camera_type || 'PTZ').toUpperCase(),
+          vms_vendor: record.vms_vendor || 'Live Sentinel Feeder (H264/MP4)',
           status: (record.status || 'ACTIVE').toUpperCase(),
-          stream_url: record.stream_url || ''
+          stream_url: record.stream_url || record.rtsp_url || '',
+          rtsp_url: record.rtsp_url || (record.stream_url && record.stream_url.startsWith('rtsp://') ? record.stream_url : ''),
+          whep_url: record.whep_url || (record.stream_url && record.stream_url.endsWith('/whep') ? record.stream_url : ''),
+          hls_url: record.hls_url || '',
+          codec: record.codec || 'H.264',
+          retention_days: parseInt(record.retention_days || 15, 10),
+          resolution: record.resolution || '1920x1080',
+          fps: parseInt(record.fps || 30, 10),
+          bitrate: record.bitrate || '4Mbps'
         });
       }
     });

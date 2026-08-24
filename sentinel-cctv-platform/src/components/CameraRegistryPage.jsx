@@ -335,7 +335,7 @@ export const CameraRegistryPage = ({
                         <td colSpan={7} style={{ padding: '16px 20px', background: 'var(--input-bg)' }}>
                           <div style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            gridTemplateColumns: 'repeat(4, 1fr)',
                             gap: '12px'
                           }}>
                             <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
@@ -346,23 +346,55 @@ export const CameraRegistryPage = ({
                             </div>
 
                             <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
-                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>VMS Vendor Platform</div>
+                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>VMS Feeder / Platform</div>
                               <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                {cam.vms_vendor || 'Hikvision Platform'}
+                                {cam.vms_vendor || 'Live Sentinel Feeder'}
                               </div>
                             </div>
 
                             <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
-                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Taluka / Area</div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                {cam.taluka || 'Central Zone'}
+                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Codec & Resolution</div>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginTop: '2px' }}>
+                                {cam.codec || cam.stream_properties?.codec || 'H.264'} · {cam.stream_properties?.resolution || '1080p'} ({cam.stream_properties?.fps || 30}fps)
                               </div>
                             </div>
 
-                            <div style={{ gridColumn: '1 / -1', background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
-                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Stream Endpoint URL</div>
-                              <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginTop: '2px', wordBreak: 'break-all' }}>
-                                {cam.stream_url || 'N/A Direct Protocol'}
+                            <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Retention SLA</div>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                                {cam.retention_days || 15} Days
+                              </div>
+                            </div>
+
+                            {/* WHEP Stream URL */}
+                            <div style={{ gridColumn: 'span 2', background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(34, 211, 238, 0.25)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ fontSize: '10px', color: 'var(--success)', textTransform: 'uppercase', fontWeight: 800 }}>
+                                  WHEP WebRTC Playback Endpoint
+                                </div>
+                                <button
+                                  className="btn btn-sm btn-primary"
+                                  style={{ padding: '2px 8px', fontSize: '10.5px', gap: '4px' }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onCameraSelect(cam);
+                                  }}
+                                >
+                                  <Play size={11} /> Play WHEP Feed
+                                </button>
+                              </div>
+                              <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginTop: '4px', wordBreak: 'break-all' }}>
+                                {cam.whep_url || (cam.urls && cam.urls.whep) || `http://localhost:8889/stream/${(cam.id || '').replace('gov-feed-', '')}/whep`}
+                              </div>
+                            </div>
+
+                            {/* RTSP / Ingest URL */}
+                            <div style={{ gridColumn: 'span 2', background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>
+                                Primary RTSP Stream URL
+                              </div>
+                              <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', marginTop: '4px', wordBreak: 'break-all' }}>
+                                {cam.rtsp_url || (cam.urls && cam.urls.rtsp) || cam.stream_url || 'N/A'}
                               </div>
                             </div>
                           </div>

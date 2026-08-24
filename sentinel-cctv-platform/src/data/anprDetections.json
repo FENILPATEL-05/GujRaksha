@@ -1,23 +1,23 @@
 [
   {
-    "id": "det-1787311577035-mgyz",
+    "id": "det-1787571756887-icnb",
     "vehicle_plate": "GJ01AA1234",
     "vehicle_type": "SUV / Sedan",
     "vehicle_color": "Unknown",
-    "camera_id": "gov-feed-1787137548382",
-    "camera_code": "GJ-GOV-382",
-    "camera_name": "THE ORION",
-    "district": "AHMEDABAD",
-    "latitude": 23.0258,
-    "longitude": 72.5873,
-    "speed_kmh": 49,
-    "confidence": 98,
+    "camera_id": "gov-feed-1",
+    "camera_code": "GJ-GOV-001",
+    "camera_name": "THE ORION — SG Highway Command CCTV Node",
+    "district": "Ahmedabad",
+    "latitude": 23.0225,
+    "longitude": 72.5714,
+    "speed_kmh": 68,
+    "confidence": 98.4,
     "is_watchlist_hit": true,
     "watchlist_category": "STOLEN_VEHICLE",
     "watchlist_fir": "FIR01",
     "watchlist_ps": "ahmedabad",
     "watchlist_priority": "CRITICAL",
-    "timestamp": "2026-08-21T11:26:17.024199Z",
+    "timestamp": "2026-08-24T11:42:36Z",
     "stored": true
   }
 ]

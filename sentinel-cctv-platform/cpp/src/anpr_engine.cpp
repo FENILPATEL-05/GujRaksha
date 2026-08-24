@@ -47,8 +47,8 @@ std::string ANPREngine::sanitizePlate(const std::string& raw_text) const {
 }
 
 bool ANPREngine::isValidIndianPlate(const std::string& plate) const {
-    if (plate.length() < 4 || plate.length() > 13) return false;
-    // Standard Indian license plate pattern check: State code + District code + Series + Number
+    if (plate.length() < 6 || plate.length() > 12) return false;
+    // Standard Indian license plate pattern: State code (GJ, MH, etc.) + District code + Series + Number
     std::regex pattern("^(GJ|MH|DL|KA|TN|UP|HR|RJ|MP|PB|WB|KL|BR|AP|TS|CG|OD|UK|HP|JK)[0-9]{1,2}[A-Z]{0,3}[0-9]{1,4}$");
     return std::regex_match(plate, pattern);
 }
@@ -118,20 +118,39 @@ bool ANPREngine::syncWatchlist() {
     std::lock_guard<std::mutex> lock(m_watchlistMutex);
     m_watchlistSet.clear();
     
-    // Parse plates from JSON response (handles both array of strings and object records)
-    std::regex plate_regex("\"(?:vehicle_plate|plates?)\"\\s*:\\s*\"([^\"]+)\"|\"([A-Z0-9]{4,12})\"");
-    auto words_begin = std::sregex_iterator(resp.begin(), resp.end(), plate_regex);
-    auto words_end = std::sregex_iterator();
+    // Extract plates array specifically from "plates": ["...", "..."]
+    size_t plates_pos = resp.find("\"plates\"");
+    if (plates_pos != std::string::npos) {
+        size_t start_bracket = resp.find('[', plates_pos);
+        size_t end_bracket = resp.find(']', start_bracket);
+        if (start_bracket != std::string::npos && end_bracket != std::string::npos) {
+            std::string plates_array = resp.substr(start_bracket, end_bracket - start_bracket + 1);
+            std::regex item_regex("\"([^\"]+)\"");
+            auto begin = std::sregex_iterator(plates_array.begin(), plates_array.end(), item_regex);
+            auto end = std::sregex_iterator();
+            for (auto i = begin; i != end; ++i) {
+                std::smatch m = *i;
+                std::string p = sanitizePlate(m[1].str());
+                if (!p.empty() && isValidIndianPlate(p)) {
+                    m_watchlistSet.insert(p);
+                }
+            }
+        }
+    }
 
-    for (std::sregex_iterator i = words_begin; i != words_end; ++i) {
-        std::smatch match = *i;
-        std::string raw = match[1].matched ? match[1].str() : match[2].str();
-        std::string p = sanitizePlate(raw);
-        if (!p.empty() && p.length() >= 4) {
+    // Fallback: extract specific "vehicle_plate": "..."
+    std::regex vp_regex("\"vehicle_plate\"\\s*:\\s*\"([^\"]+)\"");
+    auto vbegin = std::sregex_iterator(resp.begin(), resp.end(), vp_regex);
+    auto vend = std::sregex_iterator();
+    for (auto i = vbegin; i != vend; ++i) {
+        std::smatch m = *i;
+        std::string p = sanitizePlate(m[1].str());
+        if (!p.empty() && isValidIndianPlate(p)) {
             m_watchlistSet.insert(p);
         }
     }
-    return true;
+
+    return !m_watchlistSet.empty();
 }
 
 bool ANPREngine::syncCameraConfig(const std::string& target_camera_code) {
@@ -149,7 +168,6 @@ bool ANPREngine::syncCameraConfig(const std::string& target_camera_code) {
 
 std::vector<CameraConfig> ANPREngine::fetchAllCameras() {
     std::vector<CameraConfig> list;
-    // Query backend cameras endpoint
     std::string url = m_apiBaseUrl + "/cameras/sync-list";
     std::string resp = httpGetJson(url);
     
@@ -209,20 +227,29 @@ size_t ANPREngine::runInferenceAllCameras() {
     auto cameras = fetchAllCameras();
     auto dynamic_plates = getWatchlistPlates();
 
-    if (dynamic_plates.empty()) {
-        std::cout << "ℹ️ Watchlist is empty. No active target vehicles configured in web UI.\n";
-        return 0;
-    }
+    // Pool of realistic traffic stream plates passing through CCTV feeds
+    std::vector<std::string> normal_traffic = {
+        "GJ01CD5678", "GJ05XY9999", "GJ27BZ1020", "GJ06MK4321", "GJ18KL9012"
+    };
 
     size_t hits = 0;
     for (size_t i = 0; i < cameras.size(); ++i) {
         const auto& cam = cameras[i];
-        // Use active target plate added from Web UI
-        std::string plate = dynamic_plates[i % dynamic_plates.size()];
-        auto evt = processCameraFrame(cam, plate, 98.2);
-        if (evt.is_watchlist_hit) {
+        
+        // Alternate between normal traffic and active hotlist targets
+        std::string plate;
+        if (!dynamic_plates.empty() && (i % 4 == 0)) {
+            plate = dynamic_plates[i % dynamic_plates.size()];
+        } else {
+            plate = normal_traffic[i % normal_traffic.size()];
+        }
+
+        if (isValidIndianPlate(plate)) {
+            auto evt = processCameraFrame(cam, plate, 97.8);
             dispatchAlertToBackend(evt);
-            hits++;
+            if (evt.is_watchlist_hit) {
+                hits++;
+            }
         }
     }
     return hits;

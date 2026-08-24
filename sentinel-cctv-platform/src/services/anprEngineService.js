@@ -45,11 +45,15 @@ class AnprEngineService {
       let stderrData = '';
 
       child.stdout.on('data', (chunk) => {
-        stdoutData += chunk.toString();
+        const text = chunk.toString();
+        stdoutData += text;
+        process.stdout.write(`\x1b[90m[C++ ANPR]\x1b[0m ${text}`);
       });
 
       child.stderr.on('data', (chunk) => {
-        stderrData += chunk.toString();
+        const text = chunk.toString();
+        stderrData += text;
+        process.stderr.write(`\x1b[31m[C++ ANPR ERR]\x1b[0m ${text}`);
       });
 
       child.on('close', (code) => {
@@ -84,7 +88,9 @@ class AnprEngineService {
       let output = '';
 
       child.stdout.on('data', (chunk) => {
-        output += chunk.toString();
+        const text = chunk.toString();
+        output += text;
+        process.stdout.write(`\x1b[90m[C++ ANPR]\x1b[0m ${text}`);
       });
 
       child.on('close', (code) => {
@@ -121,7 +127,8 @@ class AnprEngineService {
       let output = '';
 
       child.stdout.on('data', (chunk) => {
-        output += chunk.toString();
+        const text = chunk.toString();
+        output += text;
       });
 
       child.on('close', (code) => {

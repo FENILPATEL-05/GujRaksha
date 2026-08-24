@@ -31,6 +31,8 @@ int main(int argc, char* argv[]) {
     std::string single_plate = "";
     bool test_mode = false;
     bool all_cameras = false;
+    bool live_mode = false;
+    int interval_ms = 2000;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -44,6 +46,10 @@ int main(int argc, char* argv[]) {
             test_mode = true;
         } else if (arg == "--all-cameras" || arg == "--scan-all") {
             all_cameras = true;
+        } else if (arg == "--live" || arg == "--continuous" || arg == "--realtime") {
+            live_mode = true;
+        } else if (arg == "--interval" && i + 1 < argc) {
+            interval_ms = std::max(500, std::stoi(argv[++i]));
         } else if (arg == "--help" || arg == "-h") {
             printUsage();
             return 0;
@@ -52,6 +58,19 @@ int main(int argc, char* argv[]) {
 
     std::cout << "⚡ [GujRaksha Native ANPR Engine] Initializing...\n";
     GujRaksha::ANPREngine engine(api_url);
+
+    if (live_mode) {
+        std::cout << "🔴 [REAL-TIME ANPR RADAR] Continuous live detection active (Frequency: " << interval_ms << "ms)...\n";
+        engine.syncWatchlist();
+        while (true) {
+            size_t hits = engine.runInferenceAllCameras();
+            if (hits > 0) {
+                std::cout << "🚨 [REAL-TIME HIT] Dispatched " << hits << " active watchlist hit(s) to GIS Command Center!\n";
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
+        }
+        return 0;
+    }
 
     if (all_cameras) {
         std::cout << "🌐 Running ANPR Inference across ALL camera nodes on the platform...\n";

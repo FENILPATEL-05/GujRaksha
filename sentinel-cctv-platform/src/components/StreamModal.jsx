@@ -1,11 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Radio,
   X,
-  Network,
-  CheckCircle2,
-  AlertTriangle,
-  ShieldAlert,
   ChevronUp,
   ChevronDown,
   ChevronLeft,
@@ -15,20 +11,34 @@ import {
   ZoomOut,
   SquarePen,
   ExternalLink,
-  Power
+  Power,
+  Copy,
+  Check,
+  Zap
 } from 'lucide-react';
 import { LiveCCTVFeed } from './LiveCCTVFeed';
 
 export const StreamModal = ({ camera, onClose, onEditCamera }) => {
-  const rawStreamUrl = camera ? (camera.stream_url || `http://live.sentinelgujarat.in/stream/${camera.id.replace('gov-feed-', '')}`) : '';
+  const [copied, setCopied] = useState(false);
 
   if (!camera) return null;
+
+  const whepUrl = camera.whep_url || (camera.urls && camera.urls.whep) || `http://localhost:8889/stream/${(camera.id || '').replace('gov-feed-', '')}/whep`;
+  const rtspUrl = camera.rtsp_url || (camera.urls && camera.urls.rtsp) || camera.stream_url || '';
+
+  const handleCopyWhep = () => {
+    navigator.clipboard.writeText(whepUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
 
   return (
     <div className="modal-overlay">
       <div className="modal modal-lg">
         <div className="modal-head">
-          <h3><Radio size={16} strokeWidth={2.2} style={{ color: 'var(--accent)' }} /> Live Stream — <span>{camera.name}</span></h3>
+          <h3>
+            <Radio size={16} strokeWidth={2.2} style={{ color: 'var(--accent)' }} /> Live Surveillance Feed — <span>{camera.name}</span>
+          </h3>
           <button className="modal-close" onClick={onClose}><X size={16} strokeWidth={2.2} /></button>
         </div>
         <div className="modal-body">
@@ -43,14 +53,32 @@ export const StreamModal = ({ camera, onClose, onEditCamera }) => {
               <div className="stream-meta-grid">
                 <div className="item"><span>District</span><b>{camera.district || '—'}</b></div>
                 <div className="item"><span>Department</span><b>{camera.department_name || camera.department_id || '—'}</b></div>
-                <div className="item"><span>Resolution</span><b>{camera.resolution || '1080p Full HD'}</b></div>
-                <div className="item"><span>VMS Vendor</span><b>{camera.vms_vendor || 'Hikvision Platform'}</b></div>
-                <div className="item"><span>Coordinates</span><b>{camera.latitude}, {camera.longitude}</b></div>
+                <div className="item"><span>Protocol / SLA</span><b style={{ color: 'var(--success)' }}>WHEP WebRTC (Ultra Low Latency)</b></div>
+                <div className="item"><span>Codec & Res</span><b>{camera.codec || camera.stream_properties?.codec || 'H.264'} · {camera.stream_properties?.resolution || camera.resolution || '1080p FHD'}</b></div>
+                <div className="item"><span>VMS Vendor</span><b>{camera.vms_vendor || 'Live Sentinel Feeder'}</b></div>
                 <div className="item"><span>Status</span><b style={{ color: camera.status === 'ACTIVE' ? 'var(--success)' : 'var(--danger)' }}>{camera.status}</b></div>
+                
+                {/* WHEP Endpoint URL */}
+                <div className="item" style={{ gridColumn: '1 / -1', background: 'rgba(34, 211, 238, 0.06)', border: '1px solid rgba(34, 211, 238, 0.2)', padding: '8px 10px', borderRadius: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: 'var(--accent)', fontWeight: 700 }}>WHEP URL</span>
+                    <button
+                      className="btn btn-sm"
+                      onClick={handleCopyWhep}
+                      style={{ fontSize: '10px', padding: '1px 6px', gap: '3px' }}
+                    >
+                      {copied ? <Check size={10} style={{ color: 'var(--success)' }} /> : <Copy size={10} />}
+                      {copied ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', wordBreak: 'break-all', marginTop: '2px' }}>
+                    {whepUrl}
+                  </div>
+                </div>
               </div>
 
               {/* PTZ Panel */}
-              <div className="ptz-panel">
+              <div className="ptz-panel" style={{ marginTop: '12px' }}>
                 <div>
                   <div className="ptz-dpad">
                     <span></span><button title="Tilt Up"><ChevronUp size={13} strokeWidth={2.4} /></button><span></span>
@@ -73,8 +101,8 @@ export const StreamModal = ({ camera, onClose, onEditCamera }) => {
                 <div>
                   <div className="ptz-zoom">
                     <button title="Edit Camera" onClick={() => onEditCamera(camera)}><SquarePen size={13} strokeWidth={2} /></button>
-                    <a href={rawStreamUrl} target="_blank" rel="noreferrer">
-                      <button title="Open Stream Link"><ExternalLink size={13} strokeWidth={2} /></button>
+                    <a href={whepUrl} target="_blank" rel="noreferrer">
+                      <button title="Open WHEP Link in Browser"><ExternalLink size={13} strokeWidth={2} /></button>
                     </a>
                   </div>
                   <div className="ptz-label">Actions</div>
@@ -86,9 +114,17 @@ export const StreamModal = ({ camera, onClose, onEditCamera }) => {
 
         <div className="modal-foot">
           <button className="btn btn-danger-outline" onClick={onClose}><Power size={14} strokeWidth={2} /> Close Session</button>
-          <button className="btn btn-primary" onClick={() => window.open(rawStreamUrl, '_blank')}><ExternalLink size={14} strokeWidth={2} /> Full Stream URL</button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn" onClick={handleCopyWhep}>
+              {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'WHEP Copied!' : 'Copy WHEP URL'}
+            </button>
+            <button className="btn btn-primary" onClick={() => window.open(whepUrl, '_blank')}>
+              <ExternalLink size={14} strokeWidth={2} /> Open WHEP Endpoint
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
+

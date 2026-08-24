@@ -156,8 +156,9 @@ class AnprDataStore {
     // Check against real Watchlist Database
     const watchlistHit = watchlistStore.getByPlate(cleanPlate);
 
-    // If vehicle is NOT in the police watchlist, discard it immediately (Zero Database Bloat)
+    // If vehicle is NOT in the police watchlist, log as clean vehicle
     if (!watchlistHit) {
+      console.log(`\x1b[36m[ANPR SCAN]\x1b[0m 🚗 Plate: \x1b[1m\x1b[37m${cleanPlate}\x1b[0m | Camera: \x1b[33m${payload.camera_code || payload.camera_id || "GJ-GOV-001"}\x1b[0m | Status: \x1b[32mPASS (Clean Vehicle)\x1b[0m`);
       return {
         vehicle_plate: cleanPlate,
         is_watchlist_hit: false,
@@ -192,6 +193,18 @@ class AnprDataStore {
       timestamp: payload.timestamp || new Date().toISOString(),
       stored: true
     };
+
+    // Print High-Visibility Alert in Terminal
+    console.log(`\n\x1b[41m\x1b[1m\x1b[37m 🚨 [ANPR ALERT] POLICE WATCHLIST TARGET DETECTED! \x1b[0m`);
+    console.log(`\x1b[31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m`);
+    console.log(`   🚘 \x1b[1mVehicle Plate  :\x1b[0m \x1b[33m\x1b[1m${newDetection.vehicle_plate}\x1b[0m`);
+    console.log(`   🚨 \x1b[1mThreat Category:\x1b[0m \x1b[31m\x1b[1m${newDetection.watchlist_category || "SUSPECT_HOTLIST"}\x1b[0m (\x1b[35m${newDetection.watchlist_priority || "CRITICAL"}\x1b[0m)`);
+    console.log(`   📋 \x1b[1mFIR Reference  :\x1b[0m \x1b[36m${newDetection.watchlist_fir || "Active FIR"}\x1b[0m (\x1b[37m${newDetection.watchlist_ps || "State Police"}\x1b[0m)`);
+    console.log(`   🎥 \x1b[1mCamera Node    :\x1b[0m \x1b[32m[${newDetection.camera_code}]\x1b[0m ${newDetection.camera_name}`);
+    console.log(`   📍 \x1b[1mLocation / GPS :\x1b[0m ${newDetection.district} (${newDetection.latitude.toFixed(4)}, ${newDetection.longitude.toFixed(4)})`);
+    console.log(`   ⚡ \x1b[1mTelemetry      :\x1b[0m Speed: \x1b[33m${newDetection.speed_kmh} km/h\x1b[0m | AI Confidence: \x1b[32m${newDetection.confidence}%\x1b[0m`);
+    console.log(`   🕒 \x1b[1mTimestamp      :\x1b[0m ${newDetection.timestamp}`);
+    console.log(`\x1b[31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m\n`);
 
     this.detections.unshift(newDetection);
     this.save();
