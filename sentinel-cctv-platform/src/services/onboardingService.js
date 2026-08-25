@@ -123,19 +123,89 @@ class OnboardingService {
 
   async syncGovernmentLiveFeeds() {
     try {
-      // Use local registry as primary authoritative source
-      const existing = db.getAll({});
+      // 1. Fetch live camera catalogue from official sandbox endpoint
+      const response = await fetch('https://live.corp8.cloud/api/ingest', {
+        headers: { 'User-Agent': 'GujRaksha-CCTV-Platform/1.0' }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch catalogue from sandbox: HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      const rawCameras = data.cameras || (Array.isArray(data) ? data : []);
+
+      if (rawCameras.length === 0) {
+        throw new Error('No camera records found in sandbox response');
+      }
+
+      const syncedCameras = [];
+
+      for (const cam of rawCameras) {
+        const num = parseInt(cam.number || cam.id, 10) || 1;
+        const camId = `gov-feed-${num}`;
+        const camCode = `GJ-GOV-${String(num).padStart(3, '0')}`;
+        const locMeta = this.resolveLocationMetadata(cam.location || cam.name);
+        const camType = this.resolveCameraType(num, cam.name, cam.location);
+
+        const rtspUrl = cam.rtsp_url || `rtsp://live.corp8.cloud:8554/stream/${num}`;
+        const whepUrl = cam.webrtc_url || `http://live.corp8.cloud:8889/stream/${num}/whep`;
+        const hlsUrl = cam.hls_live_url ? (cam.hls_live_url.startsWith('http') ? cam.hls_live_url : `https://live.corp8.cloud${cam.hls_live_url}`) : `https://live.corp8.cloud/live/stream/${num}/index.m3u8`;
+
+        const cameraRecord = {
+          id: camId,
+          camera_code: camCode,
+          name: cam.name ? `${cam.name} (${cam.location || 'Gujarat Highway'})` : `State Highway Node #${num}`,
+          department_id: 'HOME',
+          department_name: 'Home Department / Gujarat Police',
+          district: locMeta.district,
+          taluka: locMeta.district,
+          latitude: locMeta.lat,
+          longitude: locMeta.lng,
+          address: cam.location || `State Highway Corridor #${num}, ${locMeta.district}`,
+          ownership_type: 'GOVERNMENT',
+          camera_type: camType,
+          vms_vendor: 'Official Gujarat Police Sandbox Gateway',
+          status: cam.live !== false ? 'ACTIVE' : 'INACTIVE',
+          stream_url: rtspUrl,
+          rtsp_url: rtspUrl,
+          whep_url: whepUrl,
+          hls_url: hlsUrl,
+          codec: (cam.codec || 'H.264').toUpperCase(),
+          retention_days: 30,
+          stream_properties: {
+            resolution: (cam.width && cam.height) ? `${cam.width}x${cam.height}` : '1920x1080',
+            fps: cam.fps ? parseFloat(cam.fps) : 25,
+            codec: (cam.codec || 'H.264').toUpperCase(),
+            bitrate: cam.bitrate_kbps ? `${cam.bitrate_kbps}Kbps` : '2000Kbps'
+          },
+          urls: {
+            rtsp: rtspUrl,
+            whep: whepUrl,
+            hls: hlsUrl
+          }
+        };
+
+        syncedCameras.push(cameraRecord);
+      }
+
+      // Bulk upsert into camera database
+      const added = db.bulkCreate(syncedCameras);
+
       return {
         success: true,
-        count: existing.length,
-        cameras: existing
+        count: added.length,
+        cameras: added
       };
     } catch (err) {
       console.error('Government live feeds sync error:', err.message);
+      // Fallback to local cameras
+      const existing = db.getAll({});
       return {
         success: false,
-        count: 0,
-        cameras: []
+        count: existing.length,
+        cameras: existing,
+        error: err.message
       };
     }
   }

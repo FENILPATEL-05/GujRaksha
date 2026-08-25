@@ -23,7 +23,9 @@ export const StreamModal = ({ camera, onClose, onEditCamera }) => {
 
   if (!camera) return null;
 
-  const whepUrl = camera.whep_url || (camera.urls && camera.urls.whep) || `http://localhost:8889/stream/${(camera.id || '').replace('gov-feed-', '')}/whep`;
+  const currentHost = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+  const cleanId = (camera.id || '').replace('gov-feed-', '') || '1';
+  const whepUrl = `http://${currentHost}:8889/stream/${cleanId}/whep`;
   const rtspUrl = camera.rtsp_url || (camera.urls && camera.urls.rtsp) || camera.stream_url || '';
 
   const handleCopyWhep = () => {

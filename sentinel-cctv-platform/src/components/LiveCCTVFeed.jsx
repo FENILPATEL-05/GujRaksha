@@ -17,31 +17,99 @@ export const LiveCCTVFeed = ({
   const [isPlaying, setIsPlaying] = useState(true);
   const [activeProtocol, setActiveProtocol] = useState("WHEP WebRTC");
 
-  // Extract clean stream ID / number
-  const cleanId = camera ? (camera.id || "").replace("gov-feed-", "") : "1";
-  
+  const getCleanId = useCallback((cam) => {
+    if (!cam) return "1";
+    if (cam.number !== undefined && cam.number !== null) return String(cam.number);
+    const idStr = String(cam.id || "");
+    const cleaned = idStr.replace("gov-feed-", "").replace("cam-", "").trim();
+    return cleaned || "1";
+  }, []);
+
+  // Helper to extract the actual stream path (e.g., 'webcam' or 'stream/1')
+  const resolveStreamPath = useCallback((cam) => {
+    if (!cam) return "stream/1";
+    const cleanId = getCleanId(cam);
+    const raw = cam.whep_url || cam.rtsp_url || cam.stream_url || (cam.urls && (cam.urls.whep || cam.urls.rtsp)) || "";
+
+    // If it's a MediaMTX URL with port 8554 or 8889
+    if (raw.includes(":8554/") || raw.includes(":8889/")) {
+      const match = raw.match(/:(?:8554|8889)\/([^?#]+)/);
+      if (match) {
+        let p = match[1].replace(/\/whep$/, "").replace(/\/$/, "");
+        if (p === "stream" || p === "stream/") {
+          p = `stream/${cleanId}`;
+        }
+        return p;
+      }
+    }
+
+    // If raw URL is explicit custom path like rtsp://127.0.0.1:8554/webcam
+    if (raw.endsWith("/webcam")) {
+      return "webcam";
+    }
+
+    return `stream/${cleanId}`;
+  }, [getCleanId]);
+
+  const streamPath = resolveStreamPath(camera);
+
   // Resolve MediaMTX WebRTC Embed URL
   const resolveWebRtcUrl = useCallback((cam) => {
     if (!cam) return "";
-    const id = (cam.id || "").replace("gov-feed-", "") || "1";
-    const raw = cam.whep_url || (cam.urls && cam.urls.whep) || cam.stream_url || "";
-    
-    // If raw URL points to MediaMTX port 8889
-    if (raw.includes(":8889/")) {
-      const match = raw.match(/http:\/\/([^:/]+):8889\/(.+)/);
+    const cleanId = getCleanId(cam);
+    let path = resolveStreamPath(cam);
+    if (path === "stream" || path === "stream/") {
+      path = `stream/${cleanId}`;
+    }
+    const rawWhep = cam.whep_url || (cam.urls && cam.urls.whep) || "";
+    const rawRtsp = cam.rtsp_url || cam.stream_url || (cam.urls && cam.urls.rtsp) || "";
+    const currentHost = typeof window !== "undefined" ? (window.location.hostname || "localhost") : "localhost";
+
+    // 1. If explicit sandbox host live.corp8.cloud
+    if (rawWhep && rawWhep.includes("live.corp8.cloud")) {
+      return `http://live.corp8.cloud:8889/${path}/?autoplay=1&muted=${isMuted ? 1 : 0}&controls=${isDetailed ? 1 : 0}`;
+    }
+
+    // 2. If remote RTSP URL with specific host (like rtsp://live.corp8.cloud:8554/stream/2)
+    if (rawRtsp && rawRtsp.includes("live.corp8.cloud")) {
+      const match = rawRtsp.match(/rtsp:\/\/([^:/]+):?(\d*)\/(.+)/);
       if (match) {
-        const host = match[1] || "localhost";
-        let path = match[2].replace(/\/whep$/, "");
-        return `http://${host}:8889/${path}/?autoplay=1&muted=${isMuted ? 1 : 0}&controls=${isDetailed ? 1 : 0}`;
+        const host = match[1];
+        let p = match[3];
+        if (p === "stream") p = `stream/${cleanId}`;
+        return `http://${host}:8889/${p}/?autoplay=1&muted=${isMuted ? 1 : 0}&controls=${isDetailed ? 1 : 0}`;
       }
     }
-    return `http://localhost:8889/stream/${id}/?autoplay=1&muted=${isMuted ? 1 : 0}&controls=${isDetailed ? 1 : 0}`;
-  }, [isMuted, isDetailed]);
+
+    // 3. Localhost / Local Server fallback
+    return `http://${currentHost}:8889/${path}/?autoplay=1&muted=${isMuted ? 1 : 0}&controls=${isDetailed ? 1 : 0}`;
+  }, [isMuted, isDetailed, resolveStreamPath, getCleanId]);
+
+  // Resolve WHEP API endpoint
+  const resolveWhepApiUrl = useCallback((cam) => {
+    if (!cam) return "";
+    const cleanId = getCleanId(cam);
+    let path = resolveStreamPath(cam);
+    if (path === "stream" || path === "stream/") {
+      path = `stream/${cleanId}`;
+    }
+    const rawWhep = cam.whep_url || (cam.urls && cam.urls.whep) || "";
+    const rawRtsp = cam.rtsp_url || cam.stream_url || "";
+    if (rawWhep && (rawWhep.includes("live.corp8.cloud") || (!rawWhep.includes("localhost") && !rawWhep.includes("127.0.0.1")))) {
+      return rawWhep;
+    }
+    if (rawRtsp && rawRtsp.includes("live.corp8.cloud")) {
+      const match = rawRtsp.match(/rtsp:\/\/([^:/]+):?(\d*)\/(.+)/);
+      if (match) return `http://${match[1]}:8889/${match[3]}/whep`;
+    }
+    const currentHost = typeof window !== "undefined" ? (window.location.hostname || "localhost") : "localhost";
+    return `http://${currentHost}:8889/${path}/whep`;
+  }, [resolveStreamPath, getCleanId]);
 
   const webRtcEmbedUrl = resolveWebRtcUrl(camera);
-  const whepApiUrl = camera?.whep_url || (camera?.urls && camera.urls.whep) || `http://localhost:8889/stream/${cleanId}/whep`;
+  const whepApiUrl = resolveWhepApiUrl(camera);
   const rawStreamUrl = camera ? (camera.stream_url || camera.rtsp_url || whepApiUrl) : "";
-  const isRtspOnly = rawStreamUrl.toLowerCase().startsWith("rtsp://") && !camera?.whep_url;
+  const isRtspOnly = false;
 
   useEffect(() => {
     setStreamError(false);
@@ -64,7 +132,19 @@ export const LiveCCTVFeed = ({
       lower.includes("action=stream")
     );
 
-    if (isMjpegPattern) {
+    const isCorp8Sandbox = (rawStreamUrl || "").includes("live.corp8.cloud") || (camera?.whep_url || "").includes("live.corp8.cloud");
+    const isPhysicalLocalRtsp = rawStreamUrl.includes("192.168.") || rawStreamUrl.includes("10.") || rawStreamUrl.includes("172.") || rawStreamUrl.includes("admin:");
+
+    if (isCorp8Sandbox) {
+      setStreamMode("sandbox_video");
+      setActiveProtocol("HTTPS Live Stream");
+      setIsLoading(false);
+    } else if (isPhysicalLocalRtsp) {
+      // Physical IP camera (e.g. H.265 / 4K / RTSP) -> Stream via ultra-fast RTSP Proxy
+      setStreamMode("mjpeg");
+      setActiveProtocol("Live RTSP Stream Gateway");
+      setIsLoading(false);
+    } else if (isMjpegPattern) {
       setStreamMode("mjpeg");
       setActiveProtocol("MJPEG");
       setIsLoading(false);
@@ -88,7 +168,7 @@ export const LiveCCTVFeed = ({
   };
 
   const handleVideoError = () => {
-    if (streamMode === "video") {
+    if (streamMode === "video" || streamMode === "sandbox_video") {
       setStreamMode("mjpeg");
       setActiveProtocol("MJPEG Fallback");
     } else {
@@ -101,7 +181,7 @@ export const LiveCCTVFeed = ({
   const handleImgError = () => {
     setIsLoading(false);
     setStreamError(true);
-    setErrorMessage("Live snapshot/feed currently unavailable.");
+    setErrorMessage("Live camera stream is buffering or offline.");
   };
 
   if (!camera) {
@@ -112,13 +192,40 @@ export const LiveCCTVFeed = ({
     );
   }
 
-  const effectiveFallbackUrl = isRtspOnly
-    ? `/api/v1/proxy-stream?url=${encodeURIComponent(rawStreamUrl)}`
+  const cleanNumId = getCleanId(camera);
+  const sandboxVideoUrl = `https://live.corp8.cloud/stream/${cleanNumId}`;
+  const rtspProxyUrl = `/api/v1/proxy-stream?url=${encodeURIComponent(camera?.stream_url || camera?.rtsp_url || '')}`;
+
+  const effectiveFallbackUrl = (rawStreamUrl.startsWith('rtsp://') || isRtspOnly)
+    ? rtspProxyUrl
     : (camera.hls_url || rawStreamUrl);
 
   return (
     <div style={{ width: "100%", height: "100%", position: "relative", background: "#000", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      {/* 1. MediaMTX WebRTC Stream Embed */}
+      {/* 1. Sandbox HTTPS Video Stream Player */}
+      {streamMode === "sandbox_video" && (
+        <video
+          ref={videoRef}
+          src={sandboxVideoUrl}
+          autoPlay
+          muted={isMuted}
+          loop
+          playsInline
+          controls={isDetailed}
+          onLoadedData={handleVideoLoaded}
+          onError={handleVideoError}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            position: "relative",
+            zIndex: 1,
+            display: streamError ? "none" : "block"
+          }}
+        />
+      )}
+
+      {/* 2. MediaMTX WebRTC Stream Embed */}
       {streamMode === "webrtc" && (
         <iframe
           ref={iframeRef}
@@ -139,7 +246,7 @@ export const LiveCCTVFeed = ({
         />
       )}
 
-      {/* 2. HTML5 Video Player */}
+      {/* 3. HTML5 Fallback Video Player */}
       {streamMode === "video" && (
         <video
           ref={videoRef}

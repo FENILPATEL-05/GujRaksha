@@ -195,44 +195,46 @@ class AnprDataStore {
       console.log(`   ⚡ \x1b[1mTelemetry      :\x1b[0m Speed: \x1b[33m${newDetection.speed_kmh} km/h\x1b[0m | AI Confidence: \x1b[32m${newDetection.confidence}%\x1b[0m`);
       console.log(`   🕒 \x1b[1mTimestamp      :\x1b[0m ${newDetection.timestamp}`);
       console.log(`\x1b[31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m\n`);
+
+      // Keep in detections store
+      this.detections.unshift(newDetection);
+      if (this.detections.length > 500) {
+        this.detections = this.detections.slice(0, 500);
+      }
+      this.save();
+
+      // Broadcast ONLY watchlist hits to live SSE radar/alerts
+      const alertObject = {
+        id: `alert-${newDetection.id}`,
+        type: "ANPR_HOTLIST",
+        title: `🚨 WATCHLIST ALERT: ${newDetection.watchlist_category ? newDetection.watchlist_category.replace("_", " ") : "SUSPECT DETECTED"}`,
+        vehicleNo: newDetection.vehicle_plate,
+        vehicle_plate: newDetection.vehicle_plate,
+        description: `${newDetection.vehicle_plate} (${newDetection.vehicle_type}) · Matched ${newDetection.watchlist_fir || "Police Watchlist"} at ${newDetection.speed_kmh} km/h`,
+        severity: newDetection.watchlist_category === "STOLEN_VEHICLE" ? "CRITICAL" : "HIGH",
+        is_watchlist_hit: true,
+        cameraId: newDetection.camera_id,
+        cameraCode: newDetection.camera_code,
+        cameraName: newDetection.camera_name,
+        district: newDetection.district,
+        latitude: newDetection.latitude,
+        longitude: newDetection.longitude,
+        createdAt: Date.now(),
+        timestamp: newDetection.timestamp,
+        isNew: true
+      };
+      this.broadcastAlert(alertObject);
+      return newDetection;
     } else {
-      console.log(`\x1b[36m[ANPR SCAN]\x1b[0m 🚗 Plate: \x1b[1m\x1b[37m${cleanPlate}\x1b[0m | Camera: \x1b[33m${newDetection.camera_code}\x1b[0m | Status: \x1b[32mPASS (Verified Vehicle)\x1b[0m`);
+      // Clean / non-watchlist vehicles are logged in console only (no popup alerts)
+      console.log(`\x1b[36m[ANPR SCAN]\x1b[0m 🚗 Plate: \x1b[1m\x1b[37m${cleanPlate}\x1b[0m | Camera: \x1b[33m${newDetection.camera_code}\x1b[0m | Status: \x1b[32mPASS (Clean Vehicle - No Alert)\x1b[0m`);
+      return {
+        vehicle_plate: cleanPlate,
+        is_watchlist_hit: false,
+        stored: false,
+        message: "Clean vehicle passed (Logged in console, no alert broadcasted)."
+      };
     }
-
-    // Keep up to 500 recent detections
-    this.detections.unshift(newDetection);
-    if (this.detections.length > 500) {
-      this.detections = this.detections.slice(0, 500);
-    }
-    this.save();
-
-    // Broadcast instant real-time alert via SSE
-    const alertObject = {
-      id: `alert-${newDetection.id}`,
-      type: "ANPR_HOTLIST",
-      title: newDetection.is_watchlist_hit 
-        ? `🚨 WATCHLIST ALERT: ${newDetection.watchlist_category ? newDetection.watchlist_category.replace("_", " ") : "SUSPECT DETECTED"}`
-        : `✓ Vehicle Detected: ${newDetection.vehicle_plate}`,
-      vehicleNo: newDetection.vehicle_plate,
-      vehicle_plate: newDetection.vehicle_plate,
-      description: newDetection.is_watchlist_hit
-        ? `${newDetection.vehicle_plate} (${newDetection.vehicle_type}) · Matched ${newDetection.watchlist_fir || "Police Watchlist"} at ${newDetection.speed_kmh} km/h`
-        : `${newDetection.vehicle_plate} (${newDetection.vehicle_type}) passed through ${newDetection.camera_name}`,
-      severity: newDetection.is_watchlist_hit ? (newDetection.watchlist_category === "STOLEN_VEHICLE" ? "CRITICAL" : "HIGH") : "INFO",
-      is_watchlist_hit: newDetection.is_watchlist_hit,
-      cameraId: newDetection.camera_id,
-      cameraCode: newDetection.camera_code,
-      cameraName: newDetection.camera_name,
-      district: newDetection.district,
-      latitude: newDetection.latitude,
-      longitude: newDetection.longitude,
-      createdAt: Date.now(),
-      timestamp: newDetection.timestamp,
-      isNew: true
-    };
-    this.broadcastAlert(alertObject);
-
-    return newDetection;
   }
 }
 

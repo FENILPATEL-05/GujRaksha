@@ -20,9 +20,10 @@ import urllib.request
 import json
 import threading
 
-# Suppress noisy OpenCV / FFMPEG probing logs
+# Suppress noisy OpenCV / FFMPEG probing logs and force RTSP over TCP
 os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
 import cv2
 try:
     cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)
@@ -53,6 +54,17 @@ DET_SIZE = 384
 OCR_W, OCR_H = 128, 64
 OCR_CHARSET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
+INDIAN_STATE_CODES = (
+    'GJ', 'MH', 'DL', 'KA', 'TN', 'UP', 'HR', 'RJ', 'MP', 'PB',
+    'WB', 'KL', 'BR', 'AP', 'TS', 'CG', 'OD', 'UK', 'HP', 'JK',
+    'GA', 'AS', 'TR', 'ML', 'MN', 'NL', 'MZ', 'SK', 'CH', 'PY',
+    'DD', 'DN', 'LD', 'AN'
+)
+PLATE_REGEX = re.compile(
+    r'^(?:' + '|'.join(INDIAN_STATE_CODES) + r')[0-9]{1,2}(?:[A-Z]{1,3}[0-9]{1,4}|[0-9]{3,4})$'
+)
+BH_REGEX = re.compile(r'^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$')
+
 
 def normalize_ocr_text(raw_text: str) -> str:
     """Clean and standardize raw OCR characters."""
@@ -72,6 +84,16 @@ def normalize_ocr_text(raw_text: str) -> str:
             text = "DL" + text[2:]
             
     return text
+
+
+def is_valid_indian_plate(text: str) -> bool:
+    """Validate if string strictly matches standard Indian vehicle number plate or BH format."""
+    if not text:
+        return False
+    clean = re.sub(r'[^A-Z0-9]', '', text.upper().strip())
+    if len(clean) < 6 or len(clean) > 11:
+        return False
+    return bool(PLATE_REGEX.match(clean) or BH_REGEX.match(clean))
 
 
 class PlateDetectorTFLite:
@@ -224,23 +246,39 @@ def post_detection_to_api(api_url: str, vehicle_plate: str, camera_code: str, ca
 
 
 def fetch_all_cameras(api_url: str):
-    """Fetch live camera registry from backend."""
+    """Fetch live camera registry from backend (Catalogue Endpoint /api/ingest)."""
+    # 1. Try official /api/ingest catalogue endpoint (as defined in evaluation protocol)
+    try:
+        base_host = api_url.replace("/api/v1", "")
+        req = urllib.request.Request(f"{base_host}/api/ingest", headers={"User-Agent": "GujRaksha-ANPR-Engine/1.0"})
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            cams = data.get("cameras") or data.get("data")
+            if cams and len(cams) > 0:
+                return cams
+    except Exception:
+        pass
+
+    # 2. Try /api/v1/cameras/sync-list
     try:
         req = urllib.request.Request(f"{api_url}/cameras/sync-list", headers={"User-Agent": "GujRaksha-ANPR-Engine/1.0"})
         with urllib.request.urlopen(req, timeout=3.0) as resp:
             data = json.loads(resp.read().decode('utf-8'))
             return data.get("data") or data.get("cameras") or []
     except Exception:
-        try:
-            req = urllib.request.Request(f"{api_url}/cameras")
-            with urllib.request.urlopen(req, timeout=3.0) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-                res = data.get("data")
-                if isinstance(res, dict):
-                    return res.get("cameras") or []
-                return res or []
-        except Exception as e:
-            return []
+        pass
+
+    # 3. Fallback /api/v1/cameras
+    try:
+        req = urllib.request.Request(f"{api_url}/cameras")
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            res = data.get("data")
+            if isinstance(res, dict):
+                return res.get("cameras") or []
+            return res or []
+    except Exception:
+        return []
 
 
 class CameraWorkerThread(threading.Thread):
@@ -250,7 +288,8 @@ class CameraWorkerThread(threading.Thread):
         self.cam_info = cam_info
         self.camera_id = cam_info.get("id") or "gov-feed-1"
         self.camera_code = cam_info.get("camera_code") or "GJ-GOV-001"
-        self.stream_url = cam_info.get("rtsp_url") or cam_info.get("stream_url") or f"rtsp://localhost:8554/stream/{str(self.camera_id).replace('gov-feed-', '')}"
+        urls = cam_info.get("urls") or {}
+        self.stream_url = urls.get("rtsp") or cam_info.get("rtsp_url") or cam_info.get("stream_url") or f"rtsp://localhost:8554/stream/{str(self.camera_id).replace('gov-feed-', '')}"
         self.detector = detector
         self.ocr = ocr
         self.api_url = api_url
@@ -278,10 +317,12 @@ class CameraWorkerThread(threading.Thread):
                 cap = cv2.VideoCapture(str(self.stream_url), cv2.CAP_FFMPEG)
 
             if not cap.isOpened():
-                if retry_count % 5 == 0:
+                if retry_count % 4 == 0:
                     print(f"\x1b[33m⏳ [STREAM STANDBY]\x1b[0m Camera \x1b[36m{self.camera_code}\x1b[0m ({self.stream_url}) — Waiting for RTSP video stream...", flush=True)
                 retry_count += 1
-                time.sleep(3.0)
+                # Exponential backoff (start at ~2s, cap at ~30s) as per protocol
+                backoff = min(30.0, 2.0 * (1.35 ** min(retry_count, 8)))
+                time.sleep(backoff)
                 continue
 
             retry_count = 0
@@ -310,32 +351,13 @@ class CameraWorkerThread(threading.Thread):
                     raw_text, ocr_conf = self.ocr.recognize(frame, (x1, y1, x2, y2))
                     cleaned_text = normalize_ocr_text(raw_text)
 
-                    # USER REQUIREMENT: Log ANY text detected so user knows Python OCR is working
-                    if cleaned_text and len(cleaned_text) >= 2:
-                        last_text_time = self.recent_text_logs.get(cleaned_text, 0)
-                        if now - last_text_time > 3.0:  # 3s log cooldown to prevent spam
-                            self.recent_text_logs[cleaned_text] = now
-                            print(f"\x1b[35m[TEXT OCR RECOGNIZED]\x1b[0m 👁️  Camera: \x1b[36m{self.camera_code}\x1b[0m | Detected Text: \"\x1b[33m\x1b[1m{cleaned_text}\x1b[0m\" (Raw: '{raw_text}', Conf: {int(ocr_conf * 100)}%)", flush=True)
-
-                    # 3. Check for valid license plate candidate
-                    if cleaned_text and len(cleaned_text) >= 5:
+                    # ONLY process and print if it strictly matches a valid Indian number plate
+                    if is_valid_indian_plate(cleaned_text):
                         last_seen = self.recent_detections.get(cleaned_text, 0)
                         if now - last_seen > 6.0:  # 6s cooldown per plate
                             self.recent_detections[cleaned_text] = now
-                            print(f"\x1b[32m[PLATE RECOGNIZED]\x1b[0m 🚘 Camera: \x1b[36m{self.camera_code}\x1b[0m | Number Plate: \x1b[1m\x1b[32m{cleaned_text}\x1b[0m -> Sending to GujRaksha Dashboard...", flush=True)
+                            print(f"\x1b[32m[PLATE RECOGNIZED]\x1b[0m 🚘 Camera: \x1b[36m{self.camera_code}\x1b[0m | Number Plate: \x1b[1m\x1b[32m{cleaned_text}\x1b[0m (Conf: {int(ocr_conf * 100)}%)", flush=True)
                             post_detection_to_api(self.api_url, cleaned_text, self.camera_code, self.camera_id, ocr_conf)
-
-                # Periodic central crop scan (to detect text/plates even if detector threshold is borderline)
-                if frame_counter % 25 == 0:
-                    h, w = frame.shape[:2]
-                    crop_center = frame[int(h*0.3):int(h*0.8), int(w*0.2):int(w*0.8)]
-                    center_text, center_conf = self.ocr.recognize(crop_center)
-                    clean_center = normalize_ocr_text(center_text)
-                    if clean_center and len(clean_center) >= 4 and center_conf > 0.4:
-                        last_text_time = self.recent_text_logs.get(clean_center, 0)
-                        if now - last_text_time > 4.0:
-                            self.recent_text_logs[clean_center] = now
-                            print(f"\x1b[35m[TEXT OCR SCAN]\x1b[0m 👁️  Camera: \x1b[36m{self.camera_code}\x1b[0m | Screen Text: \"\x1b[33m{clean_center}\x1b[0m\" (Conf: {int(center_conf * 100)}%)", flush=True)
 
                 time.sleep(0.02)  # Frame loop pacing (~30-40 FPS max)
 
@@ -436,10 +458,9 @@ def main():
         for x1, y1, x2, y2, det_score in raw_boxes:
             raw_text, ocr_conf = ocr.recognize(frame, (x1, y1, x2, y2))
             clean_text = normalize_ocr_text(raw_text)
-            if clean_text:
-                print(f"[TEXT OCR] Recognized: \"{clean_text}\" (Raw: '{raw_text}', Conf: {int(ocr_conf*100)}%)", flush=True)
-                if len(clean_text) >= 4:
-                    post_detection_to_api(args.api_url, clean_text, args.camera_code, args.camera_id, ocr_conf)
+            if is_valid_indian_plate(clean_text):
+                print(f"[PLATE DETECTED] Number Plate: \"{clean_text}\" (Conf: {int(ocr_conf*100)}%)", flush=True)
+                post_detection_to_api(args.api_url, clean_text, args.camera_code, args.camera_id, ocr_conf)
         return
 
     source_val = args.source

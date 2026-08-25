@@ -75,14 +75,49 @@ router.all(['/proxy-whep', '/whep-proxy'], (req, res) => {
   }
 });
 
-// 2. Generic HTTP / MJPEG / HLS Media Stream Proxy
-router.get(['/proxy-stream', '/'], (req, res) => {
+import { spawn } from 'child_process';
+
+// 2. Generic HTTP / RTSP / MJPEG / HLS Media Stream Proxy
+router.get(['/proxy-stream', '/mjpeg-feed'], (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl) {
     return res.status(400).send('Missing target stream URL.');
   }
 
   res.setHeader('Access-Control-Allow-Origin', '*');
+
+  // If RTSP Stream (including H.265 / HEVC physical cameras):
+  if (targetUrl.startsWith('rtsp://')) {
+    res.writeHead(200, {
+      'Content-Type': 'multipart/x-mixed-replace; boundary=--ffmpegframe',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Connection': 'close',
+      'Pragma': 'no-cache'
+    });
+
+    const ffmpeg = spawn('ffmpeg', [
+      '-rtsp_transport', 'tcp',
+      '-i', targetUrl,
+      '-f', 'mpjpeg',
+      '-boundary_tag', 'ffmpegframe',
+      '-q:v', '4',
+      '-r', '20',
+      '-an',
+      'pipe:1'
+    ], { stdio: ['ignore', 'pipe', 'ignore'] });
+
+    ffmpeg.stdout.pipe(res);
+
+    req.on('close', () => {
+      try { ffmpeg.kill('SIGKILL'); } catch (e) {}
+    });
+
+    ffmpeg.on('error', (err) => {
+      console.error('FFmpeg RTSP Stream Proxy Error:', err.message);
+      if (!res.headersSent) res.status(500).send('Stream error');
+    });
+    return;
+  }
 
   try {
     const client = targetUrl.startsWith('https') ? https : http;

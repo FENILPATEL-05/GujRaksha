@@ -19,6 +19,7 @@ import watchlistRoutes from './src/routes/watchlistRoutes.js';
 import anprRoutes from './src/routes/anprRoutes.js';
 import anprEngineService from './src/services/anprEngineService.js';
 import streamAnprScanner from './src/services/streamAnprScanner.js';
+import mediamtxService from './src/services/mediamtxService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -136,6 +137,9 @@ async function startServer() {
     // Auto-connect Real-Time Video Stream ANPR Scanner & Launch Parallel TFLite AI Engine
     setTimeout(async () => {
       try {
+        await mediamtxService.startServerProcess();
+        const cams = cameraService.getCameras({}).cameras || [];
+        await mediamtxService.syncAllCameras(cams);
         await streamAnprScanner.init();
         // Automatically start high-speed Python TFLite ANPR Engine across all cameras in parallel
         anprEngineService.runPythonTFLiteScanner('--all-cameras');

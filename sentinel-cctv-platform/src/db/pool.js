@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import config from '../config/env.js';
+import mediamtxService from '../services/mediamtxService.js';
 
 class CameraDataStore {
   constructor() {
@@ -115,33 +116,29 @@ class CameraDataStore {
     }
 
     if (rtspUrl && !whepUrl) {
-      const match = rtspUrl.match(/rtsp:\/\/([^:/]+):?(\d*)\/(.+)/);
-      if (match) {
-        const host = match[1] || 'localhost';
-        const pathPart = match[3];
-        whepUrl = `http://${host}:8889/${pathPart}/whep`;
-        if (!hlsUrl) hlsUrl = `http://${host}/live/${pathPart}/index.m3u8`;
+      if (rtspUrl.includes('live.corp8.cloud')) {
+        whepUrl = `http://live.corp8.cloud:8889/stream/${cleanId}/whep`;
+        if (!hlsUrl) hlsUrl = `https://live.corp8.cloud/live/stream/${cleanId}/index.m3u8`;
       } else {
         whepUrl = `http://localhost:8889/stream/${cleanId}/whep`;
+        if (!hlsUrl) hlsUrl = `http://localhost:8888/stream/${cleanId}/index.m3u8`;
       }
     }
 
     if (whepUrl && !rtspUrl) {
-      const match = whepUrl.match(/https?:\/\/([^:/]+):?(\d*)\/(.+)\/whep/);
-      if (match) {
-        const host = match[1] || 'localhost';
-        const pathPart = match[3];
-        rtspUrl = `rtsp://${host}:8554/${pathPart}`;
-        if (!hlsUrl) hlsUrl = `http://${host}/live/${pathPart}/index.m3u8`;
+      if (whepUrl.includes('live.corp8.cloud')) {
+        rtspUrl = `rtsp://live.corp8.cloud:8554/stream/${cleanId}`;
+        if (!hlsUrl) hlsUrl = `https://live.corp8.cloud/live/stream/${cleanId}/index.m3u8`;
       } else {
         rtspUrl = `rtsp://localhost:8554/stream/${cleanId}`;
+        if (!hlsUrl) hlsUrl = `http://localhost:8888/stream/${cleanId}/index.m3u8`;
       }
     }
 
     if (!rtspUrl && !whepUrl && !streamUrl) {
       rtspUrl = `rtsp://localhost:8554/stream/${cleanId}`;
       whepUrl = `http://localhost:8889/stream/${cleanId}/whep`;
-      hlsUrl = `http://localhost/live/stream/${cleanId}/index.m3u8`;
+      hlsUrl = `http://localhost:8888/stream/${cleanId}/index.m3u8`;
       streamUrl = rtspUrl;
     } else if (!streamUrl) {
       streamUrl = rtspUrl || whepUrl;
@@ -222,6 +219,9 @@ class CameraDataStore {
     }
 
     this.save();
+    try {
+      mediamtxService.registerCameraStream(newCamera);
+    } catch (e) {}
     return newCamera;
   }
 
@@ -265,6 +265,9 @@ class CameraDataStore {
 
     this.cameras[idx] = updated;
     this.save();
+    try {
+      mediamtxService.registerCameraStream(updated);
+    } catch (e) {}
     return updated;
   }
 
