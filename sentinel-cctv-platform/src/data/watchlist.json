@@ -1,5 +1,18 @@
 [
   {
+    "id": "wl-1787647839738",
+    "vehicle_plate": "GJ-01-HW-8888",
+    "vehicle_type": "SUV / Scorpio",
+    "category": "STOLEN_VEHICLE",
+    "fir_number": "FIR #502/2026",
+    "police_station": "SG Highway PS",
+    "owner_name": "Under Investigation",
+    "priority": "CRITICAL",
+    "status": "ACTIVE",
+    "description": "Flagged in statewide CCTV police watchlist.",
+    "created_at": "2026-08-25T08:50:39.738Z"
+  },
+  {
     "id": "wl-1787303333857",
     "vehicle_plate": "GJ-01-AA-1234",
     "vehicle_type": "SUV / Sedan",

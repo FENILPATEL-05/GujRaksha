@@ -1,23 +1,37 @@
 /**
- * GujRaksha (ગુજ રક્ષા) — Robust Real-Time RTSP Stream ANPR Scanner
+ * GujRaksha (ગુજ રક્ષા) — Fully Automatic & Dynamically Adjustable Real-Time Multi-Camera ANPR Scanner
  * Copyright (c) 2026 Fenil Patel. All Rights Reserved.
  *
- * Grabs complete atomic video frames from live camera RTSP streams,
- * extracts Indian license plate text via OCR, and dispatches real-time alerts.
+ * Automatically scans all registered camera feeds in round-robin fashion,
+ * detects license plates via OCR Vision & C++ Engine, and supports dynamic runtime configuration.
  */
 
 import { spawn } from 'child_process';
 import { createWorker } from 'tesseract.js';
 import anprStore from '../db/anprStore.js';
 import watchlistStore from '../db/watchlistStore.js';
+import cameraService from './cameraService.js';
+import anprEngineService from './anprEngineService.js';
 
 class StreamAnprScanner {
   constructor() {
     this.worker = null;
-    this.scanInterval = null;
+    this.scanIntervalHandle = null;
     this.recentDetections = new Map(); // Plate cooldown cache
     this.isInitialized = false;
     this.isProcessing = false;
+    this.cameraIndex = 0;
+
+    // Dynamically Adjustable Scanner Parameters
+    this.config = {
+      autoScanEnabled: true,
+      scanIntervalMs: 3000,
+      cooldownMs: 10000,
+      mode: 'HYBRID_AUTO', // 'HYBRID_AUTO' | 'CPP_ENGINE' | 'STREAM_OCR'
+      scannedCount: 0,
+      lastScanTimestamp: null
+    };
+
     this.defaultRtspUrl = process.env.PRIMARY_RTSP_URL || 'rtsp://localhost:8554/stream/1';
     this.defaultCameraCode = 'GJ-GOV-001';
   }
@@ -28,8 +42,100 @@ class StreamAnprScanner {
       this.worker = await createWorker('eng');
       this.isInitialized = true;
       console.log('⚡ [Real-Time Stream ANPR] OCR Vision Engine Initialized');
+      this.restartScheduler();
     } catch (err) {
       console.warn('⚠️ [Real-Time Stream ANPR] OCR worker init notice:', err.message);
+    }
+  }
+
+  // Get current dynamic configuration & scanner status
+  getConfig() {
+    const cameras = cameraService.getCameras({}).cameras || [];
+    return {
+      ...this.config,
+      isInitialized: this.isInitialized,
+      isProcessing: this.isProcessing,
+      activeCameraCount: cameras.length,
+      currentCameraCode: cameras[this.cameraIndex % (cameras.length || 1)]?.camera_code || 'GJ-GOV-001'
+    };
+  }
+
+  // Dynamically update scanner configuration at runtime
+  updateConfig(newConfig = {}) {
+    if (typeof newConfig.autoScanEnabled === 'boolean') {
+      this.config.autoScanEnabled = newConfig.autoScanEnabled;
+    }
+    if (typeof newConfig.scanIntervalMs === 'number' && newConfig.scanIntervalMs >= 500) {
+      this.config.scanIntervalMs = newConfig.scanIntervalMs;
+    }
+    if (typeof newConfig.cooldownMs === 'number' && newConfig.cooldownMs >= 1000) {
+      this.config.cooldownMs = newConfig.cooldownMs;
+    }
+    if (['HYBRID_AUTO', 'CPP_ENGINE', 'STREAM_OCR'].includes(newConfig.mode)) {
+      this.config.mode = newConfig.mode;
+    }
+
+    console.log(`⚙️ [ANPR Config Updated] AutoScan: ${this.config.autoScanEnabled} | Interval: ${this.config.scanIntervalMs}ms | Mode: ${this.config.mode}`);
+    this.restartScheduler();
+    return this.getConfig();
+  }
+
+  // Restart scheduler loop with current interval settings
+  restartScheduler() {
+    if (this.scanIntervalHandle) {
+      clearInterval(this.scanIntervalHandle);
+      this.scanIntervalHandle = null;
+    }
+
+    if (!this.config.autoScanEnabled) {
+      console.log('⏸️ [Real-Time Stream ANPR] Auto-Scan Paused');
+      return;
+    }
+
+    console.log(`🎥 [Real-Time Stream ANPR] Fully Automatic Scanner Active (Frequency: ${this.config.scanIntervalMs}ms, Mode: ${this.config.mode})`);
+    
+    this.scanIntervalHandle = setInterval(() => {
+      this.performAutomaticScanStep();
+    }, this.config.scanIntervalMs);
+  }
+
+  // Main background automatic scan step across cameras
+  async performAutomaticScanStep() {
+    if (this.isProcessing) return;
+    this.isProcessing = true;
+    this.config.lastScanTimestamp = new Date().toISOString();
+    this.config.scannedCount++;
+
+    try {
+      const result = cameraService.getCameras({});
+      const cameras = result.cameras || [];
+
+      if (cameras.length === 0) {
+        this.isProcessing = false;
+        return;
+      }
+
+      // Pick next camera in dynamic round-robin fashion
+      const currentCamera = cameras[this.cameraIndex % cameras.length];
+      this.cameraIndex = (this.cameraIndex + 1) % cameras.length;
+
+      const rtspUrl = currentCamera.rtsp_url || currentCamera.stream_url || `rtsp://localhost:8554/stream/${currentCamera.id}`;
+      const cameraCode = currentCamera.camera_code || 'GJ-GOV-001';
+
+      if (this.config.mode === 'HYBRID_AUTO' || this.config.mode === 'STREAM_OCR') {
+        await this.captureAndProcessFrame(rtspUrl, cameraCode);
+      }
+
+      if (this.config.mode === 'HYBRID_AUTO' || this.config.mode === 'CPP_ENGINE') {
+        // Trigger multi-camera C++ engine inference periodically (every 5 steps)
+        if (this.config.scannedCount % 5 === 0) {
+          anprEngineService.runInferenceOnAllCameras().catch(() => {});
+        }
+      }
+    } catch (err) {
+      // Ignore background transient scan errors
+    } finally {
+      this.isProcessing = false;
     }
   }
 
@@ -40,10 +146,7 @@ class StreamAnprScanner {
     const tokens = cleaned.split(/[\s\n\r]+/);
     const validPlates = [];
 
-    // Standard Indian plate regex: (GJ|MH|DL...)(01..99)(A..ZZ)(1..9999)
     const plateRegex = /^(GJ|MH|DL|KA|TN|UP|HR|RJ|MP|PB|WB|KL|BR|AP|TS|CG|OD|UK|HP|JK)[0-9]{1,2}[A-Z]{0,3}[0-9]{1,4}$/;
-
-    // Also check watchlist hotlist plates directly
     const hotlist = watchlistStore.getAll().map(w => w.vehicle_plate.toUpperCase().replace(/[^A-Z0-9]/g, ''));
 
     for (let i = 0; i < tokens.length; i++) {
@@ -89,13 +192,12 @@ class StreamAnprScanner {
         const now = Date.now();
         const lastSeen = this.recentDetections.get(plate) || 0;
         
-        // Cooldown: 10 seconds per plate per camera to prevent duplicate spam
-        if (now - lastSeen < 10000) {
+        // Configurable Cooldown per plate
+        if (now - lastSeen < this.config.cooldownMs) {
           continue;
         }
         this.recentDetections.set(plate, now);
 
-        // Ingest and dispatch detection in real-time
         anprStore.ingest({
           vehicle_plate: plate,
           camera_code: cameraCode,
@@ -110,8 +212,7 @@ class StreamAnprScanner {
 
   // Grab single atomic complete frame from live RTSP stream
   async captureAndProcessFrame(rtspUrl = this.defaultRtspUrl, cameraCode = this.defaultCameraCode) {
-    if (this.isProcessing || !this.worker) return;
-    this.isProcessing = true;
+    if (!this.worker) return;
 
     try {
       const child = spawn('ffmpeg', [
@@ -141,30 +242,17 @@ class StreamAnprScanner {
       }
     } catch (err) {
       // Transient stream grab error ignored
-    } finally {
-      this.isProcessing = false;
     }
   }
 
-  // Start continuous real-time video stream scanner
   startStreamScanner(rtspUrl = this.defaultRtspUrl, cameraCode = this.defaultCameraCode) {
-    if (this.scanInterval) {
-      clearInterval(this.scanInterval);
-    }
-
-    console.log(`🎥 [Real-Time Stream ANPR] Live frame scanner active on ${rtspUrl} (${cameraCode})`);
-
-    // Capture and analyze an atomic frame every 1.8 seconds
-    this.scanInterval = setInterval(() => {
-      this.captureAndProcessFrame(rtspUrl, cameraCode);
-    }, 1800);
+    this.config.autoScanEnabled = true;
+    this.restartScheduler();
   }
 
   stopStreamScanner() {
-    if (this.scanInterval) {
-      clearInterval(this.scanInterval);
-      this.scanInterval = null;
-    }
+    this.config.autoScanEnabled = false;
+    this.restartScheduler();
   }
 
   stopAll() {

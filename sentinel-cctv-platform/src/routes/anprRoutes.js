@@ -84,6 +84,34 @@ router.post("/ingest", (req, res, next) => {
   }
 });
 
+// GET Dynamic Scanner Status & Configuration
+router.get("/scanner-config", async (req, res, next) => {
+  try {
+    const { default: streamAnprScanner } = await import("../services/streamAnprScanner.js");
+    res.json({
+      success: true,
+      data: streamAnprScanner.getConfig()
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST Update Dynamic Scanner Configuration at Runtime
+router.post("/scanner-config", async (req, res, next) => {
+  try {
+    const { default: streamAnprScanner } = await import("../services/streamAnprScanner.js");
+    const updated = streamAnprScanner.updateConfig(req.body);
+    res.json({
+      success: true,
+      message: "⚡ ANPR Auto-Scanner configuration dynamically updated at runtime!",
+      data: updated
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST Trigger Native C++ ANPR Inference on All Cameras
 router.post("/run-engine-all", async (req, res, next) => {
   try {
