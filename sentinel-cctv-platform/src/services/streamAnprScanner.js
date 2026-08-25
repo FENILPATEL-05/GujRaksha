@@ -24,10 +24,10 @@ class StreamAnprScanner {
 
     // Dynamically Adjustable Scanner Parameters
     this.config = {
-      autoScanEnabled: true,
+      autoScanEnabled: false,
       scanIntervalMs: 3000,
       cooldownMs: 10000,
-      mode: 'HYBRID_AUTO', // 'HYBRID_AUTO' | 'CPP_ENGINE' | 'STREAM_OCR'
+      mode: 'STREAM_OCR',
       scannedCount: 0,
       lastScanTimestamp: null
     };
@@ -122,16 +122,8 @@ class StreamAnprScanner {
       const rtspUrl = currentCamera.rtsp_url || currentCamera.stream_url || `rtsp://localhost:8554/stream/${currentCamera.id}`;
       const cameraCode = currentCamera.camera_code || 'GJ-GOV-001';
 
-      if (this.config.mode === 'HYBRID_AUTO' || this.config.mode === 'STREAM_OCR') {
-        await this.captureAndProcessFrame(rtspUrl, cameraCode);
-      }
-
-      if (this.config.mode === 'HYBRID_AUTO' || this.config.mode === 'CPP_ENGINE') {
-        // Trigger multi-camera C++ engine inference periodically (every 5 steps)
-        if (this.config.scannedCount % 5 === 0) {
-          anprEngineService.runInferenceOnAllCameras().catch(() => {});
-        }
-      }
+      // Real-time RTSP/Webcam frame capture & OCR Vision analysis
+      await this.captureAndProcessFrame(rtspUrl, cameraCode);
     } catch (err) {
       // Ignore background transient scan errors
     } finally {

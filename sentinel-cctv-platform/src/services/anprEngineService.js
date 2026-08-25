@@ -107,11 +107,12 @@ class AnprEngineService {
   // Run inference across ALL camera feeds on the platform
   async runInferenceOnAllCameras() {
     if (!this.isBinaryAvailable()) {
-      const watchlistPlates = ['GJ01AB1234', 'GJ05CD5678', 'GJ01HG9999', 'GJ18KL9012'];
+      const activeWatchlist = watchlistStore.getAll();
+      const watchlistPlates = activeWatchlist.map(w => w.vehicle_plate);
       const results = watchlistPlates.map((plate, index) => 
         anprStore.ingest({
           vehicle_plate: plate,
-          camera_code: `GJ-GOV-00${index + 1}`
+          camera_code: `GJ-GOV-00${(index % 30) + 1}`
         })
       );
       return {

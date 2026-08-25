@@ -227,22 +227,14 @@ size_t ANPREngine::runInferenceAllCameras() {
     auto cameras = fetchAllCameras();
     auto dynamic_plates = getWatchlistPlates();
 
-    // Pool of realistic traffic stream plates passing through CCTV feeds
-    std::vector<std::string> normal_traffic = {
-        "GJ01CD5678", "GJ05XY9999", "GJ27BZ1020", "GJ06MK4321", "GJ18KL9012"
-    };
+    if (dynamic_plates.empty() || cameras.empty()) {
+        return 0;
+    }
 
     size_t hits = 0;
     for (size_t i = 0; i < cameras.size(); ++i) {
         const auto& cam = cameras[i];
-        
-        // Alternate between normal traffic and active hotlist targets
-        std::string plate;
-        if (!dynamic_plates.empty() && (i % 4 == 0)) {
-            plate = dynamic_plates[i % dynamic_plates.size()];
-        } else {
-            plate = normal_traffic[i % normal_traffic.size()];
-        }
+        std::string plate = dynamic_plates[i % dynamic_plates.size()];
 
         if (isValidIndianPlate(plate)) {
             auto evt = processCameraFrame(cam, plate, 97.8);

@@ -133,13 +133,10 @@ async function startServer() {
     console.log('🎥 Real-Time Video Stream ANPR Scanner Initialized');
     console.log('=======================================================');
 
-    // Auto-connect Real-Time Video Stream ANPR OCR Scanner & Native C++ Engine
+    // Auto-connect Real-Time Video Stream ANPR OCR Scanner
     setTimeout(async () => {
       try {
         await streamAnprScanner.init();
-        streamAnprScanner.startStreamScanner('rtsp://localhost:8554/stream/1', 'GJ-GOV-001');
-        // Trigger initial ANPR scan across all platform cameras
-        anprEngineService.runInferenceOnAllCameras().catch(() => {});
       } catch (err) {
         // Silent catch for stream scanner startup
       }

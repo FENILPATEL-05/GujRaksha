@@ -67,16 +67,9 @@ router.get("/check/:plate", authenticateToken, (req, res, next) => {
 });
 
 // POST add target to watchlist
-router.post("/", authenticateToken, async (req, res, next) => {
+router.post("/", authenticateToken, (req, res, next) => {
   try {
     const created = watchlistStore.create(req.body);
-
-    // Auto-trigger ANPR inference across all camera feeds immediately for the new plate
-    try {
-      const { default: anprEngineService } = await import("../services/anprEngineService.js");
-      anprEngineService.runInferenceOnAllCameras().catch(() => {});
-    } catch (e) {}
-
     res.status(201).json({
       success: true,
       message: "Target vehicle added to statewide police watchlist.",
