@@ -24,10 +24,11 @@ class StreamAnprScanner {
 
     // Dynamically Adjustable Scanner Parameters
     this.config = {
-      autoScanEnabled: false,
+      autoScanEnabled: true,
       scanIntervalMs: 3000,
       cooldownMs: 10000,
       mode: 'STREAM_OCR',
+      debugLogs: true,
       scannedCount: 0,
       lastScanTimestamp: null
     };
@@ -70,6 +71,9 @@ class StreamAnprScanner {
     }
     if (typeof newConfig.cooldownMs === 'number' && newConfig.cooldownMs >= 1000) {
       this.config.cooldownMs = newConfig.cooldownMs;
+    }
+    if (typeof newConfig.debugLogs === 'boolean') {
+      this.config.debugLogs = newConfig.debugLogs;
     }
     if (['HYBRID_AUTO', 'CPP_ENGINE', 'STREAM_OCR'].includes(newConfig.mode)) {
       this.config.mode = newConfig.mode;
@@ -178,7 +182,21 @@ class StreamAnprScanner {
 
     try {
       const { data: { text } } = await this.worker.recognize(imageBuffer);
+      const cleanText = (text || '').trim().replace(/[\r\n]+/g, ' ');
+
+      if (this.config.debugLogs) {
+        console.log(`\x1b[35m[OCR VISION]\x1b[0m 👁️  Camera: \x1b[36m${cameraCode}\x1b[0m | Raw Recognized Text: "\x1b[37m${cleanText || '(No text detected)'}\x1b[0m"`);
+      }
+
       const plates = this.extractIndianPlates(text);
+
+      if (this.config.debugLogs) {
+        if (plates.length > 0) {
+          console.log(`\x1b[35m[OCR VISION]\x1b[0m 🚗 Camera: \x1b[36m${cameraCode}\x1b[0m | Extracted Indian Plates: \x1b[32m[${plates.join(', ')}]\x1b[0m`);
+        } else if (cleanText.length > 0) {
+          console.log(`\x1b[35m[OCR VISION]\x1b[0m ℹ️  Camera: \x1b[36m${cameraCode}\x1b[0m | Text found but no valid license plate pattern matched.`);
+        }
+      }
 
       for (const plate of plates) {
         const now = Date.now();
@@ -186,6 +204,9 @@ class StreamAnprScanner {
         
         // Configurable Cooldown per plate
         if (now - lastSeen < this.config.cooldownMs) {
+          if (this.config.debugLogs) {
+            console.log(`\x1b[33m[OCR COOLDOWN]\x1b[0m ⏳ Plate \x1b[37m${plate}\x1b[0m skipped due to active cooldown.`);
+          }
           continue;
         }
         this.recentDetections.set(plate, now);
@@ -198,13 +219,19 @@ class StreamAnprScanner {
         });
       }
     } catch (err) {
-      // Ignore OCR transient frame errors
+      if (this.config.debugLogs) {
+        console.warn(`⚠️ [OCR ERROR] Camera: ${cameraCode} | OCR processing notice: ${err.message}`);
+      }
     }
   }
 
   // Grab single atomic complete frame from live RTSP stream
   async captureAndProcessFrame(rtspUrl = this.defaultRtspUrl, cameraCode = this.defaultCameraCode) {
     if (!this.worker) return;
+
+    if (this.config.debugLogs) {
+      console.log(`\x1b[34m[RTSP SCAN]\x1b[0m 🎥 Requesting frame from \x1b[36m${cameraCode}\x1b[0m (\x1b[90m${rtspUrl}\x1b[0m)...`);
+    }
 
     try {
       const child = spawn('ffmpeg', [
@@ -230,10 +257,19 @@ class StreamAnprScanner {
 
       const frameBuffer = Buffer.concat(chunks);
       if (frameBuffer.length > 5000) {
+        if (this.config.debugLogs) {
+          console.log(`\x1b[32m[FRAME GRAB]\x1b[0m 🖼️  Frame captured for \x1b[36m${cameraCode}\x1b[0m (Size: ${(frameBuffer.length / 1024).toFixed(1)} KB) -> Running Tesseract OCR...`);
+        }
         await this.processFrameBuffer(frameBuffer, cameraCode);
+      } else {
+        if (this.config.debugLogs) {
+          console.log(`\x1b[33m[FRAME GRAB]\x1b[0m ⚠️  No frame payload returned for \x1b[36m${cameraCode}\x1b[0m (\x1b[90mStream offline/unreachable\x1b[0m)`);
+        }
       }
     } catch (err) {
-      // Transient stream grab error ignored
+      if (this.config.debugLogs) {
+        console.warn(`⚠️ [RTSP SCAN ERROR] Camera: ${cameraCode} | ${err.message}`);
+      }
     }
   }
 
