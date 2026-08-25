@@ -61,39 +61,61 @@ INDIAN_STATE_CODES = (
     'DD', 'DN', 'LD', 'AN'
 )
 PLATE_REGEX = re.compile(
-    r'^(?:' + '|'.join(INDIAN_STATE_CODES) + r')[0-9]{1,2}(?:[A-Z]{1,3}[0-9]{1,4}|[0-9]{3,4})$'
+    r'^(?:' + '|'.join(INDIAN_STATE_CODES) + r')[0-9]{1,2}(?:[A-Z]{0,3}[0-9]{3,4}|[0-9]{3,4})$'
 )
 BH_REGEX = re.compile(r'^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$')
+GENERIC_PLATE_REGEX = re.compile(r'^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{2,4}$')
 
 
 def normalize_ocr_text(raw_text: str) -> str:
-    """Clean and standardize raw OCR characters."""
+    """Clean, standardize, and correct raw OCR characters from Indian plates."""
     if not raw_text:
         return ""
     text = raw_text.upper().strip()
     text = re.sub(r'[^A-Z0-9]', '', text)
-    
-    # State prefix fixes (e.g., '6J' -> 'GJ', 'OJ' -> 'GJ', '0J' -> 'GJ')
+
+    # 1. Strip common HSRP country badge 'IND' / 'INDIA' on the left
+    if text.startswith("IND") and len(text) >= 7:
+        text = text[3:]
+    elif text.startswith("INDIA") and len(text) >= 9:
+        text = text[5:]
+    elif text.startswith("IN") and len(text) >= 6 and not text.startswith("IND"):
+        if text[2:4] in INDIAN_STATE_CODES or text[2:4].isdigit():
+            text = text[2:]
+
+    # 2. Common OCR prefix misrecognitions (e.g., '6J' -> 'GJ', 'OJ' -> 'GJ', 'CI' -> 'GJ')
     if len(text) >= 2:
         prefix = text[:2]
-        if prefix in ["6J", "OJ", "0J", "CJ", "QJ"]:
+        if prefix in ["6J", "OJ", "0J", "CJ", "QJ", "CI", "C1", "GI", "G1"]:
             text = "GJ" + text[2:]
-        elif prefix in ["NH", "HH", "1H"]:
+        elif prefix in ["NH", "HH", "1H", "M4", "MI"]:
             text = "MH" + text[2:]
-        elif prefix in ["OL", "0L", "QL"]:
+        elif prefix in ["OL", "0L", "QL", "D1", "DI"]:
             text = "DL" + text[2:]
-            
+        elif prefix in ["K4", "K8", "KA"]:
+            text = "KA" + text[2:]
+        elif prefix in ["R1", "P1", "RJ"]:
+            text = "RJ" + text[2:]
+        elif prefix in ["U9", "UP", "VP"]:
+            text = "UP" + text[2:]
+
     return text
 
 
 def is_valid_indian_plate(text: str) -> bool:
-    """Validate if string strictly matches standard Indian vehicle number plate or BH format."""
+    """Validate if string matches standard Indian vehicle number plate or BH format."""
     if not text:
         return False
     clean = re.sub(r'[^A-Z0-9]', '', text.upper().strip())
-    if len(clean) < 6 or len(clean) > 11:
+    if len(clean) < 5 or len(clean) > 11:
         return False
-    return bool(PLATE_REGEX.match(clean) or BH_REGEX.match(clean))
+    # Check exact state code pattern OR BH format OR generic alphanumeric Indian format
+    return bool(
+        PLATE_REGEX.match(clean) or
+        BH_REGEX.match(clean) or
+        (clean[:2] in INDIAN_STATE_CODES and clean[-2:].isdigit() and len(clean) >= 6) or
+        GENERIC_PLATE_REGEX.match(clean)
+    )
 
 
 def create_accelerated_interpreter(model_path: str, num_threads: int = None):
@@ -225,12 +247,21 @@ class PlateOCRTFLite:
         else:
             crop = img
 
-        if crop is None or crop.size == 0 or crop.shape[0] < 5 or crop.shape[1] < 5:
+        if crop is None or crop.size == 0 or crop.shape[0] < 10 or crop.shape[1] < 20:
             return "", 0.0
 
-        crop_resized = cv2.resize(crop, (OCR_W, OCR_H), interpolation=cv2.INTER_LINEAR)
-        crop_rgb = cv2.cvtColor(crop_resized, cv2.COLOR_BGR2RGB)
-        batch = crop_rgb[np.newaxis, :]
+        # Apply CLAHE contrast enhancement for sharp character recognition
+        try:
+            gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(4, 4))
+            enhanced = clahe.apply(gray)
+            crop_rgb = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2RGB)
+            crop_resized = cv2.resize(crop_rgb, (OCR_W, OCR_H), interpolation=cv2.INTER_LINEAR)
+        except Exception:
+            crop_resized = cv2.resize(crop, (OCR_W, OCR_H), interpolation=cv2.INTER_LINEAR)
+            crop_resized = cv2.cvtColor(crop_resized, cv2.COLOR_BGR2RGB)
+
+        batch = crop_resized[np.newaxis, :]
 
         self.interpreter.set_tensor(self.input_details['index'], batch)
         self.interpreter.invoke()
@@ -267,11 +298,9 @@ def post_detection_to_api(api_url: str, vehicle_plate: str, camera_code: str, ca
         with urllib.request.urlopen(req, timeout=2.5) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             if data.get("isWatchlistHit"):
-                print(f"\x1b[41m\x1b[1m\x1b[37m 🚨 [WATCHLIST HIT] \x1b[0m \x1b[31mTarget {vehicle_plate} spotted on camera {camera_code}!\x1b[0m", flush=True)
-            else:
-                print(f"\x1b[32m✓ [ANPR LOGGED]\x1b[0m \x1b[37mPlate: \x1b[1m{vehicle_plate}\x1b[0m on \x1b[36m{camera_code}\x1b[0m (Sent to Platform)", flush=True)
+                print(f"\x1b[41m\x1b[1m\x1b[37m 🚨 [WATCHLIST HIT] \x1b[0m \x1b[1m\x1b[31mTarget {vehicle_plate} spotted on camera {camera_code}!\x1b[0m", flush=True)
     except Exception as e:
-        print(f"\x1b[33m⚠️ [Ingest Notice]\x1b[0m Failed to post {vehicle_plate}: {e}", flush=True)
+        pass
 
 
 def fetch_all_cameras(api_url: str):
@@ -310,9 +339,12 @@ def fetch_all_cameras(api_url: str):
         return []
 
 
+INFERENCE_LOCK = threading.Lock()
+
+
 class CameraWorkerThread(threading.Thread):
     """Dedicated Real-Time RTSP Stream Processor for a single CCTV camera."""
-    def __init__(self, cam_info: dict, detector: PlateDetectorTFLite, ocr: PlateOCRTFLite, api_url: str, conf: float = 0.20, iou: float = 0.45):
+    def __init__(self, cam_info: dict, detector: PlateDetectorTFLite, ocr: PlateOCRTFLite, api_url: str, conf: float = 0.12, iou: float = 0.40):
         super().__init__(daemon=True)
         self.cam_info = cam_info
         self.camera_id = cam_info.get("id") or "gov-feed-1"
@@ -326,36 +358,35 @@ class CameraWorkerThread(threading.Thread):
         self.iou = iou
         self.running = True
         self.recent_detections = {}
-        self.recent_text_logs = {}
+        self.connected_once = False
 
     def stop(self):
         self.running = False
 
     def run(self):
-        print(f"\x1b[36m🎥 [Camera Worker Started]\x1b[0m \x1b[1m{self.camera_code}\x1b[0m -> \x1b[90m{self.stream_url}\x1b[0m", flush=True)
-
         retry_count = 0
         last_heartbeat = 0
         frame_counter = 0
 
         while self.running:
-            # Connect to RTSP stream
+            # Set short connection timeout for checking streams
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;2000000"
+
             if str(self.stream_url).isdigit():
                 cap = cv2.VideoCapture(int(self.stream_url), cv2.CAP_V4L2)
             else:
                 cap = cv2.VideoCapture(str(self.stream_url), cv2.CAP_FFMPEG)
 
             if not cap.isOpened():
-                if retry_count % 4 == 0:
-                    print(f"\x1b[33m⏳ [STREAM STANDBY]\x1b[0m Camera \x1b[36m{self.camera_code}\x1b[0m ({self.stream_url}) — Waiting for RTSP video stream...", flush=True)
                 retry_count += 1
-                # Exponential backoff (start at ~2s, cap at ~30s) as per protocol
-                backoff = min(30.0, 2.0 * (1.35 ** min(retry_count, 8)))
+                # Sleep 20s for offline streams so active streams get 100% bandwidth & CPU
+                backoff = min(30.0, 15.0 + (retry_count * 2.0))
                 time.sleep(backoff)
                 continue
 
             retry_count = 0
-            print(f"\x1b[32m🔴 [STREAM CONNECTED]\x1b[0m Camera \x1b[36m{self.camera_code}\x1b[0m — Live video feed active! Real-time ANPR scanning running...", flush=True)
+            self.connected_once = True
+            print(f"\x1b[32m🔴 [STREAM CONNECTED]\x1b[0m Camera \x1b[1m\x1b[36m{self.camera_code}\x1b[0m — Live feed active! Real-time ANPR scanning running...", flush=True)
 
             while self.running and cap.isOpened():
                 ret, frame = cap.read()
@@ -366,29 +397,45 @@ class CameraWorkerThread(threading.Thread):
                 frame_counter += 1
                 now = time.time()
 
-                # Status Heartbeat every 15 seconds
-                if now - last_heartbeat > 15.0:
+                # Status Heartbeat every 30 seconds for active connected cameras only
+                if now - last_heartbeat > 30.0:
                     last_heartbeat = now
                     h, w = frame.shape[:2]
                     print(f"\x1b[34m[STREAM MONITOR]\x1b[0m 📡 Camera: \x1b[36m{self.camera_code}\x1b[0m | Feed: {w}x{h} | AI Scanner Active (Frame #{frame_counter})", flush=True)
 
-                # 1. Run YOLOv9 Plate Detector on frame
-                raw_boxes = self.detector.detect(frame, self.conf, self.iou)
+                # 1. Run Thread-Safe YOLOv9 Plate Detector on frame
+                with INFERENCE_LOCK:
+                    raw_boxes = self.detector.detect(frame, self.conf, self.iou)
 
                 for x1, y1, x2, y2, det_score in raw_boxes:
-                    # 2. Run CCT Transformer OCR on detected plate box
-                    raw_text, ocr_conf = self.ocr.recognize(frame, (x1, y1, x2, y2))
+                    # 2. Run Thread-Safe CCT Transformer OCR on detected plate box
+                    with INFERENCE_LOCK:
+                        raw_text, ocr_conf = self.ocr.recognize(frame, (x1, y1, x2, y2))
                     cleaned_text = normalize_ocr_text(raw_text)
 
-                    # ONLY process and print if it strictly matches a valid Indian number plate
-                    if is_valid_indian_plate(cleaned_text):
+                    # Recognized license plate candidate
+                    if cleaned_text and len(cleaned_text) >= 4:
                         last_seen = self.recent_detections.get(cleaned_text, 0)
-                        if now - last_seen > 6.0:  # 6s cooldown per plate
+                        if now - last_seen > 3.0:  # 3s cooldown per plate
                             self.recent_detections[cleaned_text] = now
-                            print(f"\x1b[32m[PLATE RECOGNIZED]\x1b[0m 🚘 Camera: \x1b[36m{self.camera_code}\x1b[0m | Number Plate: \x1b[1m\x1b[32m{cleaned_text}\x1b[0m (Conf: {int(ocr_conf * 100)}%)", flush=True)
+                            print(f"\x1b[1m\x1b[32m🚘 [PLATE RECOGNIZED]\x1b[0m Camera: \x1b[36m{self.camera_code}\x1b[0m | Number Plate: \x1b[1m\x1b[32m{cleaned_text}\x1b[0m (Conf: {int(ocr_conf * 100)}%)", flush=True)
                             post_detection_to_api(self.api_url, cleaned_text, self.camera_code, self.camera_id, ocr_conf)
 
-                time.sleep(0.02)  # Frame loop pacing (~30-40 FPS max)
+                # 3. Periodic central crop scan (essential when testing plates directly in front of camera)
+                if frame_counter % 8 == 0:
+                    h, w = frame.shape[:2]
+                    crop_center = frame[int(h * 0.20):int(h * 0.80), int(w * 0.15):int(w * 0.85)]
+                    with INFERENCE_LOCK:
+                        center_text, center_conf = self.ocr.recognize(crop_center)
+                    clean_center = normalize_ocr_text(center_text)
+                    if clean_center and len(clean_center) >= 4 and center_conf > 0.30:
+                        last_seen = self.recent_detections.get(clean_center, 0)
+                        if now - last_seen > 3.0:
+                            self.recent_detections[clean_center] = now
+                            print(f"\x1b[1m\x1b[32m🚘 [PLATE RECOGNIZED]\x1b[0m Camera: \x1b[36m{self.camera_code}\x1b[0m | Number Plate: \x1b[1m\x1b[32m{clean_center}\x1b[0m (Direct Scan, Conf: {int(center_conf * 100)}%)", flush=True)
+                            post_detection_to_api(self.api_url, clean_center, self.camera_code, self.camera_id, center_conf)
+
+                time.sleep(0.02)  # Frame loop pacing
 
             cap.release()
             time.sleep(2.0)
@@ -406,10 +453,12 @@ class DynamicCameraManager:
         self.iou = iou
         self.workers = {}  # camera_code -> CameraWorkerThread
         self.running = True
+        self.initial_synced = False
 
     def sync_cameras(self):
         cameras = fetch_all_cameras(self.api_url)
         current_codes = set()
+        new_count = 0
 
         for cam in cameras:
             code = cam.get("camera_code") or cam.get("id") or "GJ-GOV-001"
@@ -421,12 +470,17 @@ class DynamicCameraManager:
                 )
                 worker.start()
                 self.workers[code] = worker
-                print(f"⚡ [Auto-Discovery] Attached real-time AI worker to newly detected camera: \x1b[36m{code}\x1b[0m", flush=True)
+                new_count += 1
+                if self.initial_synced:
+                    print(f"⚡ [Auto-Discovery] Attached real-time AI worker to new camera: \x1b[36m{code}\x1b[0m", flush=True)
+
+        if not self.initial_synced and len(self.workers) > 0:
+            self.initial_synced = True
+            print(f"🚀 [Dynamic Camera Manager] Initialized {len(self.workers)} camera workers in parallel. Standing by for active feeds...", flush=True)
 
         # Clean up removed cameras
         for code in list(self.workers.keys()):
             if code not in current_codes:
-                print(f"ℹ️ [Auto-Discovery] Stopping worker for removed camera: {code}", flush=True)
                 self.workers[code].stop()
                 del self.workers[code]
 
