@@ -183,7 +183,7 @@ def post_detection_to_api(api_url: str, vehicle_plate: str, camera_code: str, co
         print(f"⚠️ Ingest API Post notice: {e}")
 
 
-import concurrent.futures
+import threading
 
 def fetch_all_cameras(api_url: str):
     try:
@@ -196,24 +196,39 @@ def fetch_all_cameras(api_url: str):
         return []
 
 
-def process_single_camera_stream(cam_info: dict, detector: PlateDetectorTFLite, ocr: PlateOCRTFLite, api_url: str, conf: float, iou: float):
+def start_continuous_camera_thread(cam_info: dict, detector: PlateDetectorTFLite, ocr: PlateOCRTFLite, api_url: str, conf: float, iou: float):
     camera_code = cam_info.get("camera_code") or "GJ-GOV-001"
     stream_url = cam_info.get("rtsp_url") or cam_info.get("stream_url") or f"rtsp://localhost:8554/stream/{cam_info.get('id', 1)}"
     
-    cap = cv2.VideoCapture(stream_url)
-    if not cap.isOpened():
-        return
+    print(f"🎥 [Camera Worker Active] \x1b[36m{camera_code}\x1b[0m -> \x1b[90m{stream_url}\x1b[0m")
+    recent_detections = {}
 
-    ret, frame = cap.read()
-    cap.release()
-    if not ret or frame is None:
-        return
+    while True:
+        cap = cv2.VideoCapture(stream_url)
+        if not cap.isOpened():
+            time.sleep(3.0)
+            continue
 
-    raw_boxes = detector.detect(frame, conf, iou)
-    for x1, y1, x2, y2, det_score in raw_boxes:
-        text, ocr_conf = ocr.recognize(frame, (x1, y1, x2, y2))
-        if text and len(text) >= 4:
-            post_detection_to_api(api_url, text, camera_code, ocr_conf)
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret or frame is None:
+                time.sleep(0.5)
+                break
+
+            raw_boxes = detector.detect(frame, conf, iou)
+            for x1, y1, x2, y2, det_score in raw_boxes:
+                text, ocr_conf = ocr.recognize(frame, (x1, y1, x2, y2))
+                if text and len(text) >= 4:
+                    now = time.time()
+                    last_seen = recent_detections.get(text, 0)
+                    if now - last_seen > 5.0:  # 5s cooldown per plate
+                        recent_detections[text] = now
+                        post_detection_to_api(api_url, text, camera_code, ocr_conf)
+            
+            time.sleep(0.01)  # Frame loop pacing
+        
+        cap.release()
+        time.sleep(2.0)
 
 
 def run_all_cameras_parallel(api_url: str, det_model: str, ocr_model: str, threads: int, conf: float, iou: float):
@@ -225,18 +240,24 @@ def run_all_cameras_parallel(api_url: str, det_model: str, ocr_model: str, threa
         print("⚠️ No active camera feeds returned from platform registry.")
         return
 
-    print(f"🚀 [TFLite ANPR Engine] Scanning {len(cameras)} cameras concurrently in parallel...")
-    recent_detections = {}
+    print(f"🚀 [TFLite ANPR Engine] Launching persistent frame-by-frame workers across {len(cameras)} cameras in parallel...")
+    
+    threads_list = []
+    for cam in cameras:
+        t = threading.Thread(
+            target=start_continuous_camera_thread,
+            args=(cam, detector, ocr, api_url, conf, iou),
+            daemon=True
+        )
+        t.start()
+        threads_list.append(t)
 
-    while True:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(cameras), 16)) as executor:
-            futures = [
-                executor.submit(process_single_camera_stream, cam, detector, ocr, api_url, conf, iou)
-                for cam in cameras
-            ]
-            concurrent.futures.wait(futures)
-        
-        time.sleep(3.0)
+    # Keep main engine process alive
+    try:
+        while True:
+            time.sleep(1.0)
+    except KeyboardInterrupt:
+        print("\nParallel TFLite ANPR Engine stopped.")
 
 
 def main():
