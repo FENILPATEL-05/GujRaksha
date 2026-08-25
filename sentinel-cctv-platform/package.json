@@ -5,8 +5,11 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
+    "prestart": "node scripts/verify_and_fulfill_requirements.js",
     "start": "NODE_ENV=production node server.js",
     "dev": "node --watch-path=server.js --watch-path=src/routes --watch-path=src/services --watch-path=src/middleware --watch-path=src/config --watch-path=src/db server.js",
+    "setup": "node scripts/verify_and_fulfill_requirements.js",
+    "prebuild": "node scripts/verify_and_fulfill_requirements.js",
     "build": "vite build"
   },
   "keywords": [
