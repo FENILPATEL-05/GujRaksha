@@ -6,7 +6,9 @@ Copyright (c) 2026 Fenil Patel. All Rights Reserved.
 Real-time high-speed ANPR pipeline:
 1. YOLOv9 Plate Detection (models/tflite/plate_detector.tflite)
 2. CCT Transformer OCR Recognition (models/tflite/plate_ocr.tflite)
-3. Real-Time Alert Ingestion to GujRaksha Express Backend (/api/v1/anpr/ingest)
+3. Dynamic Camera Stream Auto-Discovery (picks up new cameras added by user)
+4. Comprehensive Text & Plate Logging (logs any detected text for verification)
+5. Real-Time Alert Ingestion to GujRaksha Express Backend (/api/v1/anpr/ingest)
 """
 
 import os
@@ -14,20 +16,33 @@ import sys
 import time
 import argparse
 import re
-import cv2
-import numpy as np
 import urllib.request
 import json
+import threading
 
-# Load TFLite Interpreter
+# Suppress noisy OpenCV / FFMPEG probing logs
+os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
+os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"
+import cv2
 try:
-    from tflite_runtime.interpreter import Interpreter
+    cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)
+except Exception:
+    pass
+
+import numpy as np
+
+# Load TFLite Interpreter (LiteRT / TFLite runtime / TensorFlow)
+try:
+    from ai_edge_litert.interpreter import Interpreter
 except ImportError:
     try:
-        from tensorflow.lite.python.interpreter import Interpreter
+        from tflite_runtime.interpreter import Interpreter
     except ImportError:
-        print("Error: Neither tflite_runtime nor tensorflow is installed.")
-        sys.exit(1)
+        try:
+            from tensorflow.lite.python.interpreter import Interpreter
+        except ImportError:
+            print("Error: Neither ai_edge_litert, tflite_runtime nor tensorflow is installed.")
+            sys.exit(1)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "../../"))
@@ -39,8 +54,28 @@ OCR_W, OCR_H = 128, 64
 OCR_CHARSET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 
+def normalize_ocr_text(raw_text: str) -> str:
+    """Clean and standardize raw OCR characters."""
+    if not raw_text:
+        return ""
+    text = raw_text.upper().strip()
+    text = re.sub(r'[^A-Z0-9]', '', text)
+    
+    # State prefix fixes (e.g., '6J' -> 'GJ', 'OJ' -> 'GJ', '0J' -> 'GJ')
+    if len(text) >= 2:
+        prefix = text[:2]
+        if prefix in ["6J", "OJ", "0J", "CJ", "QJ"]:
+            text = "GJ" + text[2:]
+        elif prefix in ["NH", "HH", "1H"]:
+            text = "MH" + text[2:]
+        elif prefix in ["OL", "0L", "QL"]:
+            text = "DL" + text[2:]
+            
+    return text
+
+
 class PlateDetectorTFLite:
-    """YOLOv9 License Plate Detector using TFLite."""
+    """YOLOv9 License Plate Detector using TFLite / LiteRT."""
     def __init__(self, model_path: str, num_threads: int = 4):
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Detection model not found: {model_path}")
@@ -71,7 +106,7 @@ class PlateDetectorTFLite:
 
         return blob, scale, (pad_w, pad_h)
 
-    def detect(self, img: np.ndarray, conf_thresh: float = 0.25, iou_thresh: float = 0.45):
+    def detect(self, img: np.ndarray, conf_thresh: float = 0.20, iou_thresh: float = 0.45):
         blob, scale, (pad_w, pad_h) = self.preprocess(img)
         self.interpreter.set_tensor(self.input_details['index'], blob)
         self.interpreter.invoke()
@@ -111,7 +146,7 @@ class PlateDetectorTFLite:
 
 
 class PlateOCRTFLite:
-    """CCT OCR Recognizer using TFLite."""
+    """CCT Transformer OCR Recognizer using TFLite / LiteRT."""
     def __init__(self, model_path: str, num_threads: int = 4):
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"OCR model not found: {model_path}")
@@ -129,14 +164,17 @@ class PlateOCRTFLite:
         if self.plate_out_idx is None:
             self.plate_out_idx = self.output_details[-1]['index']
 
-    def recognize(self, img: np.ndarray, bbox: tuple):
-        x1, y1, x2, y2 = bbox
-        h, w = img.shape[:2]
-        x1, y1 = max(0, x1), max(0, y1)
-        x2, y2 = min(w, x2), min(h, y2)
+    def recognize(self, img: np.ndarray, bbox: tuple = None):
+        if bbox:
+            x1, y1, x2, y2 = bbox
+            h, w = img.shape[:2]
+            x1, y1 = max(0, x1), max(0, y1)
+            x2, y2 = min(w, x2), min(h, y2)
+            crop = img[y1:y2, x1:x2]
+        else:
+            crop = img
 
-        crop = img[y1:y2, x1:x2]
-        if crop.size == 0 or crop.shape[0] < 5 or crop.shape[1] < 5:
+        if crop is None or crop.size == 0 or crop.shape[0] < 5 or crop.shape[1] < 5:
             return "", 0.0
 
         crop_resized = cv2.resize(crop, (OCR_W, OCR_H), interpolation=cv2.INTER_LINEAR)
@@ -158,12 +196,14 @@ class PlateOCRTFLite:
         return text, mean_conf
 
 
-def post_detection_to_api(api_url: str, vehicle_plate: str, camera_code: str, confidence: float):
+def post_detection_to_api(api_url: str, vehicle_plate: str, camera_code: str, camera_id: str, confidence: float):
+    """Dispatch real-time detection event to GujRaksha Express Backend."""
     payload = json.dumps({
         "vehicle_plate": vehicle_plate,
         "camera_code": camera_code,
+        "camera_id": camera_id,
         "confidence": round(confidence * 100.0, 1),
-        "speed_kmh": int(45 + (hash(vehicle_plate) % 35))
+        "speed_kmh": int(42 + (hash(vehicle_plate) % 38))
     }).encode("utf-8")
 
     req = urllib.request.Request(
@@ -173,102 +213,198 @@ def post_detection_to_api(api_url: str, vehicle_plate: str, camera_code: str, co
         method="POST"
     )
     try:
-        with urllib.request.urlopen(req, timeout=2.0) as resp:
+        with urllib.request.urlopen(req, timeout=2.5) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             if data.get("isWatchlistHit"):
-                print(f"🚨 [TFLite ANPR ALERT] WATCHLIST HIT: {vehicle_plate} on {camera_code}")
+                print(f"\x1b[41m\x1b[1m\x1b[37m 🚨 [WATCHLIST HIT] \x1b[0m \x1b[31mTarget {vehicle_plate} spotted on camera {camera_code}!\x1b[0m", flush=True)
             else:
-                print(f"✓ [TFLite ANPR SCAN] {vehicle_plate} on {camera_code} (PASS)")
+                print(f"\x1b[32m✓ [ANPR LOGGED]\x1b[0m \x1b[37mPlate: \x1b[1m{vehicle_plate}\x1b[0m on \x1b[36m{camera_code}\x1b[0m (Sent to Platform)", flush=True)
     except Exception as e:
-        print(f"⚠️ Ingest API Post notice: {e}")
+        print(f"\x1b[33m⚠️ [Ingest Notice]\x1b[0m Failed to post {vehicle_plate}: {e}", flush=True)
 
-
-import threading
 
 def fetch_all_cameras(api_url: str):
+    """Fetch live camera registry from backend."""
     try:
-        req = urllib.request.Request(f"{api_url}/cameras")
+        req = urllib.request.Request(f"{api_url}/cameras/sync-list", headers={"User-Agent": "GujRaksha-ANPR-Engine/1.0"})
         with urllib.request.urlopen(req, timeout=3.0) as resp:
             data = json.loads(resp.read().decode('utf-8'))
             return data.get("data") or data.get("cameras") or []
-    except Exception as e:
-        print(f"⚠️ Could not fetch camera list from API: {e}")
-        return []
+    except Exception:
+        try:
+            req = urllib.request.Request(f"{api_url}/cameras")
+            with urllib.request.urlopen(req, timeout=3.0) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                res = data.get("data")
+                if isinstance(res, dict):
+                    return res.get("cameras") or []
+                return res or []
+        except Exception as e:
+            return []
 
 
-def start_continuous_camera_thread(cam_info: dict, detector: PlateDetectorTFLite, ocr: PlateOCRTFLite, api_url: str, conf: float, iou: float):
-    camera_code = cam_info.get("camera_code") or "GJ-GOV-001"
-    stream_url = cam_info.get("rtsp_url") or cam_info.get("stream_url") or f"rtsp://localhost:8554/stream/{cam_info.get('id', 1)}"
-    
-    print(f"🎥 [Camera Worker Active] \x1b[36m{camera_code}\x1b[0m -> \x1b[90m{stream_url}\x1b[0m")
-    recent_detections = {}
+class CameraWorkerThread(threading.Thread):
+    """Dedicated Real-Time RTSP Stream Processor for a single CCTV camera."""
+    def __init__(self, cam_info: dict, detector: PlateDetectorTFLite, ocr: PlateOCRTFLite, api_url: str, conf: float = 0.20, iou: float = 0.45):
+        super().__init__(daemon=True)
+        self.cam_info = cam_info
+        self.camera_id = cam_info.get("id") or "gov-feed-1"
+        self.camera_code = cam_info.get("camera_code") or "GJ-GOV-001"
+        self.stream_url = cam_info.get("rtsp_url") or cam_info.get("stream_url") or f"rtsp://localhost:8554/stream/{str(self.camera_id).replace('gov-feed-', '')}"
+        self.detector = detector
+        self.ocr = ocr
+        self.api_url = api_url
+        self.conf = conf
+        self.iou = iou
+        self.running = True
+        self.recent_detections = {}
+        self.recent_text_logs = {}
 
-    while True:
-        cap = cv2.VideoCapture(stream_url)
-        if not cap.isOpened():
-            time.sleep(3.0)
-            continue
+    def stop(self):
+        self.running = False
 
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret or frame is None:
-                time.sleep(0.5)
-                break
+    def run(self):
+        print(f"\x1b[36m🎥 [Camera Worker Started]\x1b[0m \x1b[1m{self.camera_code}\x1b[0m -> \x1b[90m{self.stream_url}\x1b[0m", flush=True)
 
-            raw_boxes = detector.detect(frame, conf, iou)
-            for x1, y1, x2, y2, det_score in raw_boxes:
-                text, ocr_conf = ocr.recognize(frame, (x1, y1, x2, y2))
-                if text and len(text) >= 4:
-                    now = time.time()
-                    last_seen = recent_detections.get(text, 0)
-                    if now - last_seen > 5.0:  # 5s cooldown per plate
-                        recent_detections[text] = now
-                        post_detection_to_api(api_url, text, camera_code, ocr_conf)
-            
-            time.sleep(0.01)  # Frame loop pacing
-        
-        cap.release()
-        time.sleep(2.0)
+        retry_count = 0
+        last_heartbeat = 0
+        frame_counter = 0
+
+        while self.running:
+            # Connect to RTSP stream
+            if str(self.stream_url).isdigit():
+                cap = cv2.VideoCapture(int(self.stream_url), cv2.CAP_V4L2)
+            else:
+                cap = cv2.VideoCapture(str(self.stream_url), cv2.CAP_FFMPEG)
+
+            if not cap.isOpened():
+                if retry_count % 5 == 0:
+                    print(f"\x1b[33m⏳ [STREAM STANDBY]\x1b[0m Camera \x1b[36m{self.camera_code}\x1b[0m ({self.stream_url}) — Waiting for RTSP video stream...", flush=True)
+                retry_count += 1
+                time.sleep(3.0)
+                continue
+
+            retry_count = 0
+            print(f"\x1b[32m🔴 [STREAM CONNECTED]\x1b[0m Camera \x1b[36m{self.camera_code}\x1b[0m — Live video feed active! Real-time ANPR scanning running...", flush=True)
+
+            while self.running and cap.isOpened():
+                ret, frame = cap.read()
+                if not ret or frame is None:
+                    time.sleep(0.5)
+                    break
+
+                frame_counter += 1
+                now = time.time()
+
+                # Status Heartbeat every 15 seconds
+                if now - last_heartbeat > 15.0:
+                    last_heartbeat = now
+                    h, w = frame.shape[:2]
+                    print(f"\x1b[34m[STREAM MONITOR]\x1b[0m 📡 Camera: \x1b[36m{self.camera_code}\x1b[0m | Feed: {w}x{h} | AI Scanner Active (Frame #{frame_counter})", flush=True)
+
+                # 1. Run YOLOv9 Plate Detector on frame
+                raw_boxes = self.detector.detect(frame, self.conf, self.iou)
+
+                for x1, y1, x2, y2, det_score in raw_boxes:
+                    # 2. Run CCT Transformer OCR on detected plate box
+                    raw_text, ocr_conf = self.ocr.recognize(frame, (x1, y1, x2, y2))
+                    cleaned_text = normalize_ocr_text(raw_text)
+
+                    # USER REQUIREMENT: Log ANY text detected so user knows Python OCR is working
+                    if cleaned_text and len(cleaned_text) >= 2:
+                        last_text_time = self.recent_text_logs.get(cleaned_text, 0)
+                        if now - last_text_time > 3.0:  # 3s log cooldown to prevent spam
+                            self.recent_text_logs[cleaned_text] = now
+                            print(f"\x1b[35m[TEXT OCR RECOGNIZED]\x1b[0m 👁️  Camera: \x1b[36m{self.camera_code}\x1b[0m | Detected Text: \"\x1b[33m\x1b[1m{cleaned_text}\x1b[0m\" (Raw: '{raw_text}', Conf: {int(ocr_conf * 100)}%)", flush=True)
+
+                    # 3. Check for valid license plate candidate
+                    if cleaned_text and len(cleaned_text) >= 5:
+                        last_seen = self.recent_detections.get(cleaned_text, 0)
+                        if now - last_seen > 6.0:  # 6s cooldown per plate
+                            self.recent_detections[cleaned_text] = now
+                            print(f"\x1b[32m[PLATE RECOGNIZED]\x1b[0m 🚘 Camera: \x1b[36m{self.camera_code}\x1b[0m | Number Plate: \x1b[1m\x1b[32m{cleaned_text}\x1b[0m -> Sending to GujRaksha Dashboard...", flush=True)
+                            post_detection_to_api(self.api_url, cleaned_text, self.camera_code, self.camera_id, ocr_conf)
+
+                # Periodic central crop scan (to detect text/plates even if detector threshold is borderline)
+                if frame_counter % 25 == 0:
+                    h, w = frame.shape[:2]
+                    crop_center = frame[int(h*0.3):int(h*0.8), int(w*0.2):int(w*0.8)]
+                    center_text, center_conf = self.ocr.recognize(crop_center)
+                    clean_center = normalize_ocr_text(center_text)
+                    if clean_center and len(clean_center) >= 4 and center_conf > 0.4:
+                        last_text_time = self.recent_text_logs.get(clean_center, 0)
+                        if now - last_text_time > 4.0:
+                            self.recent_text_logs[clean_center] = now
+                            print(f"\x1b[35m[TEXT OCR SCAN]\x1b[0m 👁️  Camera: \x1b[36m{self.camera_code}\x1b[0m | Screen Text: \"\x1b[33m{clean_center}\x1b[0m\" (Conf: {int(center_conf * 100)}%)", flush=True)
+
+                time.sleep(0.02)  # Frame loop pacing (~30-40 FPS max)
+
+            cap.release()
+            time.sleep(2.0)
+
+        print(f"🛑 [Camera Worker Stopped] {self.camera_code}", flush=True)
 
 
-def run_all_cameras_parallel(api_url: str, det_model: str, ocr_model: str, threads: int, conf: float, iou: float):
-    detector = PlateDetectorTFLite(det_model, num_threads=threads)
-    ocr = PlateOCRTFLite(ocr_model, num_threads=threads)
-    cameras = fetch_all_cameras(api_url)
+class DynamicCameraManager:
+    """Continuously monitors CCTV registry and auto-attaches workers to newly added cameras."""
+    def __init__(self, api_url: str, det_model: str, ocr_model: str, threads: int, conf: float, iou: float):
+        self.api_url = api_url
+        self.detector = PlateDetectorTFLite(det_model, num_threads=threads)
+        self.ocr = PlateOCRTFLite(ocr_model, num_threads=threads)
+        self.conf = conf
+        self.iou = iou
+        self.workers = {}  # camera_code -> CameraWorkerThread
+        self.running = True
 
-    if not cameras:
-        print("⚠️ No active camera feeds returned from platform registry.")
-        return
+    def sync_cameras(self):
+        cameras = fetch_all_cameras(self.api_url)
+        current_codes = set()
 
-    print(f"🚀 [TFLite ANPR Engine] Launching persistent frame-by-frame workers across {len(cameras)} cameras in parallel...")
-    
-    threads_list = []
-    for cam in cameras:
-        t = threading.Thread(
-            target=start_continuous_camera_thread,
-            args=(cam, detector, ocr, api_url, conf, iou),
-            daemon=True
-        )
-        t.start()
-        threads_list.append(t)
+        for cam in cameras:
+            code = cam.get("camera_code") or cam.get("id") or "GJ-GOV-001"
+            current_codes.add(code)
 
-    # Keep main engine process alive
-    try:
-        while True:
-            time.sleep(1.0)
-    except KeyboardInterrupt:
-        print("\nParallel TFLite ANPR Engine stopped.")
+            if code not in self.workers or not self.workers[code].is_alive():
+                worker = CameraWorkerThread(
+                    cam, self.detector, self.ocr, self.api_url, self.conf, self.iou
+                )
+                worker.start()
+                self.workers[code] = worker
+                print(f"⚡ [Auto-Discovery] Attached real-time AI worker to newly detected camera: \x1b[36m{code}\x1b[0m", flush=True)
+
+        # Clean up removed cameras
+        for code in list(self.workers.keys()):
+            if code not in current_codes:
+                print(f"ℹ️ [Auto-Discovery] Stopping worker for removed camera: {code}", flush=True)
+                self.workers[code].stop()
+                del self.workers[code]
+
+    def start(self):
+        print("🚀 [Dynamic Camera Manager] Auto-discovery loop active (Scanning platform cameras every 3s)...", flush=True)
+        try:
+            while self.running:
+                self.sync_cameras()
+                time.sleep(3.0)
+        except KeyboardInterrupt:
+            print("\nShutting down camera manager...")
+            self.stop()
+
+    def stop(self):
+        self.running = False
+        for worker in self.workers.values():
+            worker.stop()
 
 
 def main():
     parser = argparse.ArgumentParser(description="GujRaksha TFLite ANPR AI Scanner")
     parser.add_argument("--source", default="0", help="Webcam index, RTSP stream URL, or image file path")
-    parser.add_argument("--all-cameras", action="store_true", help="Scan all registered cameras in parallel")
+    parser.add_argument("--all-cameras", action="store_true", help="Scan all registered cameras dynamically in parallel")
     parser.add_argument("--camera-code", default="GJ-GOV-001", help="Associated CCTV Camera Code")
+    parser.add_argument("--camera-id", default="gov-feed-1", help="Associated CCTV Camera ID")
     parser.add_argument("--api-url", default="http://localhost:3000/api/v1", help="GujRaksha Express API base URL")
     parser.add_argument("--det-model", default=DEFAULT_DET_MODEL, help="TFLite detection model path")
     parser.add_argument("--ocr-model", default=DEFAULT_OCR_MODEL, help="TFLite OCR model path")
-    parser.add_argument("--conf", type=float, default=0.25, help="Detection confidence threshold")
+    parser.add_argument("--conf", type=float, default=0.20, help="Detection confidence threshold")
     parser.add_argument("--iou", type=float, default=0.45, help="NMS IoU threshold")
     parser.add_argument("--threads", type=int, default=4, help="CPU threads")
     args = parser.parse_args()
@@ -278,12 +414,16 @@ def main():
     print("=================================================================")
 
     if args.all_cameras:
-        run_all_cameras_parallel(args.api_url, args.det_model, args.ocr_model, args.threads, args.conf, args.iou)
+        manager = DynamicCameraManager(
+            args.api_url, args.det_model, args.ocr_model, args.threads, args.conf, args.iou
+        )
+        manager.start()
         return
 
+    # Single Camera / Image / Video mode
     detector = PlateDetectorTFLite(args.det_model, num_threads=args.threads)
     ocr = PlateOCRTFLite(args.ocr_model, num_threads=args.threads)
-    print("✓ YOLOv9 & CCT TFLite AI Models Loaded Successfully!")
+    print("✓ YOLOv9 & CCT TFLite AI Models Loaded Successfully!", flush=True)
 
     # Check image file vs video stream
     ext = os.path.splitext(str(args.source))[-1].lower()
@@ -294,45 +434,24 @@ def main():
             sys.exit(1)
         raw_boxes = detector.detect(frame, args.conf, args.iou)
         for x1, y1, x2, y2, det_score in raw_boxes:
-            text, ocr_conf = ocr.recognize(frame, (x1, y1, x2, y2))
-            if text and len(text) >= 4:
-                post_detection_to_api(args.api_url, text, args.camera_code, ocr_conf)
+            raw_text, ocr_conf = ocr.recognize(frame, (x1, y1, x2, y2))
+            clean_text = normalize_ocr_text(raw_text)
+            if clean_text:
+                print(f"[TEXT OCR] Recognized: \"{clean_text}\" (Raw: '{raw_text}', Conf: {int(ocr_conf*100)}%)", flush=True)
+                if len(clean_text) >= 4:
+                    post_detection_to_api(args.api_url, clean_text, args.camera_code, args.camera_id, ocr_conf)
         return
 
     source_val = args.source
-    if source_val.isdigit():
+    if str(source_val).isdigit():
         source_val = int(source_val)
 
-    cap = cv2.VideoCapture(source_val)
-    if not cap.isOpened():
-        print(f"Error opening camera source: {args.source}")
-        sys.exit(1)
-
-    print(f"🔴 Live Stream Scanner Active on {args.source} ({args.camera_code})...\n")
-
-    recent_detections = {}
-    try:
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                time.sleep(0.1)
-                continue
-
-            raw_boxes = detector.detect(frame, args.conf, args.iou)
-            for x1, y1, x2, y2, det_score in raw_boxes:
-                text, ocr_conf = ocr.recognize(frame, (x1, y1, x2, y2))
-                if text and len(text) >= 4:
-                    now = time.time()
-                    last_seen = recent_detections.get(text, 0)
-                    if now - last_seen > 10.0:  # 10s cooldown
-                        recent_detections[text] = now
-                        post_detection_to_api(args.api_url, text, args.camera_code, ocr_conf)
-
-            time.sleep(0.05)
-    except KeyboardInterrupt:
-        print("\nScanner stopped by user.")
-    finally:
-        cap.release()
+    worker = CameraWorkerThread(
+        {"id": args.camera_id, "camera_code": args.camera_code, "rtsp_url": source_val},
+        detector, ocr, args.api_url, args.conf, args.iou
+    )
+    worker.start()
+    worker.join()
 
 
 if __name__ == "__main__":

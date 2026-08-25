@@ -156,17 +156,6 @@ class AnprDataStore {
     // Check against real Watchlist Database
     const watchlistHit = watchlistStore.getByPlate(cleanPlate);
 
-    // If vehicle is NOT in the police watchlist, log as clean vehicle
-    if (!watchlistHit) {
-      console.log(`\x1b[36m[ANPR SCAN]\x1b[0m 🚗 Plate: \x1b[1m\x1b[37m${cleanPlate}\x1b[0m | Camera: \x1b[33m${payload.camera_code || payload.camera_id || "GJ-GOV-001"}\x1b[0m | Status: \x1b[32mPASS (Clean Vehicle)\x1b[0m`);
-      return {
-        vehicle_plate: cleanPlate,
-        is_watchlist_hit: false,
-        stored: false,
-        message: "Non-watchlist vehicle discarded. Only watchlist targets are stored in Police CCTV registry."
-      };
-    }
-
     let camMeta = null;
     if (payload.camera_id || payload.camera_code) {
       camMeta = db.getById(payload.camera_id || payload.camera_code);
@@ -176,7 +165,7 @@ class AnprDataStore {
       id: payload.id || `det-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       vehicle_plate: cleanPlate,
       vehicle_type: payload.vehicle_type || (watchlistHit ? watchlistHit.vehicle_type : "Motor Vehicle"),
-      vehicle_color: payload.vehicle_color || "Unknown",
+      vehicle_color: payload.vehicle_color || "Standard",
       camera_id: payload.camera_id || (camMeta ? camMeta.id : "gov-feed-1"),
       camera_code: payload.camera_code || (camMeta ? camMeta.camera_code : "GJ-GOV-001"),
       camera_name: payload.camera_name || (camMeta ? camMeta.name : "State CCTV Node"),
@@ -185,38 +174,52 @@ class AnprDataStore {
       longitude: payload.longitude !== undefined ? parseFloat(payload.longitude) : (camMeta ? camMeta.longitude : 72.5714),
       speed_kmh: payload.speed_kmh ? parseInt(payload.speed_kmh, 10) : Math.floor(40 + Math.random() * 45),
       confidence: payload.confidence ? parseFloat(payload.confidence) : parseFloat((95 + Math.random() * 4.8).toFixed(1)),
-      is_watchlist_hit: true,
-      watchlist_category: watchlistHit.category,
-      watchlist_fir: watchlistHit.fir_number,
-      watchlist_ps: watchlistHit.police_station,
-      watchlist_priority: watchlistHit.priority,
+      is_watchlist_hit: !!watchlistHit,
+      watchlist_category: watchlistHit ? watchlistHit.category : null,
+      watchlist_fir: watchlistHit ? watchlistHit.fir_number : null,
+      watchlist_ps: watchlistHit ? watchlistHit.police_station : null,
+      watchlist_priority: watchlistHit ? watchlistHit.priority : null,
       timestamp: payload.timestamp || new Date().toISOString(),
       stored: true
     };
 
-    // Print High-Visibility Alert in Terminal
-    console.log(`\n\x1b[41m\x1b[1m\x1b[37m 🚨 [ANPR ALERT] POLICE WATCHLIST TARGET DETECTED! \x1b[0m`);
-    console.log(`\x1b[31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m`);
-    console.log(`   🚘 \x1b[1mVehicle Plate  :\x1b[0m \x1b[33m\x1b[1m${newDetection.vehicle_plate}\x1b[0m`);
-    console.log(`   🚨 \x1b[1mThreat Category:\x1b[0m \x1b[31m\x1b[1m${newDetection.watchlist_category || "SUSPECT_HOTLIST"}\x1b[0m (\x1b[35m${newDetection.watchlist_priority || "CRITICAL"}\x1b[0m)`);
-    console.log(`   📋 \x1b[1mFIR Reference  :\x1b[0m \x1b[36m${newDetection.watchlist_fir || "Active FIR"}\x1b[0m (\x1b[37m${newDetection.watchlist_ps || "State Police"}\x1b[0m)`);
-    console.log(`   🎥 \x1b[1mCamera Node    :\x1b[0m \x1b[32m[${newDetection.camera_code}]\x1b[0m ${newDetection.camera_name}`);
-    console.log(`   📍 \x1b[1mLocation / GPS :\x1b[0m ${newDetection.district} (${newDetection.latitude.toFixed(4)}, ${newDetection.longitude.toFixed(4)})`);
-    console.log(`   ⚡ \x1b[1mTelemetry      :\x1b[0m Speed: \x1b[33m${newDetection.speed_kmh} km/h\x1b[0m | AI Confidence: \x1b[32m${newDetection.confidence}%\x1b[0m`);
-    console.log(`   🕒 \x1b[1mTimestamp      :\x1b[0m ${newDetection.timestamp}`);
-    console.log(`\x1b[31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m\n`);
+    if (watchlistHit) {
+      // Print High-Visibility Alert in Terminal
+      console.log(`\n\x1b[41m\x1b[1m\x1b[37m 🚨 [ANPR ALERT] POLICE WATCHLIST TARGET DETECTED! \x1b[0m`);
+      console.log(`\x1b[31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m`);
+      console.log(`   🚘 \x1b[1mVehicle Plate  :\x1b[0m \x1b[33m\x1b[1m${newDetection.vehicle_plate}\x1b[0m`);
+      console.log(`   🚨 \x1b[1mThreat Category:\x1b[0m \x1b[31m\x1b[1m${newDetection.watchlist_category || "SUSPECT_HOTLIST"}\x1b[0m (\x1b[35m${newDetection.watchlist_priority || "CRITICAL"}\x1b[0m)`);
+      console.log(`   📋 \x1b[1mFIR Reference  :\x1b[0m \x1b[36m${newDetection.watchlist_fir || "Active FIR"}\x1b[0m (\x1b[37m${newDetection.watchlist_ps || "State Police"}\x1b[0m)`);
+      console.log(`   🎥 \x1b[1mCamera Node    :\x1b[0m \x1b[32m[${newDetection.camera_code}]\x1b[0m ${newDetection.camera_name}`);
+      console.log(`   📍 \x1b[1mLocation / GPS :\x1b[0m ${newDetection.district} (${newDetection.latitude.toFixed(4)}, ${newDetection.longitude.toFixed(4)})`);
+      console.log(`   ⚡ \x1b[1mTelemetry      :\x1b[0m Speed: \x1b[33m${newDetection.speed_kmh} km/h\x1b[0m | AI Confidence: \x1b[32m${newDetection.confidence}%\x1b[0m`);
+      console.log(`   🕒 \x1b[1mTimestamp      :\x1b[0m ${newDetection.timestamp}`);
+      console.log(`\x1b[31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m\n`);
+    } else {
+      console.log(`\x1b[36m[ANPR SCAN]\x1b[0m 🚗 Plate: \x1b[1m\x1b[37m${cleanPlate}\x1b[0m | Camera: \x1b[33m${newDetection.camera_code}\x1b[0m | Status: \x1b[32mPASS (Verified Vehicle)\x1b[0m`);
+    }
 
+    // Keep up to 500 recent detections
     this.detections.unshift(newDetection);
+    if (this.detections.length > 500) {
+      this.detections = this.detections.slice(0, 500);
+    }
     this.save();
 
     // Broadcast instant real-time alert via SSE
     const alertObject = {
       id: `alert-${newDetection.id}`,
       type: "ANPR_HOTLIST",
-      title: `🚨 WATCHLIST ALERT: ${newDetection.watchlist_category ? newDetection.watchlist_category.replace("_", " ") : "SUSPECT DETECTED"}`,
+      title: newDetection.is_watchlist_hit 
+        ? `🚨 WATCHLIST ALERT: ${newDetection.watchlist_category ? newDetection.watchlist_category.replace("_", " ") : "SUSPECT DETECTED"}`
+        : `✓ Vehicle Detected: ${newDetection.vehicle_plate}`,
       vehicleNo: newDetection.vehicle_plate,
-      description: `${newDetection.vehicle_plate} (${newDetection.vehicle_type}) · Matched ${newDetection.watchlist_fir || "Police Watchlist"} at ${newDetection.speed_kmh} km/h`,
-      severity: newDetection.watchlist_category === "STOLEN_VEHICLE" ? "CRITICAL" : "HIGH",
+      vehicle_plate: newDetection.vehicle_plate,
+      description: newDetection.is_watchlist_hit
+        ? `${newDetection.vehicle_plate} (${newDetection.vehicle_type}) · Matched ${newDetection.watchlist_fir || "Police Watchlist"} at ${newDetection.speed_kmh} km/h`
+        : `${newDetection.vehicle_plate} (${newDetection.vehicle_type}) passed through ${newDetection.camera_name}`,
+      severity: newDetection.is_watchlist_hit ? (newDetection.watchlist_category === "STOLEN_VEHICLE" ? "CRITICAL" : "HIGH") : "INFO",
+      is_watchlist_hit: newDetection.is_watchlist_hit,
       cameraId: newDetection.camera_id,
       cameraCode: newDetection.camera_code,
       cameraName: newDetection.camera_name,

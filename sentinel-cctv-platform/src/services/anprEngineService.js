@@ -15,11 +15,19 @@ import watchlistStore from '../db/watchlistStore.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PYTHON_TFLITE_SCRIPT = path.join(__dirname, 'anpr_tflite_scanner.py');
+const VENV_PYTHON = path.join(__dirname, '../../venv/bin/python');
 
 class AnprEngineService {
   constructor() {
     this.activeWorker = null;
     this.status = 'STOPPED';
+  }
+
+  getPythonBinary() {
+    if (fs.existsSync(VENV_PYTHON)) {
+      return VENV_PYTHON;
+    }
+    return 'python3';
   }
 
   isPythonScannerAvailable() {
@@ -33,9 +41,22 @@ class AnprEngineService {
       return null;
     }
 
+    const pythonBin = this.getPythonBinary();
     const scriptArgs = source === '--all-cameras' ? ['--all-cameras'] : ['--source', String(source), '--camera-code', cameraCode];
-    console.log(`🚀 [TFLite AI ANPR Engine] Spawning YOLOv9 + CCT OCR (${scriptArgs.join(' ')})...`);
-    const child = spawn('python3', [PYTHON_TFLITE_SCRIPT, ...scriptArgs]);
+    console.log(`🚀 [TFLite AI ANPR Engine] Spawning YOLOv9 + CCT OCR using ${pythonBin} (${scriptArgs.join(' ')})...`);
+    
+    if (this.activeWorker) {
+      try {
+        this.activeWorker.kill('SIGTERM');
+      } catch (e) {}
+    }
+
+    const child = spawn(pythonBin, [PYTHON_TFLITE_SCRIPT, ...scriptArgs], {
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    this.activeWorker = child;
+    this.status = 'RUNNING';
 
     child.stdout.on('data', (chunk) => {
       process.stdout.write(`\x1b[35m[TFLite AI ANPR]\x1b[0m ${chunk.toString()}`);
@@ -43,6 +64,12 @@ class AnprEngineService {
 
     child.stderr.on('data', (chunk) => {
       process.stdout.write(`\x1b[33m[TFLite AI Notice]\x1b[0m ${chunk.toString()}`);
+    });
+
+    child.on('close', (code) => {
+      console.log(`\x1b[90m[TFLite AI Engine] Worker exited with code ${code}\x1b[0m`);
+      this.status = 'STOPPED';
+      this.activeWorker = null;
     });
 
     return child;
@@ -70,3 +97,4 @@ class AnprEngineService {
 }
 
 export default new AnprEngineService();
+
