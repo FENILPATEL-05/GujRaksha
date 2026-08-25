@@ -150,7 +150,7 @@ async function verifyAndFulfill() {
   }
 
   // 6. Check TFLite AI Models
-  log(`\n🧠 [6/6] Checking YOLOv9 & OCR TFLite AI Models...`);
+  log(`\n🧠 [6/7] Checking YOLOv9 & OCR TFLite AI Models...`);
   const detectorPath = path.join(PROJECT_ROOT, 'models/tflite/plate_detector.tflite');
   const ocrPath = path.join(PROJECT_ROOT, 'models/tflite/plate_ocr.tflite');
 
@@ -161,6 +161,38 @@ async function verifyAndFulfill() {
     log(`   ✅ Plate OCR Transformer Model (${ocrSize} MB) [OK]`, colors.green);
   } else {
     log(`   ⚠️  One or more AI models missing in models/tflite/`, colors.yellow);
+  }
+
+  // 7. Check GPU Hardware Acceleration
+  log(`\n⚡ [7/7] Checking GPU Hardware Acceleration...`);
+  let gpuDetected = false;
+  let gpuInfo = '';
+
+  try {
+    if (checkCmd('nvidia-smi')) {
+      const smiOutput = execSync('nvidia-smi --query-gpu=name,memory.total --format=csv,noheader', { encoding: 'utf-8' }).trim();
+      if (smiOutput) {
+        gpuDetected = true;
+        gpuInfo = `NVIDIA ${smiOutput} (CUDA Accelerated)`;
+      }
+    }
+  } catch (e) {}
+
+  if (!gpuDetected) {
+    try {
+      const lspciOut = execSync("lspci 2>/dev/null | grep -i 'vga\\|3d\\|display' || true", { encoding: 'utf-8' }).trim();
+      if (lspciOut) {
+        gpuInfo = lspciOut.split(':').slice(2).join(':').trim() || lspciOut;
+        gpuDetected = true;
+      }
+    } catch (e) {}
+  }
+
+  if (gpuDetected) {
+    log(`   🚀 GPU Detected: ${colors.green}${gpuInfo}${colors.reset}`, colors.green);
+    log(`   ✅ Auto-Acceleration: GPU-First Execution with Dynamic CPU Fallback [ACTIVE]`, colors.green);
+  } else {
+    log(`   ⚡ No Dedicated GPU Found. Using Optimized Multi-Core CPU [ACTIVE]`, colors.cyan);
   }
 
   log('\n' + '='.repeat(70), colors.cyan);

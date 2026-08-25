@@ -96,13 +96,46 @@ def is_valid_indian_plate(text: str) -> bool:
     return bool(PLATE_REGEX.match(clean) or BH_REGEX.match(clean))
 
 
+def create_accelerated_interpreter(model_path: str, num_threads: int = None):
+    """
+    Initializes TFLite / LiteRT Interpreter with GPU acceleration first.
+    If GPU delegate is not available, gracefully falls back to multi-threaded CPU.
+    """
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model not found: {model_path}")
+
+    if num_threads is None:
+        num_threads = min(8, max(2, os.cpu_count() or 4))
+
+    # 1. Attempt GPU Acceleration Delegates (OpenCL / OpenGL / Vulkan / CUDA / Linux)
+    gpu_delegates_to_try = [
+        "libtensorflowlite_gpu_delegate.so",
+        "libdelegate_gpu.so",
+        "libtensorflowlite_gpu_delegate.dylib",
+        "tensorflowlite_gpu_delegate.dll"
+    ]
+
+    for delegate_name in gpu_delegates_to_try:
+        try:
+            if hasattr(Interpreter, 'load_delegate') or 'load_delegate' in globals():
+                delegate = Interpreter.load_delegate(delegate_name) if hasattr(Interpreter, 'load_delegate') else load_delegate(delegate_name)
+                interpreter = Interpreter(model_path=model_path, experimental_delegates=[delegate])
+                interpreter.allocate_tensors()
+                print(f"🚀 [AI Acceleration] GPU Hardware Acceleration ACTIVE ({delegate_name}) for {os.path.basename(model_path)}")
+                return interpreter, "GPU"
+        except Exception:
+            continue
+
+    # 2. Seamless Fallback to Optimized Multi-Core CPU
+    interpreter = Interpreter(model_path=model_path, num_threads=num_threads)
+    interpreter.allocate_tensors()
+    return interpreter, f"CPU ({num_threads} Threads)"
+
+
 class PlateDetectorTFLite:
-    """YOLOv9 License Plate Detector using TFLite / LiteRT."""
-    def __init__(self, model_path: str, num_threads: int = 4):
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Detection model not found: {model_path}")
-        self.interpreter = Interpreter(model_path=model_path, num_threads=num_threads)
-        self.interpreter.allocate_tensors()
+    """YOLOv9 License Plate Detector using TFLite / LiteRT with GPU/CPU Auto-Fallback."""
+    def __init__(self, model_path: str, num_threads: int = None):
+        self.interpreter, self.accel_mode = create_accelerated_interpreter(model_path, num_threads)
         self.input_details = self.interpreter.get_input_details()[0]
         self.output_details = self.interpreter.get_output_details()[0]
         self.input_shape = self.input_details['shape']
@@ -158,8 +191,7 @@ class PlateDetectorTFLite:
         indices = cv2.dnn.NMSBoxes(boxes, scores, conf_thresh, iou_thresh)
         detections = []
         if len(indices) > 0:
-            idx_list = indices.flatten() if hasattr(indices, 'flatten') else indices
-            for idx in idx_list:
+            for idx in indices.flatten():
                 bx, by, bw_b, bh_b = boxes[idx]
                 detections.append((
                     int(bx), int(by), int(bx + bw_b), int(by + bh_b), float(scores[idx])
@@ -168,12 +200,9 @@ class PlateDetectorTFLite:
 
 
 class PlateOCRTFLite:
-    """CCT Transformer OCR Recognizer using TFLite / LiteRT."""
-    def __init__(self, model_path: str, num_threads: int = 4):
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"OCR model not found: {model_path}")
-        self.interpreter = Interpreter(model_path=model_path, num_threads=num_threads)
-        self.interpreter.allocate_tensors()
+    """CCT Transformer OCR Recognizer using TFLite / LiteRT with GPU/CPU Auto-Fallback."""
+    def __init__(self, model_path: str, num_threads: int = None):
+        self.interpreter, self.accel_mode = create_accelerated_interpreter(model_path, num_threads)
         self.input_details = self.interpreter.get_input_details()[0]
         self.output_details = self.interpreter.get_output_details()
         
