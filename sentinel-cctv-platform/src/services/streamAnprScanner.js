@@ -26,9 +26,10 @@ class StreamAnprScanner {
     this.config = {
       autoScanEnabled: true,
       scanIntervalMs: 3000,
+      batchSize: 50,
       cooldownMs: 10000,
       mode: 'STREAM_OCR',
-      debugLogs: true,
+      debugLogs: false,
       scannedCount: 0,
       lastScanTimestamp: null
     };
@@ -69,6 +70,9 @@ class StreamAnprScanner {
     if (typeof newConfig.scanIntervalMs === 'number' && newConfig.scanIntervalMs >= 500) {
       this.config.scanIntervalMs = newConfig.scanIntervalMs;
     }
+    if (typeof newConfig.batchSize === 'number' && newConfig.batchSize >= 1) {
+      this.config.batchSize = newConfig.batchSize;
+    }
     if (typeof newConfig.cooldownMs === 'number' && newConfig.cooldownMs >= 1000) {
       this.config.cooldownMs = newConfig.cooldownMs;
     }
@@ -79,7 +83,7 @@ class StreamAnprScanner {
       this.config.mode = newConfig.mode;
     }
 
-    console.log(`⚙️ [ANPR Config Updated] AutoScan: ${this.config.autoScanEnabled} | Interval: ${this.config.scanIntervalMs}ms | Mode: ${this.config.mode}`);
+    console.log(`⚙️ [ANPR Config Updated] AutoScan: ${this.config.autoScanEnabled} | Interval: ${this.config.scanIntervalMs}ms | DebugLogs: ${this.config.debugLogs}`);
     this.restartScheduler();
     return this.getConfig();
   }
@@ -96,14 +100,29 @@ class StreamAnprScanner {
       return;
     }
 
-    console.log(`🎥 [Real-Time Stream ANPR] Fully Automatic Scanner Active (Frequency: ${this.config.scanIntervalMs}ms, Mode: ${this.config.mode})`);
+    console.log(`🎥 [Real-Time Stream ANPR] Parallel Multi-Camera Scanner Active (Frequency: ${this.config.scanIntervalMs}ms)`);
     
     this.scanIntervalHandle = setInterval(() => {
       this.performAutomaticScanStep();
     }, this.config.scanIntervalMs);
   }
 
-  // Main background automatic scan step across cameras
+  // Scan ALL registered camera feeds concurrently in parallel
+  async scanAllCamerasParallel() {
+    try {
+      const result = cameraService.getCameras({});
+      const cameras = result.cameras || [];
+      if (cameras.length === 0) return;
+
+      await Promise.all(cameras.map(cam => {
+        const rtspUrl = cam.rtsp_url || cam.stream_url || `rtsp://localhost:8554/stream/${cam.id}`;
+        const cameraCode = cam.camera_code || 'GJ-GOV-001';
+        return this.captureAndProcessFrame(rtspUrl, cameraCode);
+      }));
+    } catch (e) {}
+  }
+
+  // Main background automatic scan step across cameras (ALL cameras in parallel)
   async performAutomaticScanStep() {
     if (this.isProcessing) return;
     this.isProcessing = true;
@@ -111,23 +130,7 @@ class StreamAnprScanner {
     this.config.scannedCount++;
 
     try {
-      const result = cameraService.getCameras({});
-      const cameras = result.cameras || [];
-
-      if (cameras.length === 0) {
-        this.isProcessing = false;
-        return;
-      }
-
-      // Pick next camera in dynamic round-robin fashion
-      const currentCamera = cameras[this.cameraIndex % cameras.length];
-      this.cameraIndex = (this.cameraIndex + 1) % cameras.length;
-
-      const rtspUrl = currentCamera.rtsp_url || currentCamera.stream_url || `rtsp://localhost:8554/stream/${currentCamera.id}`;
-      const cameraCode = currentCamera.camera_code || 'GJ-GOV-001';
-
-      // Real-time RTSP/Webcam frame capture & OCR Vision analysis
-      await this.captureAndProcessFrame(rtspUrl, cameraCode);
+      await this.scanAllCamerasParallel();
     } catch (err) {
       // Ignore background transient scan errors
     } finally {

@@ -67,9 +67,16 @@ router.get("/check/:plate", authenticateToken, (req, res, next) => {
 });
 
 // POST add target to watchlist
-router.post("/", authenticateToken, (req, res, next) => {
+router.post("/", authenticateToken, async (req, res, next) => {
   try {
     const created = watchlistStore.create(req.body);
+
+    // Trigger parallel real-time stream scan across all cameras for the new target
+    try {
+      const { default: streamAnprScanner } = await import("../services/streamAnprScanner.js");
+      streamAnprScanner.scanAllCamerasParallel().catch(() => {});
+    } catch (e) {}
+
     res.status(201).json({
       success: true,
       message: "Target vehicle added to statewide police watchlist.",
