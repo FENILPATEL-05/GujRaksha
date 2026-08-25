@@ -16,6 +16,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const CPP_BINARY = path.join(__dirname, '../../cpp/sentinel_anpr_engine');
 
+const PYTHON_TFLITE_SCRIPT = path.join(__dirname, 'anpr_tflite_scanner.py');
+
 class AnprEngineService {
   constructor() {
     this.activeWorker = null;
@@ -28,6 +30,32 @@ class AnprEngineService {
 
   isBinaryAvailable() {
     return fs.existsSync(CPP_BINARY);
+  }
+
+  isPythonScannerAvailable() {
+    return fs.existsSync(PYTHON_TFLITE_SCRIPT);
+  }
+
+  // Run Ultra-Fast Python TFLite AI Scanner (YOLOv9 + CCT Transformer OCR)
+  runPythonTFLiteScanner(source = '0', cameraCode = 'GJ-GOV-001') {
+    if (!this.isPythonScannerAvailable()) {
+      console.warn('⚠️ Python TFLite scanner script not found.');
+      return null;
+    }
+
+    const scriptArgs = source === '--all-cameras' ? ['--all-cameras'] : ['--source', String(source), '--camera-code', cameraCode];
+    console.log(`🚀 [TFLite AI ANPR] Spawning YOLOv9 + CCT OCR Engine (${scriptArgs.join(' ')})...`);
+    const child = spawn('python3', [PYTHON_TFLITE_SCRIPT, ...scriptArgs]);
+
+    child.stdout.on('data', (chunk) => {
+      process.stdout.write(`\x1b[35m[TFLite AI ANPR]\x1b[0m ${chunk.toString()}`);
+    });
+
+    child.stderr.on('data', (chunk) => {
+      process.stdout.write(`\x1b[33m[TFLite AI Notice]\x1b[0m ${chunk.toString()}`);
+    });
+
+    return child;
   }
 
   // Scan / test single plate via native C++ engine

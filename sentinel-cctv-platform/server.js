@@ -133,10 +133,12 @@ async function startServer() {
     console.log('🎥 Real-Time Video Stream ANPR Scanner Initialized');
     console.log('=======================================================');
 
-    // Auto-connect Real-Time Video Stream ANPR OCR Scanner
+    // Auto-connect Real-Time Video Stream ANPR Scanner & Launch Parallel TFLite AI Engine
     setTimeout(async () => {
       try {
         await streamAnprScanner.init();
+        // Automatically start high-speed Python TFLite ANPR Engine across all cameras in parallel
+        anprEngineService.runPythonTFLiteScanner('--all-cameras');
       } catch (err) {
         // Silent catch for stream scanner startup
       }
