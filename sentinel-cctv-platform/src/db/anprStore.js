@@ -1,30 +1,78 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import watchlistStore from "./watchlistStore.js";
 import db from "./pool.js";
 import pgClient from "./pgClient.js";
 import { initialDetections } from "./seeds.js";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DATA_DIR = path.resolve(__dirname, "../../data");
+const ANPR_FILE = path.join(DATA_DIR, "anpr_detections.json");
+
 class AnprDataStore {
   constructor() {
-    this.detections = [...initialDetections];
+    this.detections = this.loadFromFile();
     this.alertSubscribers = [];
-    this.init();
+    
+    // Listen for PostgreSQL readiness to sync persisted data
+    pgClient.on("ready", () => {
+      this.loadFromDatabase();
+    });
+
+    if (pgClient.isConnected()) {
+      this.loadFromDatabase();
+    }
   }
 
-  async init() {
+  loadFromFile() {
+    try {
+      if (fs.existsSync(ANPR_FILE)) {
+        const raw = fs.readFileSync(ANPR_FILE, "utf8");
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ [AnprStore] Could not read anpr_detections.json fallback:", e.message);
+    }
+    this.saveToFile([...initialDetections]);
+    return [...initialDetections];
+  }
+
+  saveToFile(data = this.detections) {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(ANPR_FILE, JSON.stringify(data.slice(0, 500), null, 2), "utf8");
+    } catch (e) {
+      console.warn("⚠️ [AnprStore] Could not write anpr_detections.json:", e.message);
+    }
+  }
+
+  async loadFromDatabase() {
     try {
       if (pgClient.isConnected()) {
         const res = await pgClient.query("SELECT * FROM anpr_detections ORDER BY timestamp DESC LIMIT 500");
-        if (res && res.rows && res.rows.length > 0) {
+        if (res && res.rows) {
           this.detections = res.rows.map(r => ({
             ...r,
             latitude: r.location_lat,
             longitude: r.location_lng
           }));
+          this.saveToFile(this.detections);
         }
       }
     } catch (err) {
       console.error("Error loading ANPR detections store from database:", err.message);
     }
+  }
+
+  async init() {
+    await this.loadFromDatabase();
   }
 
   // Subscribe to real-time Server-Sent Events (SSE)
@@ -183,6 +231,7 @@ class AnprDataStore {
       if (this.detections.length > 500) {
         this.detections = this.detections.slice(0, 500);
       }
+      this.saveToFile();
 
       // Direct Database Persistence (PostgreSQL)
       if (pgClient.isConnected()) {

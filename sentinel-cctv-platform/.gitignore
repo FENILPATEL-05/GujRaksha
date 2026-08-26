@@ -18,3 +18,7 @@ npm-debug.log*
 .DS_Store
 .idea/
 .vscode/
+
+# Local database fallback storage
+data/
+

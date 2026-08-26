@@ -23,6 +23,11 @@ import edgeRoutes from './src/routes/edgeRoutes.js';
 import anprEngineService from './src/services/anprEngineService.js';
 import streamAnprScanner from './src/services/streamAnprScanner.js';
 import mediamtxService from './src/services/mediamtxService.js';
+import pgClient from './src/db/pgClient.js';
+import pool from './src/db/pool.js';
+import departmentStore from './src/db/departmentStore.js';
+import watchlistStore from './src/db/watchlistStore.js';
+import anprStore from './src/db/anprStore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -112,6 +117,11 @@ mountApiEndpoints('/gujraksha');
 
 
 async function startServer() {
+  await pgClient.waitUntilReady();
+  await pool.loadFromDatabase();
+  await departmentStore.loadFromDatabase();
+  await watchlistStore.loadFromDatabase();
+  await anprStore.loadFromDatabase();
   const isProd = process.env.NODE_ENV === 'production';
 
   if (!isProd) {

@@ -1,23 +1,71 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import pgClient from "./pgClient.js";
 import { initialWatchlist } from "./seeds.js";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DATA_DIR = path.resolve(__dirname, "../../data");
+const WATCHLIST_FILE = path.join(DATA_DIR, "watchlist.json");
+
 class WatchlistDataStore {
   constructor() {
-    this.watchlist = [...initialWatchlist];
-    this.init();
+    this.watchlist = this.loadFromFile();
+    
+    // Listen for PostgreSQL readiness to sync persisted data
+    pgClient.on("ready", () => {
+      this.loadFromDatabase();
+    });
+
+    if (pgClient.isConnected()) {
+      this.loadFromDatabase();
+    }
   }
 
-  async init() {
+  loadFromFile() {
+    try {
+      if (fs.existsSync(WATCHLIST_FILE)) {
+        const raw = fs.readFileSync(WATCHLIST_FILE, "utf8");
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ [WatchlistStore] Could not read watchlist.json fallback:", e.message);
+    }
+    this.saveToFile([...initialWatchlist]);
+    return [...initialWatchlist];
+  }
+
+  saveToFile(data = this.watchlist) {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(WATCHLIST_FILE, JSON.stringify(data, null, 2), "utf8");
+    } catch (e) {
+      console.warn("⚠️ [WatchlistStore] Could not write watchlist.json:", e.message);
+    }
+  }
+
+  async loadFromDatabase() {
     try {
       if (pgClient.isConnected()) {
         const res = await pgClient.query("SELECT * FROM watchlist ORDER BY created_at DESC");
-        if (res && res.rows && res.rows.length > 0) {
+        if (res && res.rows) {
           this.watchlist = res.rows;
+          this.saveToFile(this.watchlist);
         }
       }
     } catch (err) {
       console.error("Error loading watchlist store from database:", err.message);
     }
+  }
+
+  async init() {
+    await this.loadFromDatabase();
   }
 
   getAll(filters = {}) {
@@ -83,6 +131,7 @@ class WatchlistDataStore {
     };
 
     this.watchlist.unshift(newRecord);
+    this.saveToFile();
 
     // Direct Database Persistence (PostgreSQL)
     if (pgClient.isConnected()) {
@@ -110,6 +159,7 @@ class WatchlistDataStore {
     }
 
     const removed = this.watchlist.splice(idx, 1);
+    this.saveToFile();
 
     // Direct Database Persistence (PostgreSQL)
     if (pgClient.isConnected()) {

@@ -1,24 +1,72 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import db from "./pool.js";
 import pgClient from "./pgClient.js";
 import { initialDepartments } from "./seeds.js";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DATA_DIR = path.resolve(__dirname, "../../data");
+const DEPARTMENTS_FILE = path.join(DATA_DIR, "departments.json");
+
 class DepartmentDataStore {
   constructor() {
-    this.departments = [...initialDepartments];
-    this.init();
+    this.departments = this.loadFromFile();
+    
+    // Listen for PostgreSQL readiness to sync persisted data
+    pgClient.on("ready", () => {
+      this.loadFromDatabase();
+    });
+
+    if (pgClient.isConnected()) {
+      this.loadFromDatabase();
+    }
   }
 
-  async init() {
+  loadFromFile() {
+    try {
+      if (fs.existsSync(DEPARTMENTS_FILE)) {
+        const raw = fs.readFileSync(DEPARTMENTS_FILE, "utf8");
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ [DepartmentStore] Could not read departments.json fallback:", e.message);
+    }
+    this.saveToFile([...initialDepartments]);
+    return [...initialDepartments];
+  }
+
+  saveToFile(data = this.departments) {
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(DEPARTMENTS_FILE, JSON.stringify(data, null, 2), "utf8");
+    } catch (e) {
+      console.warn("⚠️ [DepartmentStore] Could not write departments.json:", e.message);
+    }
+  }
+
+  async loadFromDatabase() {
     try {
       if (pgClient.isConnected()) {
         const res = await pgClient.query("SELECT * FROM departments ORDER BY code ASC");
-        if (res && res.rows && res.rows.length > 0) {
+        if (res && res.rows) {
           this.departments = res.rows;
+          this.saveToFile(this.departments);
         }
       }
     } catch (err) {
       console.error("Error loading department data store from database:", err.message);
     }
+  }
+
+  async init() {
+    await this.loadFromDatabase();
   }
 
   getAll() {
@@ -81,6 +129,7 @@ class DepartmentDataStore {
     };
 
     this.departments.push(newDept);
+    this.saveToFile();
 
     // Direct Database Persistence (PostgreSQL)
     if (pgClient.isConnected()) {
@@ -129,6 +178,7 @@ class DepartmentDataStore {
     };
 
     this.departments[idx] = updated;
+    this.saveToFile();
 
     // Direct Database Persistence (PostgreSQL)
     if (pgClient.isConnected()) {
@@ -163,6 +213,7 @@ class DepartmentDataStore {
     }
 
     const removed = this.departments.splice(idx, 1);
+    this.saveToFile();
 
     // Direct Database Persistence (PostgreSQL)
     if (pgClient.isConnected()) {

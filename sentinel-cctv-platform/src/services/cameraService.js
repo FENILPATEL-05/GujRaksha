@@ -20,18 +20,18 @@ class CameraService {
     return camera;
   }
 
-  registerCamera(cameraData) {
+  async registerCamera(cameraData) {
     if (!cameraData.name || cameraData.latitude === undefined || cameraData.longitude === undefined) {
       const err = new Error('Camera Name, Latitude, and Longitude are mandatory parameters.');
       err.statusCode = 400;
       err.code = 'INVALID_PAYLOAD';
       throw err;
     }
-    return db.create(cameraData);
+    return await db.create(cameraData);
   }
 
-  updateCamera(id, updateData) {
-    const updated = db.update(id, updateData);
+  async updateCamera(id, updateData) {
+    const updated = await db.update(id, updateData);
     if (!updated) {
       const err = new Error(`Camera asset '${id}' not found for update.`);
       err.statusCode = 404;
@@ -41,8 +41,8 @@ class CameraService {
     return updated;
   }
 
-  deleteCamera(id) {
-    const deleted = db.delete(id);
+  async deleteCamera(id) {
+    const deleted = await db.delete(id);
     if (!deleted) {
       const err = new Error(`Camera asset '${id}' not found for deletion.`);
       err.statusCode = 404;

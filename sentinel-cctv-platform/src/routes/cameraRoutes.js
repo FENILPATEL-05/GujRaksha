@@ -62,9 +62,9 @@ router.get('/:id', authenticateToken, (req, res, next) => {
   }
 });
 
-router.post('/', authenticateToken, (req, res, next) => {
+router.post('/', authenticateToken, async (req, res, next) => {
   try {
-    const newCamera = cameraService.registerCamera(req.body);
+    const newCamera = await cameraService.registerCamera(req.body);
     res.status(201).json({
       success: true,
       message: 'Camera asset successfully registered into state CCTV registry.',
@@ -75,9 +75,9 @@ router.post('/', authenticateToken, (req, res, next) => {
   }
 });
 
-router.put('/:id', authenticateToken, (req, res, next) => {
+router.put('/:id', authenticateToken, async (req, res, next) => {
   try {
-    const updated = cameraService.updateCamera(req.params.id, req.body);
+    const updated = await cameraService.updateCamera(req.params.id, req.body);
     res.json({
       success: true,
       message: 'Camera asset successfully updated in state CCTV registry.',
@@ -88,9 +88,9 @@ router.put('/:id', authenticateToken, (req, res, next) => {
   }
 });
 
-router.delete('/:id', authenticateToken, (req, res, next) => {
+router.delete('/:id', authenticateToken, async (req, res, next) => {
   try {
-    const deleted = cameraService.deleteCamera(req.params.id);
+    const deleted = await cameraService.deleteCamera(req.params.id);
     res.json({
       success: true,
       message: 'Camera asset successfully removed from registry.',

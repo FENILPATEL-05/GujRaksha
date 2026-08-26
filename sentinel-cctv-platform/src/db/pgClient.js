@@ -9,6 +9,7 @@
 import pg from 'pg';
 import fs from 'fs';
 import path from 'path';
+import { EventEmitter } from 'events';
 import { fileURLToPath } from 'url';
 import config from '../config/env.js';
 import {
@@ -22,10 +23,12 @@ const { Pool } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-class PostgresDatabase {
+class PostgresDatabase extends EventEmitter {
   constructor() {
+    super();
     this.pool = null;
     this.connected = false;
+    this.ready = false;
     this.initAttempted = false;
     this.init();
   }
@@ -63,11 +66,34 @@ class PostgresDatabase {
     } catch (err) {
       console.warn('⚠️ [PostgreSQL Init Notice]:', err.message);
       this.connected = false;
+      this.ready = true;
+      this.emit('offline');
     }
   }
 
+  async waitUntilReady(timeoutMs = 3000) {
+    if (this.ready) return this.connected;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        resolve(this.connected);
+      }, timeoutMs);
+
+      const onDone = () => {
+        clearTimeout(timer);
+        resolve(this.connected);
+      };
+
+      this.once('ready', onDone);
+      this.once('offline', onDone);
+    });
+  }
+
   async testAndMigrate() {
-    if (!this.pool) return;
+    if (!this.pool) {
+      this.ready = true;
+      this.emit('offline');
+      return;
+    }
     try {
       const client = await this.pool.connect();
       this.connected = true;
@@ -85,18 +111,40 @@ class PostgresDatabase {
         console.warn('⚠️ [PostgreSQL Schema Notice]:', migrationErr.message);
       }
 
-      // 2. Auto-seed initial platform data if tables are empty
+      // 2. Auto-seed initial platform data if first time
       await this.autoSeedInitialData(client);
 
       client.release();
+      this.ready = true;
+      this.emit('ready');
     } catch (err) {
       this.connected = false;
+      this.ready = true;
       console.warn(`ℹ️  [PostgreSQL Mode] PostgreSQL connection on ${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 5432} is standby/offline (${err.code || err.message}).`);
+      this.emit('offline');
     }
   }
 
   async autoSeedInitialData(client) {
     try {
+      // Create metadata table to track seed state so user deletions are NEVER overwritten on restarts
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS system_metadata (
+          key VARCHAR(100) PRIMARY KEY,
+          value TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      const seedCheck = await client.query("SELECT value FROM system_metadata WHERE key = 'initial_seed_completed'");
+      const alreadySeeded = seedCheck.rows.length > 0 && seedCheck.rows[0].value === 'true';
+
+      if (alreadySeeded) {
+        // Platform has already performed initial setup in previous runs.
+        // Respect all additions/deletions made by the user.
+        return;
+      }
+
       // Check Departments
       const deptRes = await client.query('SELECT COUNT(*) FROM departments');
       if (parseInt(deptRes.rows[0].count, 10) === 0) {
@@ -122,7 +170,7 @@ class PostgresDatabase {
               vms_vendor, stream_url, rtsp_url, whep_url, hls_url, codec, retention_days,
               status, installation_date, stream_properties, urls
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
-            ON CONFLICT (id) DO UPDATE SET detection_mode = EXCLUDED.detection_mode`,
+            ON CONFLICT (id) DO NOTHING`,
             [
               c.id, c.camera_code, c.name, c.department_id, c.department_name, c.district, c.taluka || '',
               parseFloat(c.latitude) || 23.0, parseFloat(c.longitude) || 72.5, c.address || '', c.ownership_type || 'GOVERNMENT',
@@ -168,6 +216,13 @@ class PostgresDatabase {
         }
         console.log(`📦 [PostgreSQL Seed] Inserted ${initialDetections.length} ANPR detection logs into database.`);
       }
+
+      // Mark initial seed as completed
+      await client.query(`
+        INSERT INTO system_metadata (key, value)
+        VALUES ('initial_seed_completed', 'true')
+        ON CONFLICT (key) DO UPDATE SET value = 'true'
+      `);
     } catch (err) {
       console.warn('⚠️ [PostgreSQL Auto-Seed Notice]:', err.message);
     }
