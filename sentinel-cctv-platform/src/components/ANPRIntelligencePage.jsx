@@ -18,7 +18,12 @@ import {
   MapPin,
   ChevronDown,
   SlidersHorizontal,
-  X
+  X,
+  Server,
+  Cpu,
+  Zap,
+  AlertTriangle,
+  Activity
 } from "lucide-react";
 import { WatchlistManagerPage } from "./WatchlistManagerPage";
 
@@ -29,8 +34,9 @@ export const ANPRIntelligencePage = ({
   cameras = [],
   addToast
 }) => {
-  const [activeTab, setActiveTab] = useState(() => localStorage.getItem("gujraksha_anpr_tab") || "detections"); // "detections" or "watchlist"
+  const [activeTab, setActiveTab] = useState(() => localStorage.getItem("gujraksha_anpr_tab") || "detections"); // "detections", "watchlist", or "edge_nodes"
   const [detections, setDetections] = useState([]);
+  const [edgeNodes, setEdgeNodes] = useState([]);
   const [watchlistCount, setWatchlistCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searchPlate, setSearchPlate] = useState("");
@@ -43,6 +49,22 @@ export const ANPRIntelligencePage = ({
   useEffect(() => {
     localStorage.setItem("gujraksha_anpr_tab", activeTab);
   }, [activeTab]);
+
+  const fetchEdgeNodes = async () => {
+    try {
+      const res = await fetch("/api/v1/edge/nodes");
+      const json = await res.json();
+      if (json.success) {
+        setEdgeNodes(json.data || []);
+      }
+    } catch (err) {
+      console.error("Error fetching edge nodes:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchEdgeNodes();
+  }, []);
 
   const fetchDetections = async () => {
     setLoading(true);
@@ -67,6 +89,7 @@ export const ANPRIntelligencePage = ({
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchDetections();
@@ -131,6 +154,13 @@ export const ANPRIntelligencePage = ({
           >
             <ShieldAlert size={14} strokeWidth={2} style={{ color: "var(--danger)" }} /> Watchlist Database ({watchlistCount})
           </button>
+
+          <button
+            className={activeTab === "edge_nodes" ? "active" : ""}
+            onClick={() => setActiveTab("edge_nodes")}
+          >
+            <Server size={14} strokeWidth={2} style={{ color: "var(--accent)" }} /> District Edge Gateway ({edgeNodes.length})
+          </button>
         </div>
       </div>
 
@@ -140,6 +170,74 @@ export const ANPRIntelligencePage = ({
           onTrackVehicleOnMap={onTrackVehicleOnMap}
           addToast={addToast}
         />
+      ) : activeTab === "edge_nodes" ? (
+        <div className="table-wrap" style={{ padding: "20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: "16px", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
+                <Server size={18} style={{ color: "var(--accent)" }} /> Distributed District Edge Nodes Cluster
+              </h3>
+              <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "var(--text-dim)" }}>
+                Real-time telemetry and health monitoring across Gujarat district edge AI processing servers.
+              </p>
+            </div>
+            <button className="btn btn-sm" onClick={fetchEdgeNodes} style={{ gap: "6px" }}>
+              <RefreshCw size={12} /> Refresh Cluster Status
+            </button>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Node Identifier</th>
+                <th>District Location</th>
+                <th>Active Cameras</th>
+                <th>GPU Acceleration</th>
+                <th>Cluster Status</th>
+                <th>Last Heartbeat</th>
+              </tr>
+            </thead>
+            <tbody>
+              {edgeNodes.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-dim)" }}>
+                    <Server size={32} strokeWidth={1.5} style={{ color: "var(--accent)", marginBottom: "8px" }} />
+                    <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)" }}>No Remote District Edge Nodes Registered Yet</div>
+                    <div style={{ fontSize: "11.5px", marginTop: "4px" }}>District Edge servers register via <code>POST /api/v1/edge/register</code> protocol endpoint.</div>
+                  </td>
+                </tr>
+              ) : (
+                edgeNodes.map((node) => (
+                  <tr key={node.node_id}>
+                    <td>
+                      <div style={{ fontWeight: 700, color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>{node.node_id}</div>
+                      <div style={{ fontSize: "11px", color: "var(--text-dim)" }}>{node.node_name}</div>
+                    </td>
+                    <td style={{ fontWeight: 600, color: "var(--text-secondary)" }}>{node.district}</td>
+                    <td>
+                      <span className="badge" style={{ background: "rgba(34, 211, 238, 0.15)", color: "var(--accent)", fontWeight: 700 }}>
+                        📹 {node.active_cameras} Active RTSP Feeds
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ fontSize: "11.5px", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "5px" }}>
+                        <Cpu size={12} style={{ color: "#a855f7" }} /> {node.gpu_hardware}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="badge badge-success" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                        ● ONLINE
+                      </span>
+                    </td>
+                    <td style={{ fontSize: "11.5px", color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>
+                      {new Date(node.last_heartbeat).toLocaleTimeString()}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <>
           {/* Search & Modern Filter Toolbar */}
@@ -287,7 +385,7 @@ export const ANPRIntelligencePage = ({
               <thead>
                 <tr>
                   <th>Target Number Plate</th>
-                  <th>Vehicle Details</th>
+                  <th>Vehicle Details & Attributes</th>
                   <th>Spotted CCTV Camera & Location</th>
                   <th>District</th>
                   <th>FIR / Crime Case Details</th>
@@ -307,6 +405,9 @@ export const ANPRIntelligencePage = ({
                 ) : (
                   detections.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((det) => {
                     const isHit = !!det.is_watchlist_hit;
+                    const isSpeeding = det.is_speeding || (det.speed_kmh > 80);
+                    const colorHex = det.vehicle_color === "Red" ? "#ef4444" : det.vehicle_color === "Blue" ? "#3b82f6" : det.vehicle_color === "Yellow" ? "#eab308" : det.vehicle_color === "Green" ? "#22c55e" : det.vehicle_color === "White" ? "#f8fafc" : det.vehicle_color === "Black" ? "#475569" : "#cbd5e1";
+
                     return (
                       <tr key={det.id} style={{ background: isHit ? "rgba(244,63,94,0.06)" : "transparent" }}>
                         <td>
@@ -317,9 +418,30 @@ export const ANPRIntelligencePage = ({
                         </td>
 
                         <td>
-                          <div style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--text-primary)" }}>{det.vehicle_type}</div>
-                          <div style={{ fontSize: "11px", color: "var(--text-dim)" }}>Color: {det.vehicle_color || "Standard"} · Speed: {det.speed_kmh} km/h</div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                            <div style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px" }}>
+                              <Car size={13} style={{ color: "var(--accent)" }} />
+                              {det.vehicle_type || "Sedan / Car"}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", fontSize: "11px" }}>
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", background: "rgba(30, 41, 59, 0.6)", padding: "2px 6px", borderRadius: "4px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                                <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: colorHex, display: "inline-block" }} />
+                                <span style={{ color: "var(--text-secondary)", fontWeight: 600 }}>{det.vehicle_color || "Silver"}</span>
+                              </span>
+
+                              {isSpeeding ? (
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", background: "rgba(239, 68, 68, 0.2)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.4)", padding: "2px 6px", borderRadius: "4px", fontWeight: 700 }}>
+                                  <Zap size={10} /> {det.speed_kmh} km/h (SPEEDING)
+                                </span>
+                              ) : (
+                                <span style={{ color: "var(--text-dim)" }}>
+                                  Speed: {det.speed_kmh} km/h
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </td>
+
 
                         <td>
                           <div className="cell-name">{det.camera_name}</div>

@@ -84,6 +84,23 @@ router.post("/ingest", (req, res, next) => {
   }
 });
 
+// POST Micro-Batch Ingestion Endpoint for High-Throughput Multi-Camera Clusters
+router.post("/ingest-batch", (req, res, next) => {
+  try {
+    const items = Array.isArray(req.body) ? req.body : (req.body.detections || req.body.items || []);
+    const result = anprStore.ingestBatch(items);
+    res.status(201).json({
+      success: true,
+      message: `⚡ Micro-batch ingestion processed ${result.count} detection event(s).`,
+      count: result.count,
+      data: result.results
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+
 // GET Dynamic Scanner Status & Configuration
 router.get("/scanner-config", async (req, res, next) => {
   try {

@@ -236,6 +236,19 @@ class AnprDataStore {
       };
     }
   }
+
+  ingestBatch(payloads = []) {
+    if (!Array.isArray(payloads) || payloads.length === 0) {
+      return { success: true, count: 0, results: [] };
+    }
+    const results = payloads.map(p => this.ingest(p));
+    return {
+      success: true,
+      count: results.length,
+      results
+    };
+  }
 }
 
 export default new AnprDataStore();
+

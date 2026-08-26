@@ -145,12 +145,34 @@ export const IncidentRadarPanel = ({
                   </div>
 
                   {incident.vehicleNo && (
-                    <div className="vehicle-plate-box">
-                      <span className="plate-flag">IND</span>
-                      <span className="plate-number">{incident.vehicleNo}</span>
-                      <span className="plate-badge">ANPR HIT</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", margin: "6px 0" }}>
+                      <div className="vehicle-plate-box">
+                        <span className="plate-flag">IND</span>
+                        <span className="plate-number">{incident.vehicleNo}</span>
+                        <span className="plate-badge">ANPR HIT</span>
+                      </div>
+                      {(incident.vehicle_color || incident.vehicle_type || incident.speed_kmh) && (
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", flexWrap: "wrap" }}>
+                          {incident.vehicle_type && (
+                            <span className="badge" style={{ background: "rgba(34, 211, 238, 0.12)", color: "var(--accent)", fontWeight: 700 }}>
+                              {incident.vehicle_type}
+                            </span>
+                          )}
+                          {incident.vehicle_color && (
+                            <span style={{ color: "var(--text-secondary)", fontWeight: 600 }}>
+                              Color: {incident.vehicle_color}
+                            </span>
+                          )}
+                          {incident.speed_kmh && (
+                            <span style={{ color: incident.speed_kmh > 80 ? "#f87171" : "var(--text-dim)", fontWeight: incident.speed_kmh > 80 ? 700 : 400 }}>
+                              · {incident.speed_kmh} km/h {incident.speed_kmh > 80 ? "⚡ [SPEEDING]" : ""}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
+
 
                   <div className="incident-card-desc">
                     <span className="incident-loc-pin">📍</span> <b>{incident.cameraName}</b> ({incident.cameraCode}) — {incident.description}

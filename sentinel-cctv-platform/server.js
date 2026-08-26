@@ -17,6 +17,7 @@ import proxyRoutes from './src/routes/proxyRoutes.js';
 import departmentRoutes from './src/routes/departmentRoutes.js';
 import watchlistRoutes from './src/routes/watchlistRoutes.js';
 import anprRoutes from './src/routes/anprRoutes.js';
+import edgeRoutes from './src/routes/edgeRoutes.js';
 import anprEngineService from './src/services/anprEngineService.js';
 import streamAnprScanner from './src/services/streamAnprScanner.js';
 import mediamtxService from './src/services/mediamtxService.js';
@@ -38,10 +39,12 @@ app.use('/api/v1/cameras', cameraRoutes);
 app.use('/api/v1/departments', departmentRoutes);
 app.use('/api/v1/watchlist', watchlistRoutes);
 app.use('/api/v1/anpr', anprRoutes);
+app.use('/api/v1/edge', edgeRoutes);
 app.use('/api/v1/onboarding', onboardingRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1', proxyRoutes);
 app.use('/api/v1/proxy-stream', proxyRoutes);
+
 
 // Camera Ingest Catalogue API (Protocol Section 1)
 app.get('/api/ingest', (req, res, next) => {
