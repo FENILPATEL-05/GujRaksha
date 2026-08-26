@@ -1,14 +1,23 @@
 {
   "platform": "GujRaksha CCTV AI Engine",
-  "model_directory": "models/tflite",
+  "supported_backends": ["onnx_gpu", "tflite_cpu"],
+  "model_directories": {
+    "onnx": "models/onnx",
+    "tflite": "models/tflite"
+  },
   "models": {
     "plate_detector": {
-      "filename": "plate_detector.tflite",
-      "task": "LICENSE_PLATE_DETECTION"
+      "tflite": "plate_detector.tflite",
+      "onnx": "plate_detector.onnx",
+      "task": "LICENSE_PLATE_DETECTION",
+      "input_shape": [1, 384, 384, 3]
     },
     "plate_ocr": {
-      "filename": "plate_ocr.tflite",
-      "task": "LICENSE_PLATE_OCR"
+      "tflite": "plate_ocr.tflite",
+      "onnx": "plate_ocr.onnx",
+      "task": "LICENSE_PLATE_OCR",
+      "input_shape": [1, 64, 128, 3]
     }
   }
 }
+

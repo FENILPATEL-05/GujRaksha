@@ -45,10 +45,21 @@ except ImportError:
             print("Error: Neither ai_edge_litert, tflite_runtime nor tensorflow is installed.")
             sys.exit(1)
 
+# Optional ONNX Runtime for GPU Acceleration (CUDA / TensorRT)
+try:
+    import onnxruntime as ort
+    HAS_ONNXRUNTIME = True
+except ImportError:
+    HAS_ONNXRUNTIME = False
+    ort = None
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "../../"))
 DEFAULT_DET_MODEL = os.path.join(PROJECT_ROOT, "models/tflite/plate_detector.tflite")
 DEFAULT_OCR_MODEL = os.path.join(PROJECT_ROOT, "models/tflite/plate_ocr.tflite")
+DEFAULT_ONNX_DET_MODEL = os.path.join(PROJECT_ROOT, "models/onnx/plate_detector.onnx")
+DEFAULT_ONNX_OCR_MODEL = os.path.join(PROJECT_ROOT, "models/onnx/plate_ocr.onnx")
+
 
 DET_SIZE = 384
 OCR_W, OCR_H = 128, 64
@@ -278,7 +289,201 @@ class PlateOCRTFLite:
         return text, mean_conf
 
 
+class PlateDetectorONNX:
+    """YOLOv9 License Plate Detector using ONNX Runtime (CUDA / TensorRT / CPU)."""
+    def __init__(self, model_path: str, provider: str = None):
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"ONNX Model not found: {model_path}")
+
+        available = ort.get_available_providers() if HAS_ONNXRUNTIME else []
+        if provider and provider in available:
+            providers = [provider, 'CPUExecutionProvider']
+        elif 'TensorRTExecutionProvider' in available:
+            providers = ['TensorRTExecutionProvider', 'CUDAExecutionProvider', 'CPUExecutionProvider']
+        elif 'CUDAExecutionProvider' in available:
+            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        else:
+            providers = ['CPUExecutionProvider']
+
+        self.session = ort.InferenceSession(model_path, providers=providers)
+        active_providers = self.session.get_providers()
+        if 'TensorRTExecutionProvider' in active_providers or 'CUDAExecutionProvider' in active_providers:
+            self.accel_mode = f"ONNX GPU ({active_providers[0]})"
+        else:
+            self.accel_mode = "ONNX CPU"
+
+        self.input_name = self.session.get_inputs()[0].name
+        self.input_shape = self.session.get_inputs()[0].shape
+        self.is_nchw = len(self.input_shape) == 4 and self.input_shape[1] == 3
+
+    def preprocess(self, img: np.ndarray):
+        h, w = img.shape[:2]
+        scale = DET_SIZE / max(h, w)
+        new_w, new_h = int(w * scale), int(h * scale)
+
+        resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+        pad_w = (DET_SIZE - new_w) // 2
+        pad_h = (DET_SIZE - new_h) // 2
+
+        canvas = np.full((DET_SIZE, DET_SIZE, 3), 114, dtype=np.uint8)
+        canvas[pad_h : pad_h + new_h, pad_w : pad_w + new_w] = resized
+
+        canvas_rgb = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
+        blob = (canvas_rgb.astype(np.float32) / 255.0)[np.newaxis, :]
+
+        if self.is_nchw:
+            blob = np.transpose(blob, (0, 3, 1, 2))
+
+        return blob, scale, (pad_w, pad_h)
+
+    def detect(self, img: np.ndarray, conf_thresh: float = 0.20, iou_thresh: float = 0.45):
+        blob, scale, (pad_w, pad_h) = self.preprocess(img)
+        outputs = self.session.run(None, {self.input_name: blob})
+        raw_out = outputs[0]
+        preds = raw_out[0].T if raw_out.ndim == 3 else raw_out.T
+        mask = preds[:, 4] >= conf_thresh
+        filtered = preds[mask]
+        if len(filtered) == 0:
+            return []
+
+        cx, cy, bw, bh = filtered[:, 0], filtered[:, 1], filtered[:, 2], filtered[:, 3]
+        x1 = cx - bw / 2.0
+        y1 = cy - bh / 2.0
+        x2 = cx + bw / 2.0
+        y2 = cy + bh / 2.0
+
+        orig_h, orig_w = img.shape[:2]
+        x1 = np.clip((x1 - pad_w) / scale, 0, orig_w)
+        y1 = np.clip((y1 - pad_h) / scale, 0, orig_h)
+        x2 = np.clip((x2 - pad_w) / scale, 0, orig_w)
+        y2 = np.clip((y2 - pad_h) / scale, 0, orig_h)
+
+        boxes = np.stack([x1, y1, x2 - x1, y2 - y1], axis=1).tolist()
+        scores = filtered[:, 4].astype(float).tolist()
+
+        indices = cv2.dnn.NMSBoxes(boxes, scores, conf_thresh, iou_thresh)
+        detections = []
+        if len(indices) > 0:
+            for idx in indices.flatten():
+                bx, by, bw_b, bh_b = boxes[idx]
+                detections.append((
+                    int(bx), int(by), int(bx + bw_b), int(by + bh_b), float(scores[idx])
+                ))
+        return detections
+
+
+class PlateOCRONNX:
+    """CCT Transformer OCR Recognizer using ONNX Runtime (CUDA / TensorRT / CPU)."""
+    def __init__(self, model_path: str, provider: str = None):
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"ONNX Model not found: {model_path}")
+
+        available = ort.get_available_providers() if HAS_ONNXRUNTIME else []
+        if provider and provider in available:
+            providers = [provider, 'CPUExecutionProvider']
+        elif 'TensorRTExecutionProvider' in available:
+            providers = ['TensorRTExecutionProvider', 'CUDAExecutionProvider', 'CPUExecutionProvider']
+        elif 'CUDAExecutionProvider' in available:
+            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        else:
+            providers = ['CPUExecutionProvider']
+
+        self.session = ort.InferenceSession(model_path, providers=providers)
+        active_providers = self.session.get_providers()
+        if 'TensorRTExecutionProvider' in active_providers or 'CUDAExecutionProvider' in active_providers:
+            self.accel_mode = f"ONNX GPU ({active_providers[0]})"
+        else:
+            self.accel_mode = "ONNX CPU"
+
+        self.input_name = self.session.get_inputs()[0].name
+
+    def recognize(self, img: np.ndarray, bbox: tuple = None):
+        if bbox:
+            x1, y1, x2, y2 = bbox
+            h, w = img.shape[:2]
+            x1, y1 = max(0, x1), max(0, y1)
+            x2, y2 = min(w, x2), min(h, y2)
+            crop = img[y1:y2, x1:x2]
+        else:
+            crop = img
+
+        if crop is None or crop.size == 0 or crop.shape[0] < 10 or crop.shape[1] < 20:
+            return "", 0.0
+
+        try:
+            gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(4, 4))
+            enhanced = clahe.apply(gray)
+            crop_rgb = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2RGB)
+            crop_resized = cv2.resize(crop_rgb, (OCR_W, OCR_H), interpolation=cv2.INTER_LINEAR)
+        except Exception:
+            crop_resized = cv2.resize(crop, (OCR_W, OCR_H), interpolation=cv2.INTER_LINEAR)
+            crop_resized = cv2.cvtColor(crop_resized, cv2.COLOR_BGR2RGB)
+
+        batch = crop_resized[np.newaxis, :].astype(np.float32)
+
+        outputs = self.session.run(None, {self.input_name: batch})
+        plate_out = outputs[-1] if len(outputs) > 0 else outputs[0]
+        chars = plate_out[0]
+        indices = np.argmax(chars, axis=1)
+        probs = np.max(chars, axis=1)
+
+        decoded_chars = [OCR_CHARSET[idx] for idx in indices if idx < len(OCR_CHARSET)]
+        text = "".join(decoded_chars)
+        mean_conf = float(np.mean(probs))
+
+        return text, mean_conf
+
+
+def create_anpr_pipeline(backend: str = "auto", det_tflite: str = None, ocr_tflite: str = None, num_threads: int = None):
+    """
+    Adaptive Dual-Engine Pipeline Factory:
+    - Auto-probes NVIDIA CUDA / TensorRT ONNX acceleration.
+    - If GPU is available and ONNX models exist, loads ONNX GPU engine.
+    - Otherwise seamlessly falls back to optimized multi-threaded TFLite CPU engine.
+    """
+    det_tflite_path = det_tflite or DEFAULT_DET_MODEL
+    ocr_tflite_path = ocr_tflite or DEFAULT_OCR_MODEL
+    det_onnx_path = DEFAULT_ONNX_DET_MODEL
+    ocr_onnx_path = DEFAULT_ONNX_OCR_MODEL
+
+    gpu_available = False
+    if HAS_ONNXRUNTIME:
+        try:
+            providers = ort.get_available_providers()
+            gpu_available = 'CUDAExecutionProvider' in providers or 'TensorRTExecutionProvider' in providers
+        except Exception:
+            gpu_available = False
+
+    onnx_exists = os.path.exists(det_onnx_path) and os.path.exists(ocr_onnx_path)
+
+    should_use_onnx = False
+    if backend == "onnx":
+        should_use_onnx = HAS_ONNXRUNTIME and onnx_exists
+    elif backend == "tflite":
+        should_use_onnx = False
+    else:  # auto
+        should_use_onnx = HAS_ONNXRUNTIME and gpu_available and onnx_exists
+
+    if should_use_onnx:
+        try:
+            print("⚡ [AI Engine] Probing ONNX Runtime GPU Acceleration...", flush=True)
+            detector = PlateDetectorONNX(det_onnx_path)
+            ocr = PlateOCRONNX(ocr_onnx_path)
+            print(f"🚀 [AI Acceleration] ACTIVE: {detector.accel_mode} for YOLOv9 Detection & CCT OCR", flush=True)
+            return detector, ocr, detector.accel_mode
+        except Exception as e:
+            print(f"⚠️ [ONNX Exception] GPU initialization failed ({e}). Falling back to TFLite CPU...", flush=True)
+
+    # Fallback to TFLite CPU
+    detector = PlateDetectorTFLite(det_tflite_path, num_threads=num_threads)
+    ocr = PlateOCRTFLite(ocr_tflite_path, num_threads=num_threads)
+    print(f"💻 [AI Acceleration] ACTIVE: {detector.accel_mode} (TFLite Fallback)", flush=True)
+    return detector, ocr, detector.accel_mode
+
+
 def post_detection_to_api(api_url: str, vehicle_plate: str, camera_code: str, camera_id: str, confidence: float):
+
     """Dispatch real-time detection event to GujRaksha Express Backend."""
     payload = json.dumps({
         "vehicle_plate": vehicle_plate,
@@ -446,10 +651,9 @@ class CameraWorkerThread(threading.Thread):
 
 class DynamicCameraManager:
     """Continuously monitors CCTV registry and auto-attaches workers to cameras with ANPR enabled."""
-    def __init__(self, api_url: str, det_model: str, ocr_model: str, threads: int, conf: float, iou: float):
+    def __init__(self, api_url: str, det_model: str, ocr_model: str, threads: int, conf: float, iou: float, backend: str = "auto"):
         self.api_url = api_url
-        self.detector = PlateDetectorTFLite(det_model, num_threads=threads)
-        self.ocr = PlateOCRTFLite(ocr_model, num_threads=threads)
+        self.detector, self.ocr, self.accel_mode = create_anpr_pipeline(backend, det_model, ocr_model, num_threads=threads)
         self.conf = conf
         self.iou = iou
         self.workers = {}  # camera_code -> CameraWorkerThread
@@ -461,17 +665,20 @@ class DynamicCameraManager:
         current_anpr_codes = set()
 
         for cam in cameras:
-            mode = str(cam.get("detection_mode") or "").strip().upper()
-            cam_type = str(cam.get("camera_type") or "").strip().upper()
-            is_anpr = mode in ["ANPR_DETECTION", "ANPR"] or cam_type == "ANPR_SPECIAL"
+            # Match camera if detection_mode is ANPR or features contain ANPR
+            mode = str(cam.get("detection_mode", "")).upper()
+            features = [str(f).upper() for f in cam.get("features", [])]
+            is_anpr = ("ANPR" in mode) or ("ANPR" in features) or ("PLATE" in mode) or (cam.get("is_active") and not mode)
 
             if is_anpr:
-                code = cam.get("camera_code") or cam.get("id") or "GJ-GOV-001"
+                code = cam.get("camera_code") or cam.get("code") or f"CAM-{cam.get('id')}"
                 current_anpr_codes.add(code)
+                rtsp = cam.get("rtsp_url") or cam.get("stream_url") or cam.get("url") or "0"
 
                 if code not in self.workers or not self.workers[code].is_alive():
                     worker = CameraWorkerThread(
-                        cam, self.detector, self.ocr, self.api_url, self.conf, self.iou
+                        {"id": cam.get("id"), "camera_code": code, "rtsp_url": rtsp},
+                        self.detector, self.ocr, self.api_url, self.conf, self.iou
                     )
                     worker.start()
                     self.workers[code] = worker
@@ -481,9 +688,9 @@ class DynamicCameraManager:
         if not self.initial_synced:
             self.initial_synced = True
             if len(self.workers) > 0:
-                print(f"🚀 [Dynamic Camera Manager] Initialized {len(self.workers)} ANPR camera worker(s) in parallel. Standing by for active feeds...", flush=True)
+                print(f"🚀 [Dynamic Camera Manager] Initialized {len(self.workers)} ANPR camera worker(s) in parallel ({self.accel_mode}). Standing by for active feeds...", flush=True)
             else:
-                print(f"🚀 [Dynamic Camera Manager] Auto-discovery active. Standing by for cameras with 'ANPR Detection' enabled in registry...", flush=True)
+                print(f"🚀 [Dynamic Camera Manager] Auto-discovery active ({self.accel_mode}). Standing by for cameras with 'ANPR Detection' enabled in registry...", flush=True)
 
         # Detach workers from cameras that were deleted or whose detection_mode was changed away from ANPR
         for code in list(self.workers.keys()):
@@ -493,7 +700,7 @@ class DynamicCameraManager:
                 del self.workers[code]
 
     def start(self):
-        print("🚀 [Dynamic Camera Manager] Auto-discovery loop active (Scanning platform cameras every 3s)...", flush=True)
+        print(f"🚀 [Dynamic Camera Manager] Auto-discovery loop active [{self.accel_mode}] (Scanning platform cameras every 3s)...", flush=True)
         try:
             while self.running:
                 self.sync_cameras()
@@ -509,12 +716,13 @@ class DynamicCameraManager:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="GujRaksha TFLite ANPR AI Scanner")
+    parser = argparse.ArgumentParser(description="GujRaksha Adaptive ANPR AI Scanner (ONNX GPU + TFLite CPU)")
     parser.add_argument("--source", default="0", help="Webcam index, RTSP stream URL, or image file path")
     parser.add_argument("--all-cameras", action="store_true", help="Scan all registered cameras dynamically in parallel")
     parser.add_argument("--camera-code", default="GJ-GOV-001", help="Associated CCTV Camera Code")
     parser.add_argument("--camera-id", default="gov-feed-1", help="Associated CCTV Camera ID")
     parser.add_argument("--api-url", default="http://localhost:3000/api/v1", help="GujRaksha Express API base URL")
+    parser.add_argument("--backend", default="auto", choices=["auto", "onnx", "tflite"], help="Execution engine backend (auto=GPU/ONNX first, fallback to TFLite CPU)")
     parser.add_argument("--det-model", default=DEFAULT_DET_MODEL, help="TFLite detection model path")
     parser.add_argument("--ocr-model", default=DEFAULT_OCR_MODEL, help="TFLite OCR model path")
     parser.add_argument("--conf", type=float, default=0.20, help="Detection confidence threshold")
@@ -523,20 +731,19 @@ def main():
     args = parser.parse_args()
 
     print("=================================================================")
-    print(" 🚔 GujRaksha TFLite AI ANPR Engine (YOLOv9 + CCT Transformer OCR)")
+    print(" 🚔 GujRaksha Adaptive AI ANPR Engine (ONNX GPU / TFLite CPU)")
     print("=================================================================")
 
     if args.all_cameras:
         manager = DynamicCameraManager(
-            args.api_url, args.det_model, args.ocr_model, args.threads, args.conf, args.iou
+            args.api_url, args.det_model, args.ocr_model, args.threads, args.conf, args.iou, backend=args.backend
         )
         manager.start()
         return
 
     # Single Camera / Image / Video mode
-    detector = PlateDetectorTFLite(args.det_model, num_threads=args.threads)
-    ocr = PlateOCRTFLite(args.ocr_model, num_threads=args.threads)
-    print("✓ YOLOv9 & CCT TFLite AI Models Loaded Successfully!", flush=True)
+    detector, ocr, accel_mode = create_anpr_pipeline(args.backend, args.det_model, args.ocr_model, num_threads=args.threads)
+    print(f"✓ YOLOv9 & CCT AI Models Loaded Successfully! [{accel_mode}]", flush=True)
 
     # Check image file vs video stream
     ext = os.path.splitext(str(args.source))[-1].lower()

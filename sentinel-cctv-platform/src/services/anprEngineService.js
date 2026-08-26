@@ -43,13 +43,14 @@ class AnprEngineService {
 
     const pythonBin = this.getPythonBinary();
     const scriptArgs = source === '--all-cameras' ? ['--all-cameras'] : ['--source', String(source), '--camera-code', cameraCode];
-    console.log(`🚀 [TFLite AI ANPR Engine] Spawning YOLOv9 + CCT OCR using ${pythonBin} (${scriptArgs.join(' ')})...`);
-    
+
     if (this.activeWorker) {
       try {
         this.activeWorker.kill('SIGTERM');
       } catch (e) {}
     }
+
+    console.log(`🚀 [Adaptive AI ANPR Engine] Spawning ONNX GPU / TFLite CPU runner via ${pythonBin} (${scriptArgs.join(' ')})...`);
 
     const child = spawn(pythonBin, [PYTHON_TFLITE_SCRIPT, ...scriptArgs], {
       stdio: ['ignore', 'pipe', 'pipe']
@@ -57,6 +58,7 @@ class AnprEngineService {
 
     this.activeWorker = child;
     this.status = 'RUNNING';
+
 
     child.stdout.on('data', (chunk) => {
       process.stdout.write(`\x1b[35m[TFLite AI ANPR]\x1b[0m ${chunk.toString()}`);
