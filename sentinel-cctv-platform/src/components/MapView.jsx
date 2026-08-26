@@ -172,20 +172,47 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
       trajectoryLayer.current = L.layerGroup().addTo(leafletMap.current);
     }
 
-    // Dynamic Light / Dark Tile Layer (Original CARTO Dark Matter & Voyager from earlier commits)
+    // Dynamic Light / Dark Tile Layer
     if (tileLayerRef.current) {
       leafletMap.current.removeLayer(tileLayerRef.current);
     }
 
-    const cartoKey = import.meta.env.VITE_CARTO_API_KEY ? `?key=${import.meta.env.VITE_CARTO_API_KEY}` : '';
+    const cartoKey = import.meta.env.VITE_CARTO_API_KEY || import.meta.env.VITE_CARTO_KEY;
+    const customDarkUrl = import.meta.env.VITE_MAP_DARK_TILE_URL;
+    const customLightUrl = import.meta.env.VITE_MAP_LIGHT_TILE_URL;
 
-    const tileUrl = theme === 'dark'
-      ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png${cartoKey}`
-      : `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png${cartoKey}`;
+    let tileUrl;
+    let tileAttribution = '&copy; Government of Gujarat GIS Control Command Center';
+    let tileSubdomains = 'abcd';
+
+    if (theme === 'dark') {
+      if (customDarkUrl) {
+        tileUrl = customDarkUrl;
+      } else if (cartoKey) {
+        tileUrl = `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=${cartoKey}`;
+        tileAttribution += ' &copy; CARTO';
+      } else {
+        // High-quality open dark basemap without API key requirement
+        tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+        tileAttribution += ' &copy; Esri';
+        tileSubdomains = '';
+      }
+    } else {
+      if (customLightUrl) {
+        tileUrl = customLightUrl;
+      } else if (cartoKey) {
+        tileUrl = `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${cartoKey}`;
+        tileAttribution += ' &copy; CARTO';
+      } else {
+        tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+        tileAttribution += ' &copy; OpenStreetMap contributors';
+        tileSubdomains = 'abc';
+      }
+    }
 
     tileLayerRef.current = L.tileLayer(tileUrl, {
-      attribution: '&copy; Government of Gujarat GIS Control Command Center &copy; CARTO',
-      subdomains: 'abcd',
+      attribution: tileAttribution,
+      subdomains: tileSubdomains || 'abcd',
       maxZoom: 19
     }).addTo(leafletMap.current);
 
