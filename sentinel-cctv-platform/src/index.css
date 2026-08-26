@@ -502,6 +502,10 @@ body.theme-light .brand-tag {
   z-index: 1;
 }
 
+.leaflet-container {
+  background: var(--bg-main) !important;
+}
+
 .leaflet-control-attribution {
   background: var(--panel-bg) !important;
   color: var(--text-dim) !important;

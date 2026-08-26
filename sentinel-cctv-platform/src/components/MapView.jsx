@@ -172,17 +172,19 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
       trajectoryLayer.current = L.layerGroup().addTo(leafletMap.current);
     }
 
-    // Dynamic Light / Dark Tile Layer Switching
+    // Dynamic Light / Dark Tile Layer (Original CARTO Dark Matter & Voyager from earlier commits)
     if (tileLayerRef.current) {
       leafletMap.current.removeLayer(tileLayerRef.current);
     }
 
+    const cartoKey = import.meta.env.VITE_CARTO_API_KEY ? `?key=${import.meta.env.VITE_CARTO_API_KEY}` : '';
+
     const tileUrl = theme === 'dark'
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+      ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png${cartoKey}`
+      : `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png${cartoKey}`;
 
     tileLayerRef.current = L.tileLayer(tileUrl, {
-      attribution: '&copy; Government of Gujarat GIS Control Command Center',
+      attribution: '&copy; Government of Gujarat GIS Control Command Center &copy; CARTO',
       subdomains: 'abcd',
       maxZoom: 19
     }).addTo(leafletMap.current);
