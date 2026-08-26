@@ -1,43 +1,29 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import watchlistStore from "./watchlistStore.js";
 import db from "./pool.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const ANPR_PATH = path.join(__dirname, "../data/anprDetections.json");
+import pgClient from "./pgClient.js";
+import { initialDetections } from "./seeds.js";
 
 class AnprDataStore {
   constructor() {
-    this.detections = [];
+    this.detections = [...initialDetections];
     this.alertSubscribers = [];
     this.init();
   }
 
-  init() {
+  async init() {
     try {
-      if (fs.existsSync(ANPR_PATH)) {
-        const raw = fs.readFileSync(ANPR_PATH, "utf8");
-        this.detections = JSON.parse(raw);
-      } else {
-        this.detections = [];
+      if (pgClient.isConnected()) {
+        const res = await pgClient.query("SELECT * FROM anpr_detections ORDER BY timestamp DESC LIMIT 500");
+        if (res && res.rows && res.rows.length > 0) {
+          this.detections = res.rows.map(r => ({
+            ...r,
+            latitude: r.location_lat,
+            longitude: r.location_lng
+          }));
+        }
       }
     } catch (err) {
-      console.error("Error loading ANPR detections store:", err.message);
-      this.detections = [];
-    }
-  }
-
-  save() {
-    try {
-      const dir = path.dirname(ANPR_PATH);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(ANPR_PATH, JSON.stringify(this.detections, null, 2), "utf8");
-    } catch (err) {
-      console.error("Error saving ANPR store:", err.message);
+      console.error("Error loading ANPR detections store from database:", err.message);
     }
   }
 
@@ -61,7 +47,6 @@ class AnprDataStore {
   }
 
   getAll(filters = {}) {
-    this.init();
     let result = [...this.detections];
 
     if (filters.is_watchlist === "true") {
@@ -87,7 +72,6 @@ class AnprDataStore {
 
   // Returns active real-world alerts for the Radar Panel & Map
   getActiveAlerts() {
-    this.init();
     const hits = this.detections.filter(d => d.is_watchlist_hit);
     return hits.map(d => ({
       id: `alert-${d.id}`,
@@ -100,15 +84,14 @@ class AnprDataStore {
       cameraCode: d.camera_code,
       cameraName: d.camera_name,
       district: d.district || "Gujarat",
-      latitude: d.latitude,
-      longitude: d.longitude,
+      latitude: d.latitude || d.location_lat,
+      longitude: d.longitude || d.location_lng,
       createdAt: new Date(d.timestamp).getTime(),
       timestamp: d.timestamp
     }));
   }
 
   getTrajectoryForPlate(plateNumber) {
-    this.init();
     if (!plateNumber) return { vehicle_plate: "", detections: [], waypoints: [] };
     const cleanSearch = plateNumber.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
@@ -126,8 +109,8 @@ class AnprDataStore {
       camera_code: d.camera_code,
       camera_name: d.camera_name,
       district: d.district,
-      latitude: d.latitude,
-      longitude: d.longitude,
+      latitude: d.latitude || d.location_lat,
+      longitude: d.longitude || d.location_lng,
       speed_kmh: d.speed_kmh,
       confidence: d.confidence,
       timestamp: d.timestamp,
@@ -144,7 +127,6 @@ class AnprDataStore {
   }
 
   ingest(payload) {
-    this.init();
     if (!payload.vehicle_plate) {
       const err = new Error("vehicle_plate is required in detection payload.");
       err.statusCode = 400;
@@ -201,7 +183,25 @@ class AnprDataStore {
       if (this.detections.length > 500) {
         this.detections = this.detections.slice(0, 500);
       }
-      this.save();
+
+      // Direct Database Persistence (PostgreSQL)
+      if (pgClient.isConnected()) {
+        pgClient.query(
+          `INSERT INTO anpr_detections (
+            id, vehicle_plate, confidence, camera_id, camera_code, camera_name,
+            district, location_lat, location_lng, speed_kmh, vehicle_type,
+            is_watchlist_hit, watchlist_category, watchlist_fir, raw_payload, timestamp
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+          ON CONFLICT (id) DO NOTHING`,
+          [
+            newDetection.id, newDetection.vehicle_plate, parseInt(newDetection.confidence, 10) || 95,
+            newDetection.camera_id, newDetection.camera_code, newDetection.camera_name, newDetection.district,
+            newDetection.latitude, newDetection.longitude, newDetection.speed_kmh, newDetection.vehicle_type,
+            true, newDetection.watchlist_category, newDetection.watchlist_fir, JSON.stringify(newDetection),
+            newDetection.timestamp
+          ]
+        ).catch(err => console.warn("PG ANPR Detection Insert Error:", err.message));
+      }
 
       // Broadcast ONLY watchlist hits to live SSE radar/alerts
       const alertObject = {

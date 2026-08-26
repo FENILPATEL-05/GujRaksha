@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { SquarePen, X, Trash2, Save, Radio, Sliders } from 'lucide-react';
+import { SquarePen, X, Trash2, Save, Radio, Sliders, RefreshCw } from 'lucide-react';
 
 export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, departments = [] }) => {
   const [showAdvancedStream, setShowAdvancedStream] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
     name: '',
@@ -15,6 +16,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
     address: '',
     ownership_type: 'GOVERNMENT',
     camera_type: 'PTZ',
+    detection_mode: 'GENERAL_SURVEILLANCE',
     vms_vendor: '',
     status: 'ACTIVE',
     stream_url: '',
@@ -36,12 +38,13 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
         department_id: camera.department_id || 'HOME',
         district: camera.district || '',
         taluka: camera.taluka || '',
-        latitude: camera.latitude !== undefined ? camera.latitude : '',
-        longitude: camera.longitude !== undefined ? camera.longitude : '',
+        latitude: camera.latitude !== undefined && camera.latitude !== null ? String(camera.latitude) : '',
+        longitude: camera.longitude !== undefined && camera.longitude !== null ? String(camera.longitude) : '',
         address: camera.address || '',
         ownership_type: camera.ownership_type || 'GOVERNMENT',
         camera_type: camera.camera_type || 'PTZ',
-        vms_vendor: camera.vms_vendor || '',
+        detection_mode: camera.detection_mode || 'GENERAL_SURVEILLANCE',
+        vms_vendor: camera.vms_vendor || 'Live Sentinel Feeder',
         status: camera.status || 'ACTIVE',
         stream_url: camera.stream_url || '',
         rtsp_url: camera.rtsp_url || (camera.urls && camera.urls.rtsp) || '',
@@ -75,11 +78,33 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+    if (isSubmitting) return;
+
+    if (!form.name || !form.name.trim()) {
+      if (addToast) addToast('Camera Name is mandatory.', 'error', 'Validation Error');
+      return;
+    }
+
+    const lat = parseFloat(form.latitude);
+    const lng = parseFloat(form.longitude);
+    if (isNaN(lat) || isNaN(lng)) {
+      if (addToast) addToast('Valid numerical Latitude and Longitude are mandatory.', 'error', 'Validation Error');
+      return;
+    }
+
+    setIsSubmitting(true);
+
     try {
-      const selectedDeptObj = departments.find(d => d.code === form.department_id);
+      const depts = departments || [];
+      const selectedDeptObj = depts.find(d => d.code === form.department_id);
+      const targetId = camera.id || camera.camera_code;
+
       const payload = {
         ...form,
+        name: form.name.trim(),
+        latitude: lat,
+        longitude: lng,
         department_name: selectedDeptObj ? selectedDeptObj.name : `${form.department_id} Department`,
         urls: {
           rtsp: form.rtsp_url || form.stream_url || '',
@@ -94,64 +119,77 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
         }
       };
 
-      const res = await fetch(`/api/v1/cameras/${camera.id}`, {
+      const res = await fetch(`/api/v1/cameras/${encodeURIComponent(targetId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       const data = await res.json();
-      if (data.success) {
-        addToast('Camera details successfully updated!', 'success', 'Camera Saved');
+
+      if (res.ok && data.success) {
+        if (addToast) addToast('Camera details successfully updated!', 'success', 'Camera Saved');
         onClose();
-        onSaveSuccess();
+        if (onSaveSuccess) onSaveSuccess();
       } else {
-        addToast(data.error ? data.error.message : 'Update failed', 'error', 'Update Error');
+        const msg = data.error ? (typeof data.error === 'string' ? data.error : data.error.message) : 'Update failed';
+        if (addToast) addToast(msg, 'error', 'Update Error');
       }
     } catch (err) {
-      addToast(err.message, 'error', 'Network Error');
+      if (addToast) addToast(err.message || 'Network communication error', 'error', 'Network Error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDelete = async () => {
     if (!window.confirm(`Are you sure you want to remove camera '${camera.name}' [${camera.camera_code}] from the registry?`)) return;
 
+    setIsSubmitting(true);
     try {
-      const res = await fetch(`/api/v1/cameras/${camera.id}`, { method: 'DELETE' });
+      const targetId = camera.id || camera.camera_code;
+      const res = await fetch(`/api/v1/cameras/${encodeURIComponent(targetId)}`, { method: 'DELETE' });
       const data = await res.json();
-      if (data.success) {
-        addToast('Camera successfully deleted.', 'success', 'Camera Removed');
+      if (res.ok && data.success) {
+        if (addToast) addToast('Camera successfully deleted.', 'success', 'Camera Removed');
         onClose();
-        onSaveSuccess();
+        if (onSaveSuccess) onSaveSuccess();
       } else {
-        addToast(data.error ? data.error.message : 'Deletion failed', 'error', 'Delete Error');
+        const msg = data.error ? (typeof data.error === 'string' ? data.error : data.error.message) : 'Deletion failed';
+        if (addToast) addToast(msg, 'error', 'Delete Error');
       }
     } catch (err) {
-      addToast(err.message, 'error', 'Network Error');
+      if (addToast) addToast(err.message || 'Network error', 'error', 'Network Error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" style={{ zIndex: 9999 }}>
       <div className="modal modal-lg" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         <div className="modal-head">
           <h3><SquarePen size={16} strokeWidth={2.2} style={{ color: 'var(--accent)' }} /> Edit Camera Asset Details</h3>
           <button className="modal-close" onClick={onClose}><X size={16} strokeWidth={2.2} /></button>
         </div>
         <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <div className="form-grid">
               <div className="form-field">
                 <label>Camera Asset Code</label>
-                <input type="text" value={form.camera_code || camera.camera_code} onChange={(e) => setForm({ ...form, camera_code: e.target.value })} />
+                <input
+                  type="text"
+                  value={form.camera_code}
+                  onChange={(e) => setForm({ ...form, camera_code: e.target.value })}
+                />
               </div>
 
               <div className="form-field span-2">
                 <label>Camera Name / Location *</label>
                 <input
                   type="text"
-                  required
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="e.g. SG Highway Junction PTZ"
                 />
               </div>
 
@@ -161,7 +199,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                   value={form.department_id}
                   onChange={(e) => setForm({ ...form, department_id: e.target.value })}
                 >
-                  {departments.map((d) => (
+                  {(departments || []).map((d) => (
                     <option key={d.code} value={d.code}>
                       {d.name}
                     </option>
@@ -170,12 +208,12 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
               </div>
 
               <div className="form-field">
-                <label>District</label>
+                <label>District *</label>
                 <input
                   type="text"
-                  required
                   value={form.district}
                   onChange={(e) => setForm({ ...form, district: e.target.value })}
+                  placeholder="e.g. Ahmedabad"
                 />
               </div>
 
@@ -185,6 +223,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                   type="text"
                   value={form.taluka}
                   onChange={(e) => setForm({ ...form, taluka: e.target.value })}
+                  placeholder="e.g. Daskroi"
                 />
               </div>
 
@@ -205,9 +244,9 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                 <label>Latitude *</label>
                 <input
                   type="text"
-                  required
                   value={form.latitude}
                   onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+                  placeholder="e.g. 23.0225"
                 />
               </div>
 
@@ -215,9 +254,9 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                 <label>Longitude *</label>
                 <input
                   type="text"
-                  required
                   value={form.longitude}
                   onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+                  placeholder="e.g. 72.5714"
                 />
               </div>
 
@@ -231,6 +270,19 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                   <option value="FIXED_BULLET">Fixed Bullet HD Camera</option>
                   <option value="DOME_INDOOR">Dome Indoor Camera</option>
                   <option value="ANPR_SPECIAL">ANPR Special Camera</option>
+                </select>
+              </div>
+
+              <div className="form-field">
+                <label>AI Detection & Analytics Mode *</label>
+                <select
+                  value={form.detection_mode}
+                  onChange={(e) => setForm({ ...form, detection_mode: e.target.value })}
+                >
+                  <option value="GENERAL_SURVEILLANCE">General Surveillance (Standard Feed / No AI)</option>
+                  <option value="ANPR_DETECTION">ANPR Detection (Automatic License Plate Recognition)</option>
+                  <option value="VEHICLE_COUNTING">Vehicle Counting & Classification</option>
+                  <option value="TRAFFIC_MONITORING">Traffic Flow & Speed Monitoring</option>
                 </select>
               </div>
 
@@ -378,13 +430,27 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                 type="button"
                 className="btn btn-danger-outline"
                 onClick={handleDelete}
+                disabled={isSubmitting}
               >
                 <Trash2 size={14} strokeWidth={2} /> Delete Asset
               </button>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="button" className="btn" onClick={onClose}>Cancel</button>
-                <button type="submit" className="btn btn-primary">
-                  <Save size={14} strokeWidth={2.4} /> Save Changes
+                <button type="button" className="btn" onClick={onClose} disabled={isSubmitting}>Cancel</button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <RefreshCw size={14} className="spin-animation" /> Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={14} strokeWidth={2.4} /> Save Changes
+                    </>
+                  )}
                 </button>
               </div>
             </div>

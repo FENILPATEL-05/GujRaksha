@@ -1,41 +1,23 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import db from "./pool.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DEPT_FILE_PATH = path.join(__dirname, "../data/departments.json");
+import pgClient from "./pgClient.js";
+import { initialDepartments } from "./seeds.js";
 
 class DepartmentDataStore {
   constructor() {
-    this.departments = [];
+    this.departments = [...initialDepartments];
     this.init();
   }
 
-  init() {
+  async init() {
     try {
-      if (fs.existsSync(DEPT_FILE_PATH)) {
-        const raw = fs.readFileSync(DEPT_FILE_PATH, "utf8");
-        this.departments = JSON.parse(raw);
-      } else {
-        this.departments = [];
+      if (pgClient.isConnected()) {
+        const res = await pgClient.query("SELECT * FROM departments ORDER BY code ASC");
+        if (res && res.rows && res.rows.length > 0) {
+          this.departments = res.rows;
+        }
       }
     } catch (err) {
-      console.error("Error loading department data store:", err.message);
-      this.departments = [];
-    }
-  }
-
-  save() {
-    try {
-      const dir = path.dirname(DEPT_FILE_PATH);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(DEPT_FILE_PATH, JSON.stringify(this.departments, null, 2), "utf8");
-    } catch (err) {
-      console.error("Error saving department data store:", err.message);
+      console.error("Error loading department data store from database:", err.message);
     }
   }
 
@@ -79,7 +61,7 @@ class DepartmentDataStore {
 
     const existingIdx = this.departments.findIndex(d => (d.code || "").toUpperCase() === code.toUpperCase());
     if (existingIdx >= 0) {
-      const err = new Error("Department code \x27" + code + "\x27 already exists.");
+      const err = new Error("Department code '" + code + "' already exists.");
       err.statusCode = 409;
       throw err;
     }
@@ -99,14 +81,34 @@ class DepartmentDataStore {
     };
 
     this.departments.push(newDept);
-    this.save();
+
+    // Direct Database Persistence (PostgreSQL)
+    if (pgClient.isConnected()) {
+      pgClient.query(
+        `INSERT INTO departments (code, name, category, nodal_officer, contact_email, contact_phone, status, icon, color, description, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+         ON CONFLICT (code) DO UPDATE SET
+          name = EXCLUDED.name,
+          category = EXCLUDED.category,
+          nodal_officer = EXCLUDED.nodal_officer,
+          contact_email = EXCLUDED.contact_email,
+          contact_phone = EXCLUDED.contact_phone,
+          status = EXCLUDED.status,
+          icon = EXCLUDED.icon,
+          color = EXCLUDED.color,
+          description = EXCLUDED.description,
+          updated_at = NOW()`,
+        [newDept.code, newDept.name, newDept.category, newDept.nodal_officer, newDept.contact_email, newDept.contact_phone, newDept.status, newDept.icon, newDept.color, newDept.description]
+      ).catch(err => console.warn("PG Department Insert Error:", err.message));
+    }
+
     return this.getByCode(code);
   }
 
   update(code, updateData) {
     const idx = this.departments.findIndex(d => (d.code || "").toUpperCase() === (code || "").toUpperCase());
     if (idx === -1) {
-      const err = new Error("Department \x27" + code + "\x27 not found.");
+      const err = new Error("Department '" + code + "' not found.");
       err.statusCode = 404;
       throw err;
     }
@@ -127,14 +129,26 @@ class DepartmentDataStore {
     };
 
     this.departments[idx] = updated;
-    this.save();
+
+    // Direct Database Persistence (PostgreSQL)
+    if (pgClient.isConnected()) {
+      pgClient.query(
+        `UPDATE departments SET
+          name = $1, category = $2, nodal_officer = $3, contact_email = $4,
+          contact_phone = $5, status = $6, icon = $7, color = $8, description = $9,
+          updated_at = NOW()
+        WHERE code = $10`,
+        [updated.name, updated.category, updated.nodal_officer, updated.contact_email, updated.contact_phone, updated.status, updated.icon, updated.color, updated.description, code]
+      ).catch(err => console.warn("PG Department Update Error:", err.message));
+    }
+
     return this.getByCode(code);
   }
 
   delete(code) {
     const idx = this.departments.findIndex(d => (d.code || "").toUpperCase() === (code || "").toUpperCase());
     if (idx === -1) {
-      const err = new Error("Department \x27" + code + "\x27 not found.");
+      const err = new Error("Department '" + code + "' not found.");
       err.statusCode = 404;
       throw err;
     }
@@ -143,13 +157,19 @@ class DepartmentDataStore {
     const cameras = db.getAll({});
     const assignedCameras = cameras.filter(c => (c.department_id || "").toUpperCase() === code.toUpperCase());
     if (assignedCameras.length > 0) {
-      const err = new Error("Cannot delete department \x27" + code + "\x27 because " + assignedCameras.length + " camera assets are currently registered under it.");
+      const err = new Error("Cannot delete department '" + code + "' because " + assignedCameras.length + " camera assets are currently registered under it.");
       err.statusCode = 400;
       throw err;
     }
 
     const removed = this.departments.splice(idx, 1);
-    this.save();
+
+    // Direct Database Persistence (PostgreSQL)
+    if (pgClient.isConnected()) {
+      pgClient.query("DELETE FROM departments WHERE code = $1", [code])
+        .catch(err => console.warn("PG Department Delete Error:", err.message));
+    }
+
     return removed[0];
   }
 }

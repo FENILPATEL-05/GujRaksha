@@ -237,73 +237,69 @@ export function AppContent() {
         camera={selectedCameraForStream}
         onClose={() => setSelectedCameraForStream(null)}
         onEditCamera={(cam) => {
-          if (!isAdmin) return;
           setSelectedCameraForStream(null);
           setSelectedCameraForEdit(cam);
         }}
       />
 
-      {isAdmin && (
-        <>
-          <OnboardingModal
-            isOpen={isOnboardOpen}
-            onClose={() => setIsOnboardOpen(false)}
-            onRegisterSuccess={() => {
-              fetchCameras();
-              fetchDepartments();
-            }}
-            addToast={addToast}
-            departments={departments}
-          />
+      <EditModal
+        camera={selectedCameraForEdit}
+        onClose={() => setSelectedCameraForEdit(null)}
+        onSaveSuccess={() => {
+          fetchCameras();
+          fetchDepartments();
+        }}
+        addToast={addToast}
+        departments={departments}
+      />
 
-          <EditModal
-            camera={selectedCameraForEdit}
-            onClose={() => setSelectedCameraForEdit(null)}
-            onSaveSuccess={() => {
-              fetchCameras();
-              fetchDepartments();
-            }}
-            addToast={addToast}
-            departments={departments}
-          />
+      <OnboardingModal
+        isOpen={isOnboardOpen}
+        onClose={() => setIsOnboardOpen(false)}
+        onRegisterSuccess={() => {
+          fetchCameras();
+          fetchDepartments();
+        }}
+        addToast={addToast}
+        departments={departments}
+      />
 
-          <AddDepartmentModal
-            isOpen={isAddDeptOpen}
-            onClose={() => {
-              setIsAddDeptOpen(false);
-              setSelectedDeptForEdit(null);
-            }}
-            onSaveSuccess={() => {
-              fetchDepartments();
-              fetchCameras();
-            }}
-            addToast={addToast}
-            editingDept={selectedDeptForEdit}
-          />
 
-          <AddWatchlistModal
-            isOpen={isAddWatchlistOpen}
-            onClose={() => setIsAddWatchlistOpen(false)}
-            onSaveSuccess={() => {
-              fetchCameras();
-            }}
-            addToast={addToast}
-          />
+      <AddDepartmentModal
+        isOpen={isAddDeptOpen}
+        onClose={() => {
+          setIsAddDeptOpen(false);
+          setSelectedDeptForEdit(null);
+        }}
+        onSaveSuccess={() => {
+          fetchDepartments();
+          fetchCameras();
+        }}
+        addToast={addToast}
+        editingDept={selectedDeptForEdit}
+      />
 
-          <GapAnalysisModal
-            isOpen={isGapOpen}
-            onClose={() => setIsGapOpen(false)}
-            cameras={cameras}
-          />
+      <AddWatchlistModal
+        isOpen={isAddWatchlistOpen}
+        onClose={() => setIsAddWatchlistOpen(false)}
+        onSaveSuccess={() => {
+          fetchCameras();
+        }}
+        addToast={addToast}
+      />
 
-          <ExportModal
-            isOpen={isExportOpen}
-            onClose={() => setIsExportOpen(false)}
-            cameras={cameras}
-            addToast={addToast}
-          />
-        </>
-      )}
+      <GapAnalysisModal
+        isOpen={isGapOpen}
+        onClose={() => setIsGapOpen(false)}
+        cameras={cameras}
+      />
+
+      <ExportModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        cameras={cameras}
+        addToast={addToast}
+      />
 
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
     </>

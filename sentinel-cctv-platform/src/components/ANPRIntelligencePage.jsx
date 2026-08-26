@@ -68,50 +68,8 @@ export const ANPRIntelligencePage = ({
     }
   };
 
-  const [scannerConfig, setScannerConfig] = useState(null);
-  const [isSweeping, setIsSweeping] = useState(false);
-
-  const fetchScannerConfig = async () => {
-    try {
-      const res = await fetch("/api/v1/anpr/scanner-config");
-      const json = await res.json();
-      if (json.success) setScannerConfig(json.data);
-    } catch (e) {}
-  };
-
-  const handleUpdateScannerConfig = async (updates) => {
-    try {
-      const res = await fetch("/api/v1/anpr/scanner-config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates)
-      });
-      const json = await res.json();
-      if (json.success) {
-        setScannerConfig(json.data);
-        if (addToast) addToast(`ANPR Scanner config updated! Frequency: ${json.data.scanIntervalMs}ms`, "success", "Scanner Config Updated");
-      }
-    } catch (e) {}
-  };
-
-  const handleTriggerFullSweep = async () => {
-    setIsSweeping(true);
-    try {
-      const res = await fetch("/api/v1/anpr/run-engine-all", { method: "POST" });
-      const json = await res.json();
-      if (json.success) {
-        fetchDetections();
-        if (addToast) addToast("⚡ Native C++ ANPR inference completed across all platform cameras!", "success", "Multi-Camera Sweep Done");
-      }
-    } catch (e) {
-    } finally {
-      setIsSweeping(false);
-    }
-  };
-
   useEffect(() => {
     fetchDetections();
-    fetchScannerConfig();
     
     // Connect to live SSE alert stream to auto-refresh table instantly
     let eventSource;
@@ -131,7 +89,6 @@ export const ANPRIntelligencePage = ({
 
     const interval = setInterval(() => {
       fetchDetections();
-      fetchScannerConfig();
     }, 3000);
 
     return () => {
@@ -144,6 +101,10 @@ export const ANPRIntelligencePage = ({
   const totalDetections = detections.length;
   const watchlistHits = detections.filter(d => d.is_watchlist_hit).length;
   const activeFilterCount = selectedDistrict !== "ALL" ? 1 : 0;
+  const anprCamerasCount = cameras.filter(c => {
+    const mode = (c.detection_mode || '').toUpperCase();
+    return mode === 'ANPR_DETECTION' || mode === 'ANPR';
+  }).length;
 
   return (
     <div className="table-view">
@@ -296,82 +257,23 @@ export const ANPRIntelligencePage = ({
             </div>
 
             <div className="toolbar-actions-group" style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-              {scannerConfig && (
-                <div style={{ display: "flex", gap: "6px", alignItems: "center", background: "rgba(15, 23, 42, 0.6)", padding: "4px 8px", borderRadius: "8px", border: "1px solid var(--panel-border)" }}>
-                  {/* Auto-Scan Status Toggle */}
-                  <button
-                    className="btn btn-sm"
-                    onClick={() => handleUpdateScannerConfig({ autoScanEnabled: !scannerConfig.autoScanEnabled })}
-                    style={{
-                      height: "28px",
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      padding: "0 9px",
-                      gap: "5px",
-                      background: scannerConfig.autoScanEnabled ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)",
-                      color: scannerConfig.autoScanEnabled ? "#4ade80" : "#f87171",
-                      borderColor: scannerConfig.autoScanEnabled ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"
-                    }}
-                    title="Click to toggle automatic background ANPR scanner"
-                  >
-                    <Radio size={12} className={scannerConfig.autoScanEnabled ? "animate-pulse" : ""} />
-                    {scannerConfig.autoScanEnabled ? "AUTO-SCAN ACTIVE" : "SCANNER PAUSED"}
-                  </button>
-
-                  {/* Dynamic Frequency Adjuster */}
-                  <select
-                    value={scannerConfig.scanIntervalMs}
-                    onChange={(e) => handleUpdateScannerConfig({ scanIntervalMs: Number(e.target.value) })}
-                    style={{
-                      height: "28px",
-                      background: "var(--input-bg)",
-                      border: "1px solid var(--panel-border)",
-                      color: "var(--text-primary)",
-                      fontSize: "11px",
-                      borderRadius: "6px",
-                      padding: "0 6px",
-                      fontWeight: 600
-                    }}
-                    title="Dynamically adjust multi-camera scan frequency"
-                  >
-                    <option value={1500}>1.5s Interval</option>
-                    <option value={3000}>3.0s Interval</option>
-                    <option value={5000}>5.0s Interval</option>
-                    <option value={10000}>10.0s Interval</option>
-                  </select>
-
-                  {/* Mode Adjuster */}
-                  <select
-                    value={scannerConfig.mode}
-                    onChange={(e) => handleUpdateScannerConfig({ mode: e.target.value })}
-                    style={{
-                      height: "28px",
-                      background: "var(--input-bg)",
-                      border: "1px solid var(--panel-border)",
-                      color: "var(--text-primary)",
-                      fontSize: "11px",
-                      borderRadius: "6px",
-                      padding: "0 6px",
-                      fontWeight: 600
-                    }}
-                    title="Select ANPR Detection Engine Mode"
-                  >
-                    <option value="HYBRID_AUTO">Hybrid Auto (OCR + C++)</option>
-                    <option value="CPP_ENGINE">Native C++ Engine</option>
-                    <option value="STREAM_OCR">Stream OCR Vision</option>
-                  </select>
-                </div>
-              )}
-
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={handleTriggerFullSweep}
-                disabled={isSweeping}
-                style={{ height: "36px", padding: "0 12px", gap: "6px", fontSize: "11.5px" }}
-                title="Manually trigger immediate ANPR sweep across all platform cameras"
+              <div
+                style={{
+                  display: "flex",
+                  gap: "6px",
+                  alignItems: "center",
+                  background: "rgba(15, 23, 42, 0.6)",
+                  padding: "6px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--panel-border)",
+                  fontSize: "11.5px"
+                }}
               >
-                <Play size={13} fill="currentColor" /> {isSweeping ? "Sweeping All Cameras..." : "Sweep All Cameras"}
-              </button>
+                <Radio size={12} style={{ color: anprCamerasCount > 0 ? "#4ade80" : "var(--text-dim)" }} className={anprCamerasCount > 0 ? "animate-pulse" : ""} />
+                <span style={{ fontWeight: 700, color: anprCamerasCount > 0 ? "#4ade80" : "var(--text-dim)" }}>
+                  {anprCamerasCount > 0 ? `ANPR Engine Scanning (${anprCamerasCount} Active Feed${anprCamerasCount === 1 ? '' : 's'})` : "ANPR Engine Standby (No ANPR Feeds)"}
+                </span>
+              </div>
 
               <button className="btn" onClick={fetchDetections} style={{ height: "36px", padding: "0 12px", gap: "5px" }}>
                 <RefreshCw size={13} /> Refresh Logs

@@ -107,11 +107,15 @@ class StreamAnprScanner {
     }, this.config.scanIntervalMs);
   }
 
-  // Scan ALL registered camera feeds concurrently in parallel
+  // Scan ALL registered ANPR-enabled camera feeds concurrently in parallel
   async scanAllCamerasParallel() {
     try {
       const result = cameraService.getCameras({});
-      const cameras = result.cameras || [];
+      const allCameras = result.cameras || [];
+      const cameras = allCameras.filter(cam => {
+        const mode = (cam.detection_mode || '').toUpperCase();
+        return mode === 'ANPR_DETECTION' || mode === 'ANPR';
+      });
       if (cameras.length === 0) return;
 
       await Promise.all(cameras.map(cam => {

@@ -1,45 +1,26 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const WATCHLIST_PATH = path.join(__dirname, "../data/watchlist.json");
+import pgClient from "./pgClient.js";
+import { initialWatchlist } from "./seeds.js";
 
 class WatchlistDataStore {
   constructor() {
-    this.watchlist = [];
+    this.watchlist = [...initialWatchlist];
     this.init();
   }
 
-  init() {
+  async init() {
     try {
-      if (fs.existsSync(WATCHLIST_PATH)) {
-        const raw = fs.readFileSync(WATCHLIST_PATH, "utf8");
-        this.watchlist = JSON.parse(raw);
-      } else {
-        this.watchlist = [];
+      if (pgClient.isConnected()) {
+        const res = await pgClient.query("SELECT * FROM watchlist ORDER BY created_at DESC");
+        if (res && res.rows && res.rows.length > 0) {
+          this.watchlist = res.rows;
+        }
       }
     } catch (err) {
-      console.error("Error loading watchlist store:", err.message);
-      this.watchlist = [];
-    }
-  }
-
-  save() {
-    try {
-      const dir = path.dirname(WATCHLIST_PATH);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(WATCHLIST_PATH, JSON.stringify(this.watchlist, null, 2), "utf8");
-    } catch (err) {
-      console.error("Error saving watchlist store:", err.message);
+      console.error("Error loading watchlist store from database:", err.message);
     }
   }
 
   getAll(filters = {}) {
-    this.init();
     let result = [...this.watchlist];
 
     if (filters.category && filters.category !== "ALL") {
@@ -64,7 +45,6 @@ class WatchlistDataStore {
   }
 
   getByPlate(plateNumber) {
-    this.init();
     if (!plateNumber) return null;
     const cleanSearch = plateNumber.toUpperCase().replace(/[^A-Z0-9]/g, "");
     return this.watchlist.find(w => {
@@ -83,7 +63,7 @@ class WatchlistDataStore {
     const cleanPlate = record.vehicle_plate.toUpperCase().trim();
     const existing = this.getByPlate(cleanPlate);
     if (existing) {
-      const err = new Error(`Vehicle plate \x27${cleanPlate}\x27 is already in the watchlist (${existing.fir_number}).`);
+      const err = new Error(`Vehicle plate '${cleanPlate}' is already in the watchlist (${existing.fir_number}).`);
       err.statusCode = 409;
       throw err;
     }
@@ -103,20 +83,40 @@ class WatchlistDataStore {
     };
 
     this.watchlist.unshift(newRecord);
-    this.save();
+
+    // Direct Database Persistence (PostgreSQL)
+    if (pgClient.isConnected()) {
+      pgClient.query(
+        `INSERT INTO watchlist (id, vehicle_plate, vehicle_type, category, fir_number, police_station, owner_name, priority, status, description, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         ON CONFLICT (vehicle_plate) DO UPDATE SET
+          category = EXCLUDED.category,
+          priority = EXCLUDED.priority,
+          status = EXCLUDED.status,
+          description = EXCLUDED.description`,
+        [newRecord.id, newRecord.vehicle_plate, newRecord.vehicle_type, newRecord.category, newRecord.fir_number, newRecord.police_station, newRecord.owner_name, newRecord.priority, newRecord.status, newRecord.description, newRecord.created_at]
+      ).catch(err => console.warn("PG Watchlist Insert Error:", err.message));
+    }
+
     return newRecord;
   }
 
   delete(id) {
     const idx = this.watchlist.findIndex(w => w.id === id || w.vehicle_plate.toUpperCase() === id.toUpperCase());
     if (idx === -1) {
-      const err = new Error(`Watchlist record \x27${id}\x27 not found.`);
+      const err = new Error(`Watchlist record '${id}' not found.`);
       err.statusCode = 404;
       throw err;
     }
 
     const removed = this.watchlist.splice(idx, 1);
-    this.save();
+
+    // Direct Database Persistence (PostgreSQL)
+    if (pgClient.isConnected()) {
+      pgClient.query("DELETE FROM watchlist WHERE id = $1 OR vehicle_plate = $1", [id])
+        .catch(err => console.warn("PG Watchlist Delete Error:", err.message));
+    }
+
     return removed[0];
   }
 }

@@ -1,4 +1,365 @@
-[
+/**
+ * GujRaksha (ગુજ રક્ષા) — Database Initial Seed Definitions
+ * Copyright (c) 2026 Fenil Patel. All Rights Reserved.
+ *
+ * Direct database seeding models (No JSON files required).
+ */
+
+export const initialDepartments = [
+  {
+    "code": "HOME",
+    "name": "Home Department / Gujarat Police",
+    "category": "Law & Order & Crime Detection",
+    "nodal_officer": "DGP / DIG State Command & Control Center",
+    "contact_email": "police.surveillance@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 0000",
+    "status": "ACTIVE",
+    "icon": "Shield",
+    "color": "#f87171",
+    "description": "Statewide police public surveillance, traffic management, city junctions, border checkpoints, and eGujCop integration.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "TRANSPORT",
+    "name": "Transport Department / RTO Gujarat",
+    "category": "Mobility & Checkposts",
+    "nodal_officer": "Transport Commissioner / RTO Surveillance Head",
+    "contact_email": "rto.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 1361",
+    "status": "ACTIVE",
+    "icon": "Truck",
+    "color": "#38bdf8",
+    "description": "RTO automated driving testing tracks, border checkposts, weighbridges, and VAHAN/SARTHI integration nodes.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "CIVIL_SUPPLIES",
+    "name": "Food, Civil Supplies & Consumer Affairs",
+    "category": "PDS & Supply Chain",
+    "nodal_officer": "Director of Civil Supplies / Storage Division",
+    "contact_email": "civilsupplies.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 1066",
+    "status": "ACTIVE",
+    "icon": "Wheat",
+    "color": "#fbbf24",
+    "description": "State food grain godowns, Fair Price PDS distribution shops, and civil supply logistics warehouses.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "PORTS",
+    "name": "Gujarat Maritime Board & Ports",
+    "category": "Maritime & Coastal Security",
+    "nodal_officer": "Chief Port Officer / Maritime Security",
+    "contact_email": "gmb.surveillance@gujarat.gov.in",
+    "contact_phone": "+91 79 2323 8346",
+    "status": "ACTIVE",
+    "icon": "Anchor",
+    "color": "#22d3ee",
+    "description": "Non-major port berths, coastal monitoring towers, cargo terminals, and maritime landing facilities.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "URBAN_DEV",
+    "name": "Urban Development & Municipal Corporations",
+    "category": "Smart Cities & Civic Infrastructure",
+    "nodal_officer": "Chief Urban Planner / ICCC Operations Head",
+    "contact_email": "urbandev.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 0901",
+    "status": "ACTIVE",
+    "icon": "Building2",
+    "color": "#818cf8",
+    "description": "Ahmedabad (AMC), Surat (SMC), Vadodara (VMC), Rajkot (RMC) smart city ICCC networks and public plazas.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "ROADS_BUILDINGS",
+    "name": "Roads & Buildings Department (R&B)",
+    "category": "Highways & Public Infrastructure",
+    "nodal_officer": "Chief Engineer (State Highways & Bridges)",
+    "contact_email": "rnb.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 1801",
+    "status": "ACTIVE",
+    "icon": "Route",
+    "color": "#f97316",
+    "description": "State highways, major flyovers, expressway toll plazas, river bridges, and key administrative secretariats.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "FOREST",
+    "name": "Forests & Environment Department",
+    "category": "Wildlife & Ecological Protection",
+    "nodal_officer": "Principal Chief Conservator of Forests (Wildlife)",
+    "contact_email": "forest.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 4125",
+    "status": "ACTIVE",
+    "icon": "Trees",
+    "color": "#34d399",
+    "description": "Gir Asiatic Lion Sanctuary, Blackbuck National Park, marine sanctuaries, and eco-sensitive checkposts.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "HEALTH",
+    "name": "Health & Family Welfare Department",
+    "category": "Healthcare & Civil Hospitals",
+    "nodal_officer": "Additional Director (Medical Infrastructure)",
+    "contact_email": "health.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 0801",
+    "status": "ACTIVE",
+    "icon": "HeartPulse",
+    "color": "#ec4899",
+    "description": "Civil hospitals, medical college campuses, emergency trauma wards, and medical supply chain warehouses.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "EDUCATION",
+    "name": "Education Department (GSEB / Colleges)",
+    "category": "Academic & Examination Centers",
+    "nodal_officer": "Director of Higher Education / Examination Controller",
+    "contact_email": "education.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 1301",
+    "status": "ACTIVE",
+    "icon": "GraduationCap",
+    "color": "#a855f7",
+    "description": "State board examination centers, university campuses, government colleges, and evaluation hubs.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "REVENUE",
+    "name": "Revenue Department",
+    "category": "Land Records & Collectorates",
+    "nodal_officer": "Revenue Inspection Commissioner",
+    "contact_email": "revenue.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 1501",
+    "status": "ACTIVE",
+    "icon": "Landmark",
+    "color": "#eab308",
+    "description": "District Collectorates, Prant offices, Sub-Registrar registry hubs, and land record archival centers.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "ENERGY",
+    "name": "Energy & Petrochemicals Department",
+    "category": "Power & Critical Infrastructure",
+    "nodal_officer": "Chief Electrical Inspector / Grid Security",
+    "contact_email": "energy.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 0701",
+    "status": "ACTIVE",
+    "icon": "Zap",
+    "color": "#e11d48",
+    "description": "GETCO 400kV high-voltage power substations, Charanka solar park, power generation plants, and gas grid hubs.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "INDUSTRIES",
+    "name": "Industries & Mines (GIDC)",
+    "category": "Industrial Corridors & Mining",
+    "nodal_officer": "Managing Director (GIDC Infrastructure)",
+    "contact_email": "gidc.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 2501",
+    "status": "ACTIVE",
+    "icon": "Factory",
+    "color": "#64748b",
+    "description": "GIDC industrial estates (Dahej, Sanand, Ankleshwar), mining royalty checkpoints, and chemical zones.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "WATER_RESOURCES",
+    "name": "Water Resources & Narmada Water Supply",
+    "category": "Dams, Reservoirs & Canals",
+    "nodal_officer": "Chief Engineer (Narmada Project Surveillance)",
+    "contact_email": "water.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 1601",
+    "status": "ACTIVE",
+    "icon": "Droplets",
+    "color": "#06b6d4",
+    "description": "Sardar Sarovar Dam, main Narmada canal network, water treatment plants, and major reservoir barrage sites.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "TOURISM",
+    "name": "Tourism & Pilgrimage Development",
+    "category": "Heritage & Public Attractions",
+    "nodal_officer": "Director of Tourism Infrastructure",
+    "contact_email": "tourism.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2322 2517",
+    "status": "ACTIVE",
+    "icon": "Compass",
+    "color": "#10b981",
+    "description": "Statue of Unity complex, Somnath temple corridor, Dwarka pilgrimage perimeter, Rann of Kutch tent city.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "GSDMA",
+    "name": "Gujarat State Disaster Management Authority",
+    "category": "Emergency & Disaster Response",
+    "nodal_officer": "Emergency Operations Center Director",
+    "contact_email": "gsdma.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 9220",
+    "status": "ACTIVE",
+    "icon": "LifeBuoy",
+    "color": "#ef4444",
+    "description": "State Emergency Operation Center (SEOC), coastal early warning cyclone towers, and flood monitoring outposts.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "AGRICULTURE",
+    "name": "Agriculture & Farmers Welfare (APMC)",
+    "category": "Agricultural Markets & Logistics",
+    "nodal_officer": "Director of Agricultural Marketing",
+    "contact_email": "agri.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 6000",
+    "status": "ACTIVE",
+    "icon": "Sprout",
+    "color": "#84cc16",
+    "description": "APMC market yards (Unjha, Gondal, Rajkot), seed certification centers, and cold storage facilities.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "PANCHAYAT",
+    "name": "Panchayats & Rural Development",
+    "category": "Rural Civic Centers",
+    "nodal_officer": "Development Commissioner (Rural Surveillance)",
+    "contact_email": "panchayat.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 3300",
+    "status": "ACTIVE",
+    "icon": "Home",
+    "color": "#14b8a6",
+    "description": "Taluka Panchayat seva sadans, eGram connectivity centers, and rural infrastructure projects.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "LABOUR",
+    "name": "Labour, Skill Development & Employment",
+    "category": "Industrial Training & Employment",
+    "nodal_officer": "Director of Employment & Training (DET)",
+    "contact_email": "labour.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 3900",
+    "status": "ACTIVE",
+    "icon": "Wrench",
+    "color": "#6366f1",
+    "description": "Government ITI workshops, mega skill training complexes, and labor welfare commissionerates.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "SOCIAL_JUSTICE",
+    "name": "Social Justice & Empowerment",
+    "category": "Welfare & Residential Centers",
+    "nodal_officer": "Director of Social Defense",
+    "contact_email": "socialjustice.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 3200",
+    "status": "ACTIVE",
+    "icon": "Users",
+    "color": "#d946ef",
+    "description": "Samras student hostels, senior citizen care centers, and special rehabilitation homes.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "WOMEN_CHILD",
+    "name": "Women & Child Development",
+    "category": "Protection & Shelter Centers",
+    "nodal_officer": "Commissioner of Women and Child Welfare",
+    "contact_email": "wcd.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 7900",
+    "status": "ACTIVE",
+    "icon": "Heart",
+    "color": "#f43f5e",
+    "description": "Nari Sanrakshan Gruh shelter homes, smart Anganwadi model hubs, and child care institutions.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "SPORTS_YOUTH",
+    "name": "Sports, Youth & Cultural Activities",
+    "category": "Stadiums & Cultural Arenas",
+    "nodal_officer": "Director General (Sports Authority of Gujarat)",
+    "contact_email": "sports.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 8000",
+    "status": "ACTIVE",
+    "icon": "Trophy",
+    "color": "#f59e0b",
+    "description": "State sports complexes, athletics academies, swimming complexes, and cultural auditoriums.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "SCIENCE_TECH",
+    "name": "Science & Technology (GIL / Science City)",
+    "category": "Innovation & Data Centers",
+    "nodal_officer": "Managing Director (Gujarat Informatics Ltd)",
+    "contact_email": "dst.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 0301",
+    "status": "ACTIVE",
+    "icon": "Cpu",
+    "color": "#0284c7",
+    "description": "Gujarat Science City pavilions, State Data Center (SDC), and regional science centers.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "FINANCE",
+    "name": "Finance & State Tax Department (GST)",
+    "category": "Taxation & Border Commercial Posts",
+    "nodal_officer": "Chief Commissioner of State Tax",
+    "contact_email": "finance.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 0501",
+    "status": "ACTIVE",
+    "icon": "BadgePercent",
+    "color": "#16a34a",
+    "description": "State GST surveillance squads, mobile tax enforcement corridors, and treasury vaults.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "GENERAL_ADMIN",
+    "name": "General Administration Department (GAD)",
+    "category": "Secretariat Security",
+    "nodal_officer": "Chief Security Officer (Sachivalaya Complex)",
+    "contact_email": "gad.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 0300",
+    "status": "ACTIVE",
+    "icon": "ShieldCheck",
+    "color": "#475569",
+    "description": "New Sachivalaya, Swarnim Sankul 1 & 2, Vidhan Sabha complex, and Raj Bhavan perimeter.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "LEGAL",
+    "name": "Legal Department & Judiciary",
+    "category": "Judicial Complexes & Courts",
+    "nodal_officer": "Registrar (Infrastructure - High Court of Gujarat)",
+    "contact_email": "legal.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 2100",
+    "status": "ACTIVE",
+    "icon": "Scale",
+    "color": "#7c3aed",
+    "description": "High Court of Gujarat perimeter, District & Sessions courts, and judicial training academies.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "TRIBAL_DEV",
+    "name": "Tribal Development Department",
+    "category": "Tribal Welfare Infrastructure",
+    "nodal_officer": "Commissioner of Tribal Development",
+    "contact_email": "tribal.cctv@gujarat.gov.in",
+    "contact_phone": "+91 79 2325 3600",
+    "status": "ACTIVE",
+    "icon": "Mountain",
+    "color": "#0d9488",
+    "description": "Eklavya Model Residential Schools, tribal area training centers, and border tribal checkposts.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  },
+  {
+    "code": "PRIVATE_FEED",
+    "name": "Private Commercial & Society Feeder",
+    "category": "Public-Facing Commercial & Societies",
+    "nodal_officer": "Gujarat Police Public-Private CCTV Integration Cell",
+    "contact_email": "private.cctv@sentinelgujarat.in",
+    "contact_phone": "+91 79 2325 9999",
+    "status": "ACTIVE",
+    "icon": "Store",
+    "color": "#8b5cf6",
+    "description": "Public-facing CCTV cameras installed by residential societies, malls, jewelry associations, and commercial establishments.",
+    "created_at": "2026-08-20T10:00:00.000Z"
+  }
+];
+
+export const initialCameras = [
   {
     "id": "gov-feed-31",
     "camera_code": "gj-gov-32",
@@ -18,7 +379,7 @@
     "status": "ACTIVE",
     "installation_date": "2026-08-25",
     "created_at": "2026-08-25T12:41:50.339Z",
-    "updated_at": "2026-08-25T12:56:09.078Z",
+    "updated_at": "2026-08-26T08:29:17.918Z",
     "codec": "H.264",
     "urls": {
       "rtsp": "rtsp://admin:Admin@123@192.168.1.223:554/sub",
@@ -33,7 +394,8 @@
       "fps": 30,
       "codec": "H.264",
       "bitrate": "4Mbps"
-    }
+    },
+    "detection_mode": "ANPR_DETECTION"
   },
   {
     "id": "gov-feed-1",
@@ -54,7 +416,7 @@
     "status": "ACTIVE",
     "installation_date": "2026-08-25",
     "created_at": "2026-08-25T13:48:36.447Z",
-    "updated_at": "2026-08-25T13:48:36.447Z",
+    "updated_at": "2026-08-26T08:28:11.210Z",
     "codec": "H.264",
     "urls": {
       "rtsp": "rtsp://live.corp8.cloud:8554/stream/1",
@@ -69,7 +431,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-2",
@@ -105,7 +468,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-3",
@@ -141,7 +505,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-4",
@@ -177,7 +542,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-5",
@@ -213,7 +579,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-6",
@@ -249,7 +616,8 @@
       "fps": 25,
       "codec": "HEVC",
       "bitrate": "1923Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-7",
@@ -285,7 +653,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-8",
@@ -321,7 +690,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-9",
@@ -357,7 +727,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-10",
@@ -393,7 +764,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-11",
@@ -429,7 +801,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-12",
@@ -465,7 +838,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-13",
@@ -501,7 +875,8 @@
       "fps": 12.5,
       "codec": "H264",
       "bitrate": "902Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-14",
@@ -537,7 +912,8 @@
       "fps": 12.5,
       "codec": "H264",
       "bitrate": "980Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-15",
@@ -573,7 +949,8 @@
       "fps": 12.5,
       "codec": "H264",
       "bitrate": "690Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-16",
@@ -609,7 +986,8 @@
       "fps": 12.5,
       "codec": "H264",
       "bitrate": "961Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-17",
@@ -645,7 +1023,8 @@
       "fps": 24.98,
       "codec": "HEVC",
       "bitrate": "671Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-18",
@@ -681,7 +1060,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-19",
@@ -717,7 +1097,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-20",
@@ -753,7 +1134,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-21",
@@ -789,7 +1171,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-22",
@@ -825,7 +1208,8 @@
       "fps": 25,
       "codec": "HEVC",
       "bitrate": "2091Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-23",
@@ -861,7 +1245,8 @@
       "fps": 25,
       "codec": "H264",
       "bitrate": "4001Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-24",
@@ -897,7 +1282,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-25",
@@ -933,7 +1319,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-26",
@@ -969,7 +1356,8 @@
       "fps": 13.35,
       "codec": "HEVC",
       "bitrate": "2411Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-27",
@@ -1005,7 +1393,8 @@
       "fps": 24.86,
       "codec": "H264",
       "bitrate": "1112Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-28",
@@ -1041,7 +1430,8 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-29",
@@ -1077,7 +1467,8 @@
       "fps": 24.78,
       "codec": "H264",
       "bitrate": "907Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   },
   {
     "id": "gov-feed-30",
@@ -1113,6 +1504,51 @@
       "fps": 25,
       "codec": "H.264",
       "bitrate": "2000Kbps"
-    }
+    },
+    "detection_mode": "TRAFFIC_MONITORING"
   }
-]
+];
+
+export const initialWatchlist = [
+  {
+    "id": "wl-1787656966583",
+    "vehicle_plate": "HR-98-AA-0000",
+    "vehicle_type": "SUV / Sedan",
+    "category": "STOLEN_VEHICLE",
+    "fir_number": "t",
+    "police_station": "State Police Surveillance Cell",
+    "owner_name": "Under Investigation",
+    "priority": "CRITICAL",
+    "status": "ACTIVE",
+    "description": "Flagged in statewide CCTV police watchlist.",
+    "created_at": "2026-08-25T11:22:46.583Z"
+  },
+  {
+    "id": "wl-1787647839738",
+    "vehicle_plate": "GJ-01-HW-8888",
+    "vehicle_type": "SUV / Scorpio",
+    "category": "STOLEN_VEHICLE",
+    "fir_number": "FIR #502/2026",
+    "police_station": "SG Highway PS",
+    "owner_name": "Under Investigation",
+    "priority": "CRITICAL",
+    "status": "ACTIVE",
+    "description": "Flagged in statewide CCTV police watchlist.",
+    "created_at": "2026-08-25T08:50:39.738Z"
+  },
+  {
+    "id": "wl-1787303333857",
+    "vehicle_plate": "GJ-01-AA-1234",
+    "vehicle_type": "SUV / Sedan",
+    "category": "STOLEN_VEHICLE",
+    "fir_number": "FIR01",
+    "police_station": "ahmedabad",
+    "owner_name": "Under Investigation",
+    "priority": "CRITICAL",
+    "status": "ACTIVE",
+    "description": "Flagged in statewide CCTV police watchlist.",
+    "created_at": "2026-08-21T09:08:53.857Z"
+  }
+];
+
+export const initialDetections = [];

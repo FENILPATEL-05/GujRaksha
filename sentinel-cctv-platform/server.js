@@ -61,6 +61,8 @@ app.get('/api/ingest', (req, res, next) => {
           district: c.district,
           codec: c.codec || 'H.264',
           status: c.status || 'ACTIVE',
+          camera_type: c.camera_type || 'PTZ',
+          detection_mode: c.detection_mode || 'TRAFFIC_MONITORING',
           location: {
             latitude: c.latitude,
             longitude: c.longitude,

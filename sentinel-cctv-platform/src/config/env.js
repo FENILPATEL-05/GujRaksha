@@ -15,6 +15,5 @@ export default {
     PASSWORD: process.env.DB_PASSWORD || 'postgres',
   },
   JWT_SECRET: process.env.JWT_SECRET || 'sentinel-gujarat-police-secret-key-2026',
-  ENCRYPTION_KEY: process.env.ENCRYPTION_KEY || 'sentinel-aes256-secret-encryption-key-32b',
-  DATA_PATH: path.join(__dirname, '../data/sample_cameras.json')
+  ENCRYPTION_KEY: process.env.ENCRYPTION_KEY || 'sentinel-aes256-secret-encryption-key-32b'
 };

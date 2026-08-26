@@ -366,6 +366,14 @@ export const CameraRegistryPage = ({
                               </div>
                             </div>
 
+                            <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: cam.detection_mode === 'ANPR_DETECTION' ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid var(--panel-border)' }}>
+                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>AI Analytics Mode</div>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: cam.detection_mode === 'ANPR_DETECTION' ? '#4ade80' : 'var(--text-primary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {cam.detection_mode === 'ANPR_DETECTION' && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#4ade80', display: 'inline-block' }}></span>}
+                                {cam.detection_mode === 'ANPR_DETECTION' ? 'ANPR Plate Detection' : (cam.detection_mode === 'VEHICLE_COUNTING' ? 'Vehicle Counting' : (cam.detection_mode === 'TRAFFIC_MONITORING' ? 'Traffic Monitoring' : 'General Surveillance'))}
+                              </div>
+                            </div>
+
                             {/* WHEP Stream URL */}
                             <div style={{ gridColumn: 'span 2', background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(34, 211, 238, 0.25)' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

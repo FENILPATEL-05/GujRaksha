@@ -369,8 +369,8 @@ class CameraWorkerThread(threading.Thread):
         frame_counter = 0
 
         while self.running:
-            # Set short connection timeout for checking streams
-            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;2000000"
+            # Short connection timeout and TCP transport for robust RTSP stream handling
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;4000000|max_delay;500000|buffer_size;1024000"
 
             if str(self.stream_url).isdigit():
                 cap = cv2.VideoCapture(int(self.stream_url), cv2.CAP_V4L2)
@@ -379,8 +379,7 @@ class CameraWorkerThread(threading.Thread):
 
             if not cap.isOpened():
                 retry_count += 1
-                # Sleep 20s for offline streams so active streams get 100% bandwidth & CPU
-                backoff = min(30.0, 15.0 + (retry_count * 2.0))
+                backoff = min(15.0, 5.0 + (retry_count * 2.0))
                 time.sleep(backoff)
                 continue
 
@@ -390,15 +389,15 @@ class CameraWorkerThread(threading.Thread):
 
             while self.running and cap.isOpened():
                 ret, frame = cap.read()
-                if not ret or frame is None:
-                    time.sleep(0.5)
+                if not ret or frame is None or frame.shape[0] < 50 or frame.shape[1] < 50:
+                    time.sleep(0.2)
                     break
 
                 frame_counter += 1
                 now = time.time()
 
-                # Status Heartbeat every 30 seconds for active connected cameras only
-                if now - last_heartbeat > 30.0:
+                # Status Heartbeat every 5 seconds for active connected cameras
+                if now - last_heartbeat > 5.0:
                     last_heartbeat = now
                     h, w = frame.shape[:2]
                     print(f"\x1b[34m[STREAM MONITOR]\x1b[0m 📡 Camera: \x1b[36m{self.camera_code}\x1b[0m | Feed: {w}x{h} | AI Scanner Active (Frame #{frame_counter})", flush=True)
@@ -408,6 +407,8 @@ class CameraWorkerThread(threading.Thread):
                     raw_boxes = self.detector.detect(frame, self.conf, self.iou)
 
                 for x1, y1, x2, y2, det_score in raw_boxes:
+                    if (x2 - x1) < 20 or (y2 - y1) < 10:
+                        continue
                     # 2. Run Thread-Safe CCT Transformer OCR on detected plate box
                     with INFERENCE_LOCK:
                         raw_text, ocr_conf = self.ocr.recognize(frame, (x1, y1, x2, y2))
@@ -418,7 +419,7 @@ class CameraWorkerThread(threading.Thread):
                         last_seen = self.recent_detections.get(cleaned_text, 0)
                         if now - last_seen > 3.0:  # 3s cooldown per plate
                             self.recent_detections[cleaned_text] = now
-                            print(f"\x1b[1m\x1b[32m🚘 [PLATE RECOGNIZED]\x1b[0m Camera: \x1b[36m{self.camera_code}\x1b[0m | Number Plate: \x1b[1m\x1b[32m{cleaned_text}\x1b[0m (Conf: {int(ocr_conf * 100)}%)", flush=True)
+                            print(f"\x1b[1m\x1b[32m🚘 [PLATE RECOGNIZED]\x1b[0m Camera: \x1b[36m{self.camera_code}\x1b[0m (Frame #{frame_counter}) | Number Plate: \x1b[1m\x1b[32m{cleaned_text}\x1b[0m (Conf: {int(ocr_conf * 100)}%)", flush=True)
                             post_detection_to_api(self.api_url, cleaned_text, self.camera_code, self.camera_id, ocr_conf)
 
                 # 3. Periodic central crop scan (essential when testing plates directly in front of camera)
@@ -432,7 +433,7 @@ class CameraWorkerThread(threading.Thread):
                         last_seen = self.recent_detections.get(clean_center, 0)
                         if now - last_seen > 3.0:
                             self.recent_detections[clean_center] = now
-                            print(f"\x1b[1m\x1b[32m🚘 [PLATE RECOGNIZED]\x1b[0m Camera: \x1b[36m{self.camera_code}\x1b[0m | Number Plate: \x1b[1m\x1b[32m{clean_center}\x1b[0m (Direct Scan, Conf: {int(center_conf * 100)}%)", flush=True)
+                            print(f"\x1b[1m\x1b[32m🚘 [PLATE RECOGNIZED]\x1b[0m Camera: \x1b[36m{self.camera_code}\x1b[0m (Frame #{frame_counter} Direct Scan) | Number Plate: \x1b[1m\x1b[32m{clean_center}\x1b[0m (Conf: {int(center_conf * 100)}%)", flush=True)
                             post_detection_to_api(self.api_url, clean_center, self.camera_code, self.camera_id, center_conf)
 
                 time.sleep(0.02)  # Frame loop pacing
@@ -444,7 +445,7 @@ class CameraWorkerThread(threading.Thread):
 
 
 class DynamicCameraManager:
-    """Continuously monitors CCTV registry and auto-attaches workers to newly added cameras."""
+    """Continuously monitors CCTV registry and auto-attaches workers to cameras with ANPR enabled."""
     def __init__(self, api_url: str, det_model: str, ocr_model: str, threads: int, conf: float, iou: float):
         self.api_url = api_url
         self.detector = PlateDetectorTFLite(det_model, num_threads=threads)
@@ -457,30 +458,37 @@ class DynamicCameraManager:
 
     def sync_cameras(self):
         cameras = fetch_all_cameras(self.api_url)
-        current_codes = set()
-        new_count = 0
+        current_anpr_codes = set()
 
         for cam in cameras:
-            code = cam.get("camera_code") or cam.get("id") or "GJ-GOV-001"
-            current_codes.add(code)
+            mode = str(cam.get("detection_mode") or "").strip().upper()
+            cam_type = str(cam.get("camera_type") or "").strip().upper()
+            is_anpr = mode in ["ANPR_DETECTION", "ANPR"] or cam_type == "ANPR_SPECIAL"
 
-            if code not in self.workers or not self.workers[code].is_alive():
-                worker = CameraWorkerThread(
-                    cam, self.detector, self.ocr, self.api_url, self.conf, self.iou
-                )
-                worker.start()
-                self.workers[code] = worker
-                new_count += 1
-                if self.initial_synced:
-                    print(f"⚡ [Auto-Discovery] Attached real-time AI worker to new camera: \x1b[36m{code}\x1b[0m", flush=True)
+            if is_anpr:
+                code = cam.get("camera_code") or cam.get("id") or "GJ-GOV-001"
+                current_anpr_codes.add(code)
 
-        if not self.initial_synced and len(self.workers) > 0:
+                if code not in self.workers or not self.workers[code].is_alive():
+                    worker = CameraWorkerThread(
+                        cam, self.detector, self.ocr, self.api_url, self.conf, self.iou
+                    )
+                    worker.start()
+                    self.workers[code] = worker
+                    if self.initial_synced:
+                        print(f"⚡ [Auto-Discovery] Attached real-time AI worker to ANPR camera: \x1b[36m{code}\x1b[0m ({cam.get('name')})", flush=True)
+
+        if not self.initial_synced:
             self.initial_synced = True
-            print(f"🚀 [Dynamic Camera Manager] Initialized {len(self.workers)} camera workers in parallel. Standing by for active feeds...", flush=True)
+            if len(self.workers) > 0:
+                print(f"🚀 [Dynamic Camera Manager] Initialized {len(self.workers)} ANPR camera worker(s) in parallel. Standing by for active feeds...", flush=True)
+            else:
+                print(f"🚀 [Dynamic Camera Manager] Auto-discovery active. Standing by for cameras with 'ANPR Detection' enabled in registry...", flush=True)
 
-        # Clean up removed cameras
+        # Detach workers from cameras that were deleted or whose detection_mode was changed away from ANPR
         for code in list(self.workers.keys()):
-            if code not in current_codes:
+            if code not in current_anpr_codes:
+                print(f"⏹️ [Dynamic Camera Manager] Detaching AI worker from camera \x1b[36m{code}\x1b[0m (ANPR disabled)", flush=True)
                 self.workers[code].stop()
                 del self.workers[code]
 

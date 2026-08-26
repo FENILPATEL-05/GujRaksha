@@ -40,12 +40,12 @@ export const ExportModal = ({ isOpen, onClose, cameras, addToast }) => {
     const scopeLabel = scope === 'district_wise' ? selectedDistrict.toLowerCase() : scope;
 
     if (format === 'csv') {
-      let csv = 'Camera Code,Name,Department,District,Taluka,Ownership,Camera Type,Latitude,Longitude,Status SLA,VMS Vendor';
+      let csv = 'Camera Code,Name,Department,District,Taluka,Ownership,Camera Type,AI Analytics Mode,Latitude,Longitude,Status SLA,VMS Vendor';
       if (includeStreams) csv += ',Stream URL';
       csv += '\n';
 
       targetCameras.forEach(c => {
-        csv += `"${c.camera_code}","${c.name}","${c.department_name || c.department_id}","${c.district}","${c.taluka || ''}","${c.ownership_type || ''}","${c.camera_type || ''}",${c.latitude},${c.longitude},"${c.status}","${c.vms_vendor || ''}"`;
+        csv += `"${c.camera_code}","${c.name}","${c.department_name || c.department_id}","${c.district}","${c.taluka || ''}","${c.ownership_type || ''}","${c.camera_type || ''}","${c.detection_mode || 'TRAFFIC_MONITORING'}",${c.latitude},${c.longitude},"${c.status}","${c.vms_vendor || ''}"`;
         if (includeStreams) csv += `,"${c.stream_url || ''}"`;
         csv += '\n';
       });
@@ -81,6 +81,8 @@ export const ExportModal = ({ isOpen, onClose, cameras, addToast }) => {
             name: c.name,
             department: c.department_name || c.department_id,
             district: c.district,
+            camera_type: c.camera_type,
+            detection_mode: c.detection_mode || 'TRAFFIC_MONITORING',
             status: c.status,
             stream_url: c.stream_url
           }

@@ -17,6 +17,7 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
     address: '',
     ownership_type: 'GOVERNMENT',
     camera_type: 'PTZ',
+    detection_mode: 'GENERAL_SURVEILLANCE',
     vms_vendor: 'Live Sentinel Feeder (H264/MP4)',
     status: 'ACTIVE',
     stream_url: '',
@@ -87,6 +88,7 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
           address: '',
           ownership_type: 'GOVERNMENT',
           camera_type: 'PTZ',
+          detection_mode: 'GENERAL_SURVEILLANCE',
           vms_vendor: 'Live Sentinel Feeder (H264/MP4)',
           status: 'ACTIVE',
           stream_url: '',
@@ -252,6 +254,19 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                     <option value="FIXED_BULLET">Fixed Bullet HD Camera</option>
                     <option value="DOME_INDOOR">Dome Indoor Camera</option>
                     <option value="ANPR_SPECIAL">ANPR Special Camera</option>
+                  </select>
+                </div>
+
+                <div className="form-field">
+                  <label>AI Detection & Analytics Mode *</label>
+                  <select
+                    value={form.detection_mode}
+                    onChange={(e) => setForm({ ...form, detection_mode: e.target.value })}
+                  >
+                    <option value="GENERAL_SURVEILLANCE">General Surveillance (Standard Feed / No AI)</option>
+                    <option value="ANPR_DETECTION">ANPR Detection (Automatic License Plate Recognition)</option>
+                    <option value="VEHICLE_COUNTING">Vehicle Counting & Classification</option>
+                    <option value="TRAFFIC_MONITORING">Traffic Flow & Speed Monitoring</option>
                   </select>
                 </div>
 

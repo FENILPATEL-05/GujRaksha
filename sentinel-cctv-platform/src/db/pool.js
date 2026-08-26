@@ -1,38 +1,29 @@
-import fs from 'fs';
-import path from 'path';
-import config from '../config/env.js';
 import mediamtxService from '../services/mediamtxService.js';
+import pgClient from './pgClient.js';
+import { initialCameras } from './seeds.js';
 
 class CameraDataStore {
   constructor() {
-    this.filePath = config.DATA_PATH;
-    this.cameras = [];
+    this.cameras = [...initialCameras];
     this.init();
   }
 
-  init() {
+  async init() {
     try {
-      if (fs.existsSync(this.filePath)) {
-        const raw = fs.readFileSync(this.filePath, 'utf8');
-        this.cameras = JSON.parse(raw);
-      } else {
-        this.cameras = [];
+      if (pgClient.isConnected()) {
+        const res = await pgClient.query('SELECT * FROM cameras ORDER BY created_at DESC');
+        if (res && res.rows && res.rows.length > 0) {
+          this.cameras = res.rows.map(r => ({
+            ...r,
+            latitude: parseFloat(r.latitude),
+            longitude: parseFloat(r.longitude),
+            stream_properties: typeof r.stream_properties === 'string' ? JSON.parse(r.stream_properties) : (r.stream_properties || {}),
+            urls: typeof r.urls === 'string' ? JSON.parse(r.urls) : (r.urls || {})
+          }));
+        }
       }
     } catch (err) {
-      console.error('Error loading camera data store:', err.message);
-      this.cameras = [];
-    }
-  }
-
-  save() {
-    try {
-      const dir = path.dirname(this.filePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(this.filePath, JSON.stringify(this.cameras, null, 2), 'utf8');
-    } catch (err) {
-      console.error('Error saving camera data store:', err.message);
+      console.error('Error loading camera data store from database:', err.message);
     }
   }
 
@@ -40,27 +31,27 @@ class CameraDataStore {
     let result = [...this.cameras];
 
     if (filters.department && filters.department !== 'ALL') {
-      result = result.filter(c => c.department_id.toLowerCase() === filters.department.toLowerCase());
+      result = result.filter(c => (c.department_id || '').toLowerCase() === filters.department.toLowerCase());
     }
 
     if (filters.district && filters.district !== 'ALL') {
-      result = result.filter(c => c.district.toLowerCase() === filters.district.toLowerCase());
+      result = result.filter(c => (c.district || '').toLowerCase() === filters.district.toLowerCase());
     }
 
     if (filters.status && filters.status !== 'ALL') {
-      result = result.filter(c => c.status.toLowerCase() === filters.status.toLowerCase());
+      result = result.filter(c => (c.status || '').toLowerCase() === filters.status.toLowerCase());
     }
 
     if (filters.ownership && filters.ownership !== 'ALL') {
-      result = result.filter(c => c.ownership_type.toLowerCase() === filters.ownership.toLowerCase());
+      result = result.filter(c => (c.ownership_type || '').toLowerCase() === filters.ownership.toLowerCase());
     }
 
     if (filters.search) {
       const q = filters.search.toLowerCase();
       result = result.filter(c => 
-        c.camera_code.toLowerCase().includes(q) ||
-        c.name.toLowerCase().includes(q) ||
-        c.district.toLowerCase().includes(q) ||
+        (c.camera_code || '').toLowerCase().includes(q) ||
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.district || '').toLowerCase().includes(q) ||
         (c.address && c.address.toLowerCase().includes(q)) ||
         (c.vms_vendor && c.vms_vendor.toLowerCase().includes(q))
       );
@@ -196,6 +187,7 @@ class CameraDataStore {
       address: cameraData.address || '',
       ownership_type: cameraData.ownership_type || 'GOVERNMENT',
       camera_type: cameraData.camera_type || 'PTZ',
+      detection_mode: cameraData.detection_mode || 'TRAFFIC_MONITORING',
       vms_vendor: cameraData.vms_vendor || 'Live Sentinel Feeder (H264/MP4)',
       stream_url: streamData.stream_url,
       retention_days: parseInt(cameraData.retention_days || 15, 10),
@@ -218,7 +210,50 @@ class CameraDataStore {
       this.cameras.push(newCamera);
     }
 
-    this.save();
+    // Direct Database Persistence (PostgreSQL)
+    if (pgClient.isConnected()) {
+      pgClient.query(
+        `INSERT INTO cameras (
+          id, camera_code, name, department_id, department_name, district, taluka,
+          latitude, longitude, address, ownership_type, camera_type, detection_mode,
+          vms_vendor, stream_url, rtsp_url, whep_url, hls_url, codec, retention_days,
+          status, installation_date, stream_properties, urls, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, NOW(), NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          name = EXCLUDED.name,
+          camera_code = EXCLUDED.camera_code,
+          department_id = EXCLUDED.department_id,
+          department_name = EXCLUDED.department_name,
+          district = EXCLUDED.district,
+          taluka = EXCLUDED.taluka,
+          latitude = EXCLUDED.latitude,
+          longitude = EXCLUDED.longitude,
+          address = EXCLUDED.address,
+          ownership_type = EXCLUDED.ownership_type,
+          camera_type = EXCLUDED.camera_type,
+          detection_mode = EXCLUDED.detection_mode,
+          vms_vendor = EXCLUDED.vms_vendor,
+          stream_url = EXCLUDED.stream_url,
+          rtsp_url = EXCLUDED.rtsp_url,
+          whep_url = EXCLUDED.whep_url,
+          hls_url = EXCLUDED.hls_url,
+          codec = EXCLUDED.codec,
+          retention_days = EXCLUDED.retention_days,
+          status = EXCLUDED.status,
+          stream_properties = EXCLUDED.stream_properties,
+          urls = EXCLUDED.urls,
+          updated_at = NOW()`,
+        [
+          newCamera.id, newCamera.camera_code, newCamera.name, newCamera.department_id, newCamera.department_name,
+          newCamera.district, newCamera.taluka, newCamera.latitude, newCamera.longitude, newCamera.address,
+          newCamera.ownership_type, newCamera.camera_type, newCamera.detection_mode, newCamera.vms_vendor,
+          newCamera.stream_url, newCamera.rtsp_url, newCamera.whep_url, newCamera.hls_url, newCamera.codec,
+          newCamera.retention_days, newCamera.status, newCamera.installation_date,
+          JSON.stringify(newCamera.stream_properties || {}), JSON.stringify(newCamera.urls || {})
+        ]
+      ).catch(err => console.warn('PG Camera Insert Error:', err.message));
+    }
+
     try {
       mediamtxService.registerCameraStream(newCamera);
     } catch (e) {}
@@ -249,6 +284,7 @@ class CameraDataStore {
       address: updateData.address !== undefined ? updateData.address : existing.address,
       ownership_type: updateData.ownership_type !== undefined ? updateData.ownership_type : existing.ownership_type,
       camera_type: updateData.camera_type !== undefined ? updateData.camera_type : existing.camera_type,
+      detection_mode: updateData.detection_mode !== undefined ? updateData.detection_mode : (existing.detection_mode || 'TRAFFIC_MONITORING'),
       vms_vendor: updateData.vms_vendor !== undefined ? updateData.vms_vendor : existing.vms_vendor,
       stream_url: streamData.stream_url,
       retention_days: updateData.retention_days !== undefined ? parseInt(updateData.retention_days, 10) : existing.retention_days,
@@ -264,7 +300,29 @@ class CameraDataStore {
     };
 
     this.cameras[idx] = updated;
-    this.save();
+
+    // Direct Database Persistence (PostgreSQL)
+    if (pgClient.isConnected()) {
+      pgClient.query(
+        `UPDATE cameras SET
+          name = $1, department_id = $2, department_name = $3, district = $4,
+          taluka = $5, latitude = $6, longitude = $7, address = $8, ownership_type = $9,
+          camera_type = $10, detection_mode = $11, vms_vendor = $12, stream_url = $13,
+          retention_days = $14, status = $15, installation_date = $16, codec = $17,
+          urls = $18, rtsp_url = $19, whep_url = $20, hls_url = $21, stream_properties = $22,
+          updated_at = NOW()
+        WHERE id = $23 OR camera_code = $23`,
+        [
+          updated.name, updated.department_id, updated.department_name, updated.district,
+          updated.taluka, updated.latitude, updated.longitude, updated.address, updated.ownership_type,
+          updated.camera_type, updated.detection_mode, updated.vms_vendor, updated.stream_url,
+          updated.retention_days, updated.status, updated.installation_date, updated.codec,
+          JSON.stringify(updated.urls || {}), updated.rtsp_url, updated.whep_url, updated.hls_url,
+          JSON.stringify(updated.stream_properties || {}), id
+        ]
+      ).catch(err => console.warn('PG Camera Update Error:', err.message));
+    }
+
     try {
       mediamtxService.registerCameraStream(updated);
     } catch (e) {}
@@ -275,7 +333,13 @@ class CameraDataStore {
     const idx = this.cameras.findIndex(c => c.id === id || c.camera_code === id);
     if (idx !== -1) {
       const removed = this.cameras.splice(idx, 1);
-      this.save();
+
+      // Direct Database Persistence (PostgreSQL)
+      if (pgClient.isConnected()) {
+        pgClient.query('DELETE FROM cameras WHERE id = $1 OR camera_code = $1', [id])
+          .catch(err => console.warn('PG Camera Delete Error:', err.message));
+      }
+
       return removed[0];
     }
     return null;
