@@ -1113,6 +1113,205 @@ body.theme-light .brand-tag {
   border-color: #fef3c7;
 }
 
+/* ==========================================================================
+   GIS MAP CLUSTER BADGES & CAMERA ID NUMBERED PINS (1, 2, 3, 4...)
+   ========================================================================== */
+
+/* 1. Camera ID Number Pin (Individual Pin with 1, 2, 3, 4 Badges) */
+.cam-badge-pin {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.cam-badge-pin:hover {
+  transform: scale(1.2);
+  z-index: 1000 !important;
+}
+
+.cam-badge-pin .ring {
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  animation: pulseRing 2.2s ease-out infinite;
+}
+
+.cam-badge-pin .cam-badge-core {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2.5px solid rgba(255, 255, 255, 0.98);
+  box-shadow: 0 5px 16px -2px rgba(0, 0, 0, 0.7), inset 0 2px 4px rgba(255, 255, 255, 0.5);
+  font-family: var(--font-mono, monospace);
+  font-weight: 800;
+  color: #fff;
+  user-select: none;
+}
+
+.cam-badge-pin .cam-badge-num {
+  font-size: 15px;
+  line-height: 1;
+  letter-spacing: -0.5px;
+  font-weight: 900;
+  text-shadow: 0 1.5px 3px rgba(0, 0, 0, 0.85);
+}
+
+.cam-badge-pin.active .cam-badge-core {
+  background: linear-gradient(145deg, #10b981, #047857);
+  border-color: #a7f3d0;
+}
+
+.cam-badge-pin.offline .cam-badge-core {
+  background: linear-gradient(145deg, #ef4444, #b91c1c);
+  border-color: #fecaca;
+}
+
+.cam-badge-pin.maintenance .cam-badge-core {
+  background: linear-gradient(145deg, #f59e0b, #d97706);
+  border-color: #fde68a;
+}
+
+/* 2. Clustered Map Badges (High Visibility, Smooth Click-to-Zoom Expansion) */
+.map-cluster-badge {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  user-select: none;
+}
+
+.map-cluster-badge:hover {
+  transform: scale(1.16);
+  z-index: 1200 !important;
+}
+
+.map-cluster-badge .cluster-pulse-ring {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.55), transparent 70%);
+  animation: clusterPulseRing 2.4s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes clusterPulseRing {
+  0% { transform: scale(0.6); opacity: 0.95; }
+  100% { transform: scale(1.65); opacity: 0; }
+}
+
+.map-cluster-badge .cluster-inner {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 50%, #075985 100%);
+  border: 3px solid #38bdf8;
+  box-shadow: 0 8px 22px -2px rgba(2, 132, 199, 0.7), inset 0 2px 4px rgba(255, 255, 255, 0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.map-cluster-badge.medium .cluster-inner {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%);
+  border-color: #60a5fa;
+  border-width: 3.5px;
+  box-shadow: 0 10px 26px -2px rgba(37, 99, 235, 0.75), inset 0 2px 5px rgba(255, 255, 255, 0.6);
+}
+
+.map-cluster-badge.large .cluster-inner {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 50%, #5b21b6 100%);
+  border-color: #c4b5fd;
+  border-width: 4px;
+  box-shadow: 0 12px 32px -2px rgba(124, 58, 237, 0.85), inset 0 2px 6px rgba(255, 255, 255, 0.7);
+}
+
+.map-cluster-badge .cluster-top-icon {
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.95;
+  margin-bottom: 2px;
+}
+
+.map-cluster-badge.medium .cluster-top-icon {
+  font-size: 14px;
+}
+
+.map-cluster-badge.large .cluster-top-icon {
+  font-size: 16px;
+}
+
+.map-cluster-badge .cluster-count {
+  font-family: var(--font-mono, monospace);
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.5px;
+  text-shadow: 0 1.5px 4px rgba(0, 0, 0, 0.85);
+}
+
+.map-cluster-badge.medium .cluster-count {
+  font-size: 20px;
+}
+
+.map-cluster-badge.large .cluster-count {
+  font-size: 24px;
+}
+
+.map-cluster-badge .cluster-tag {
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  opacity: 0.9;
+  line-height: 1;
+  margin-top: 2px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.map-cluster-badge.medium .cluster-tag {
+  font-size: 10px;
+}
+
+.map-cluster-badge.large .cluster-tag {
+  font-size: 11px;
+}
+
+/* Cluster Alarm State */
+.map-cluster-badge.has-alarm .cluster-pulse-ring {
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.75), transparent 70%);
+  animation: clusterAlarmPulse 1.4s ease-out infinite;
+}
+
+@keyframes clusterAlarmPulse {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+.map-cluster-badge.has-alarm .cluster-inner {
+  background: linear-gradient(135deg, #e11d48 0%, #be123c 50%, #9f1239 100%) !important;
+  border-color: #fda4af !important;
+  box-shadow: 0 0 30px rgba(225, 29, 72, 0.9), inset 0 2px 5px rgba(255, 255, 255, 0.7) !important;
+}
+
+.cluster-popup-card {
+  min-width: 260px;
+  max-width: 330px;
+}
+
+
 .leaflet-popup-content-wrapper {
   background: var(--panel-bg-solid) !important;
   color: var(--text-primary) !important;

@@ -199,136 +199,299 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
     return () => window.removeEventListener('resize', handleResize);
   }, [theme]);
 
-  // Render Camera Markers with Dynamic Threat Shockwaves
-  useEffect(() => {
+  // Helper for short camera number / ID (e.g. 1, 2, 3, 4, 31)
+  const getShortCamId = (cam) => {
+    if (!cam) return '1';
+    if (cam.number !== undefined && cam.number !== null) return String(cam.number);
+    const code = String(cam.camera_code || '');
+    if (code.startsWith('GJ-GOV-')) {
+      const num = parseInt(code.replace('GJ-GOV-', ''), 10);
+      if (!isNaN(num)) return String(num);
+    }
+    const idStr = String(cam.id || '');
+    const cleaned = idStr.replace('gov-feed-', '').replace('cam-', '').replace('cam', '').trim();
+    const parsed = parseInt(cleaned, 10);
+    if (!isNaN(parsed)) return String(parsed);
+    return cleaned || '1';
+  };
+
+  // Render Single Camera Popup Template
+  const renderSingleCameraPopup = (cam, activeThreat, shortId) => {
+    const isAlarmActive = !!activeThreat;
+    const isActive = cam.status === 'ACTIVE';
+
+    if (isAlarmActive) {
+      return `
+        <div class="popup-card alarm-popup">
+          <div class="alarm-popup-banner">
+            <span class="alarm-live-badge">🚨 REAL-TIME AI THREAT ACTIVE</span>
+            <span class="threat-severity-badge ${(activeThreat.severity || 'HIGH').toLowerCase()}">${activeThreat.severity || 'HIGH'}</span>
+          </div>
+          <div class="popup-head" style="margin-top: 8px;">
+            <div>
+              <div class="pname" style="color: #f43f5e;">${activeThreat.title || 'Security Incident'}</div>
+              <div class="pid">Camera #${shortId} · ${cam.camera_code || cam.id} · ${cam.name}</div>
+            </div>
+          </div>
+          ${activeThreat.vehicleNo ? `
+            <div class="vehicle-plate-box" style="margin: 8px 0;">
+              <span class="plate-flag">IND</span>
+              <span class="plate-number">${activeThreat.vehicleNo}</span>
+              <span class="plate-badge">ANPR MATCH</span>
+            </div>
+          ` : ''}
+          <div class="popup-grid">
+            <div><span>Incident Type</span><b>${(activeThreat.type || 'THREAT').replace('_', ' ')}</b></div>
+            <div><span>District</span><b>${cam.district || '—'}</b></div>
+            <div><span>Camera Model</span><b>${cam.camera_type || 'ANPR_SPECIAL'}</b></div>
+            <div><span>Detection Time</span><b>${activeThreat.timeAgo || 'Just now'}</b></div>
+          </div>
+          <button class="popup-stream-btn alarm-stream-btn" id="stream-btn-${cam.id}">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg> Intercept & Watch Live Feed
+          </button>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="popup-card">
+        <div class="popup-head">
+          <div>
+            <div class="pname">Camera #${shortId} · ${cam.name}</div>
+            <div class="pid">${cam.camera_code || cam.id}</div>
+          </div>
+          <span class="status-chip ${isActive ? 'active' : 'offline'}">${cam.status}</span>
+        </div>
+        <div class="popup-grid">
+          <div><span>District</span><b>${cam.district || '—'}</b></div>
+          <div><span>Department</span><b>${cam.department_name || cam.department_id || '—'}</b></div>
+          <div><span>Type</span><b>${cam.camera_type || 'ANPR_SPECIAL'}</b></div>
+          <div><span>Vendor</span><b>${cam.vms_vendor || 'Hikvision'}</b></div>
+        </div>
+        <button class="popup-stream-btn" id="stream-btn-${cam.id}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg> Watch Live Stream
+        </button>
+      </div>
+    `;
+  };
+
+  // Render Multi-Camera Cluster Popup Template
+  const renderClusterPopup = (clusterCameras, alarmCameras) => {
+    const count = clusterCameras.length;
+    const hasAlarm = alarmCameras.length > 0;
+
+    return `
+      <div class="popup-card cluster-popup-card">
+        <div class="popup-head" style="border-bottom: 1px solid var(--panel-border-strong); padding-bottom: 8px; margin-bottom: 8px;">
+          <div>
+            <div class="pname" style="display: flex; align-items: center; gap: 6px;">
+              <span>${hasAlarm ? '🚨' : '🎥'}</span>
+              <span>Cluster: ${count} CCTV Feeds</span>
+            </div>
+            <div class="pid">${clusterCameras[0]?.district || 'Gujarat'} Area · Co-located Cameras</div>
+          </div>
+          ${hasAlarm ? `<span class="status-chip offline">ALERT (${alarmCameras.length})</span>` : `<span class="status-chip active">${count} Cams</span>`}
+        </div>
+        <div class="cluster-cam-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;">
+          ${clusterCameras.map(cam => {
+            const sId = getShortCamId(cam);
+            const isAlarm = alarmCameras.some(a => a.id === cam.id);
+            return `
+              <div class="cluster-cam-item ${isAlarm ? 'alarm-item' : ''}" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,0.05); font-size: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                  <span style="font-weight: 800; background: ${isAlarm ? '#f43f5e' : 'var(--accent, #22d3ee)'}; color: #000; border-radius: 4px; padding: 2px 6px; font-size: 11.5px;">#${sId}</span>
+                  <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; color: var(--text-primary); font-weight: 600;">${cam.name}</span>
+                </div>
+                <button class="popup-stream-mini-btn" id="cluster-stream-btn-${cam.id}" style="padding: 4px 10px; border-radius: 6px; background: ${isAlarm ? '#e11d48' : '#0284c7'}; color: #fff; font-size: 11px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg> Watch
+                </button>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  };
+
+  // Render Clustered / Individual Markers on Map (Intelligent Distance Clustering)
+  const renderClusteredMarkers = useCallback(() => {
     if (!leafletMap.current || !markersLayer.current) return;
+    const map = leafletMap.current;
     markersLayer.current.clearLayers();
     markersMapRef.current = {};
 
+    const zoom = map.getZoom();
+    // Dynamic cluster pixel radius based on current map zoom level
+    const clusterRadiusPx = zoom >= 16 ? 15 : zoom >= 13 ? 42 : zoom >= 10 ? 58 : 70;
+
+    const clusters = [];
+
     cameras.forEach(cam => {
       if (!cam.latitude || !cam.longitude) return;
+      const pt = map.latLngToLayerPoint([cam.latitude, cam.longitude]);
 
-      const activeThreat = incidents.find(inc => inc.cameraId === cam.id);
-      const isAlarmActive = !!activeThreat;
-
-      const isActive = cam.status === 'ACTIVE';
-      const isMaint = cam.status === 'MAINTENANCE';
-      let statusClass = isActive ? 'active' : 'offline';
-      if (isMaint) statusClass = 'maintenance';
-
-      let markerHtml = '';
-
-      if (isAlarmActive) {
-        // SLEEK & COMPACT REAL-TIME THREAT PIN (Minimal footprint, zero cluster clutter)
-        const severityClass = activeThreat.severity.toLowerCase();
-        const badgeLabel = activeThreat.type === 'ANPR_HOTLIST' && activeThreat.vehicleNo
-          ? `ANPR Hotlist: ${activeThreat.vehicleNo}`
-          : activeThreat.title;
-
-        markerHtml = `
-          <div class="cam-pin alarm-active ${severityClass}" title="${badgeLabel} · Click to View Details">
-            <div class="alarm-tight-pulse"></div>
-            <div class="core alarm-core">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
-            </div>
-            <div class="alarm-pip"></div>
-          </div>
-        `;
-      } else {
-        // STANDARD OPERATIONAL CAMERA PIN
-        markerHtml = `
-          <div class="cam-pin ${statusClass}">
-            <div class="ring"></div>
-            <div class="core">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
-            </div>
-          </div>
-        `;
-      }
-
-      const customIcon = L.divIcon({
-        html: markerHtml,
-        className: `custom-leaflet-marker ${isAlarmActive ? 'has-alarm' : ''}`,
-        iconSize: [34, 34],
-        iconAnchor: [17, 17]
-      });
-
-      const marker = L.marker([cam.latitude, cam.longitude], {
-        icon: customIcon,
-        zIndexOffset: isAlarmActive ? 1000 : 0
-      });
-
-      // TACTICAL POPUP WITH INCIDENT DETAILS (IF ALARM ACTIVE)
-      let popupHtml = '';
-
-      if (isAlarmActive) {
-        popupHtml = `
-          <div class="popup-card alarm-popup">
-            <div class="alarm-popup-banner">
-              <span class="alarm-live-badge">🚨 REAL-TIME AI THREAT ACTIVE</span>
-              <span class="threat-severity-badge ${activeThreat.severity.toLowerCase()}">${activeThreat.severity}</span>
-            </div>
-            <div class="popup-head" style="margin-top: 8px;">
-              <div>
-                <div class="pname" style="color: #f43f5e;">${activeThreat.title}</div>
-                <div class="pid">${cam.camera_code || cam.id} · ${cam.name}</div>
-              </div>
-            </div>
-            ${activeThreat.vehicleNo ? `
-              <div class="vehicle-plate-box" style="margin: 8px 0;">
-                <span class="plate-flag">IND</span>
-                <span class="plate-number">${activeThreat.vehicleNo}</span>
-                <span class="plate-badge">ANPR MATCH</span>
-              </div>
-            ` : ''}
-            <div class="popup-grid">
-              <div><span>Incident Type</span><b>${activeThreat.type.replace('_', ' ')}</b></div>
-              <div><span>District</span><b>${cam.district || '—'}</b></div>
-              <div><span>Camera Model</span><b>${cam.camera_type || 'ANPR_SPECIAL'}</b></div>
-              <div><span>Detection Time</span><b>${activeThreat.timeAgo}</b></div>
-            </div>
-            <button class="popup-stream-btn alarm-stream-btn" id="stream-btn-${cam.id}">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg> Intercept & Watch Live Feed
-            </button>
-          </div>
-        `;
-      } else {
-        popupHtml = `
-          <div class="popup-card">
-            <div class="popup-head">
-              <div>
-                <div class="pname">${cam.name}</div>
-                <div class="pid">${cam.camera_code || cam.id}</div>
-              </div>
-              <span class="status-chip ${isActive ? 'active' : 'offline'}">${cam.status}</span>
-            </div>
-            <div class="popup-grid">
-              <div><span>District</span><b>${cam.district || '—'}</b></div>
-              <div><span>Department</span><b>${cam.department_name || cam.department_id || '—'}</b></div>
-              <div><span>Type</span><b>${cam.camera_type || 'ANPR_SPECIAL'}</b></div>
-              <div><span>Vendor</span><b>${cam.vms_vendor || 'Hikvision'}</b></div>
-            </div>
-            <button class="popup-stream-btn" id="stream-btn-${cam.id}">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg> Watch Live Stream
-            </button>
-          </div>
-        `;
-      }
-
-      marker.bindPopup(popupHtml);
-      marker.on('popupopen', () => {
-        const btn = document.getElementById(`stream-btn-${cam.id}`);
-        if (btn) {
-          btn.onclick = () => onCameraSelect(cam);
+      let added = false;
+      if (zoom < 16) {
+        for (const cl of clusters) {
+          const dist = pt.distanceTo(cl.centerPt);
+          if (dist < clusterRadiusPx) {
+            cl.cameras.push(cam);
+            const n = cl.cameras.length;
+            cl.centerLat = cl.cameras.reduce((sum, c) => sum + c.latitude, 0) / n;
+            cl.centerLng = cl.cameras.reduce((sum, c) => sum + c.longitude, 0) / n;
+            cl.centerPt = map.latLngToLayerPoint([cl.centerLat, cl.centerLng]);
+            added = true;
+            break;
+          }
         }
-      });
+      }
 
-      markersLayer.current.addLayer(marker);
-      markersMapRef.current[cam.id] = marker;
+      if (!added) {
+        clusters.push({
+          centerLat: cam.latitude,
+          centerLng: cam.longitude,
+          centerPt: pt,
+          cameras: [cam]
+        });
+      }
+    });
+
+    clusters.forEach(cl => {
+      if (cl.cameras.length === 1) {
+        // Individual Numbered Camera Marker (e.g. 1, 2, 3, 4...)
+        const cam = cl.cameras[0];
+        const shortId = getShortCamId(cam);
+        const activeThreat = incidents.find(inc => inc.cameraId === cam.id);
+        const isAlarmActive = !!activeThreat;
+        const isActive = cam.status === 'ACTIVE';
+        const isMaint = cam.status === 'MAINTENANCE';
+        let statusClass = isActive ? 'active' : 'offline';
+        if (isMaint) statusClass = 'maintenance';
+
+        let markerHtml = '';
+        if (isAlarmActive) {
+          const severityClass = (activeThreat.severity || 'high').toLowerCase();
+          markerHtml = `
+            <div class="cam-pin cam-badge-pin alarm-active ${severityClass}" title="Camera #${shortId}: ${cam.name} · 🚨 Real-Time Threat Active">
+              <div class="alarm-tight-pulse"></div>
+              <div class="cam-badge-core alarm-core">
+                <span class="cam-badge-num">${shortId}</span>
+              </div>
+              <div class="alarm-pip"></div>
+            </div>
+          `;
+        } else {
+          markerHtml = `
+            <div class="cam-pin cam-badge-pin ${statusClass}" title="Camera #${shortId}: ${cam.name} (${cam.camera_code || cam.id})">
+              <div class="ring"></div>
+              <div class="cam-badge-core">
+                <span class="cam-badge-num">${shortId}</span>
+              </div>
+            </div>
+          `;
+        }
+
+        const customIcon = L.divIcon({
+          html: markerHtml,
+          className: `custom-leaflet-marker ${isAlarmActive ? 'has-alarm' : ''}`,
+          iconSize: [44, 44],
+          iconAnchor: [22, 22]
+        });
+
+        const marker = L.marker([cam.latitude, cam.longitude], {
+          icon: customIcon,
+          zIndexOffset: isAlarmActive ? 1000 : 100
+        });
+
+        marker.bindPopup(renderSingleCameraPopup(cam, activeThreat, shortId));
+        marker.on('popupopen', () => {
+          const btn = document.getElementById(`stream-btn-${cam.id}`);
+          if (btn) btn.onclick = () => onCameraSelect(cam);
+        });
+
+        markersLayer.current.addLayer(marker);
+        markersMapRef.current[cam.id] = marker;
+      } else {
+        // Multi-Camera Cluster Badge with Total Count & Click-to-Zoom Expansion
+        const count = cl.cameras.length;
+        const alarmCameras = cl.cameras.filter(c => incidents.some(inc => inc.cameraId === c.id));
+        const hasAlarm = alarmCameras.length > 0;
+
+        const sizeClass = count >= 20 ? 'large' : count >= 6 ? 'medium' : 'small';
+        const sizePx = count >= 20 ? 76 : count >= 6 ? 64 : 52;
+
+        const clusterHtml = `
+          <div class="map-cluster-badge ${sizeClass} ${hasAlarm ? 'has-alarm' : ''}" title="${count} Cameras Clustered · Click to Zoom & Separate">
+            <div class="cluster-pulse-ring"></div>
+            <div class="cluster-inner">
+              <div class="cluster-top-icon">${hasAlarm ? '🚨' : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>'}</div>
+              <div class="cluster-count">${count}</div>
+              <div class="cluster-tag">CAMS</div>
+            </div>
+          </div>
+        `;
+
+        const clusterIcon = L.divIcon({
+          html: clusterHtml,
+          className: `custom-leaflet-cluster ${hasAlarm ? 'has-alarm' : ''}`,
+          iconSize: [sizePx, sizePx],
+          iconAnchor: [sizePx / 2, sizePx / 2]
+        });
+
+        const clusterMarker = L.marker([cl.centerLat, cl.centerLng], {
+          icon: clusterIcon,
+          zIndexOffset: hasAlarm ? 900 : 50
+        });
+
+        // Click on cluster -> Smoothly fly to bounding box to expand/separate cameras
+        clusterMarker.on('click', (e) => {
+          L.DomEvent.stopPropagation(e);
+          const latLngs = cl.cameras.map(c => [c.latitude, c.longitude]);
+          const bounds = L.latLngBounds(latLngs);
+
+          const isCoLocated = bounds.getNorthEast().equals(bounds.getSouthWest());
+          if (isCoLocated || map.getZoom() >= 16) {
+            clusterMarker.openPopup();
+          } else {
+            map.flyToBounds(bounds.pad(0.35), {
+              duration: 0.85,
+              easeLinearity: 0.25,
+              maxZoom: 17
+            });
+          }
+        });
+
+        clusterMarker.bindPopup(renderClusterPopup(cl.cameras, alarmCameras));
+        clusterMarker.on('popupopen', () => {
+          cl.cameras.forEach(c => {
+            const btn = document.getElementById(`cluster-stream-btn-${c.id}`);
+            if (btn) btn.onclick = () => onCameraSelect(c);
+          });
+        });
+
+        markersLayer.current.addLayer(clusterMarker);
+        cl.cameras.forEach(c => {
+          markersMapRef.current[c.id] = clusterMarker;
+        });
+      }
     });
 
     if (leafletMap.current) leafletMap.current.invalidateSize();
   }, [cameras, incidents, onCameraSelect]);
+
+  // Hook clustering to cameras, incidents, and map zoom/move events
+  useEffect(() => {
+    if (!leafletMap.current) return;
+    renderClusteredMarkers();
+
+    const map = leafletMap.current;
+    map.on('zoomend moveend', renderClusteredMarkers);
+
+    return () => {
+      map.off('zoomend moveend', renderClusteredMarkers);
+    };
+  }, [renderClusteredMarkers]);
+
 
   // Render Vehicle Trajectory Route on GIS Map
   useEffect(() => {
