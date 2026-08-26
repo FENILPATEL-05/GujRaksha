@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  base: '/gujraksha/',
   plugins: [react()],
   server: {
     port: 5173,
@@ -9,11 +10,16 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true
+      },
+      '/gujraksha/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true
       }
     }
   },
   build: {
-    outDir: 'public',
+    outDir: 'dist',
     emptyOutDir: true
   }
 });
+

@@ -194,11 +194,13 @@ export const LiveCCTVFeed = ({
 
   const cleanNumId = getCleanId(camera);
   const sandboxVideoUrl = `https://live.corp8.cloud/stream/${cleanNumId}`;
-  const rtspProxyUrl = `/api/v1/proxy-stream?url=${encodeURIComponent(camera?.stream_url || camera?.rtsp_url || '')}`;
+  const apiPrefix = typeof window !== 'undefined' && window.location.pathname.startsWith('/gujraksha') ? '/gujraksha' : '';
+  const rtspProxyUrl = `${apiPrefix}/api/v1/proxy-stream?url=${encodeURIComponent(camera?.stream_url || camera?.rtsp_url || '')}`;
 
   const effectiveFallbackUrl = (rawStreamUrl.startsWith('rtsp://') || isRtspOnly)
     ? rtspProxyUrl
     : (camera.hls_url || rawStreamUrl);
+
 
   return (
     <div style={{ width: "100%", height: "100%", position: "relative", background: "#000", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
