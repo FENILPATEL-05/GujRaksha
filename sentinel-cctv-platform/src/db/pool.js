@@ -81,6 +81,19 @@ class CameraDataStore {
   getAll(filters = {}) {
     let result = [...this.cameras];
 
+    // 1. Spatial Bounding Box Filter (minLng, minLat, maxLng, maxLat)
+    if (filters.bbox) {
+      const parts = String(filters.bbox).split(',').map(Number);
+      if (parts.length === 4 && parts.every(n => !isNaN(n))) {
+        const [minLng, minLat, maxLng, maxLat] = parts;
+        result = result.filter(c => 
+          c.longitude >= minLng && c.longitude <= maxLng &&
+          c.latitude >= minLat && c.latitude <= maxLat
+        );
+      }
+    }
+
+    // 2. Standard Filters
     if (filters.department && filters.department !== 'ALL') {
       const dept = filters.department.toLowerCase().trim();
       result = result.filter(c => {
@@ -129,7 +142,137 @@ class CameraDataStore {
       }
     }
 
+    // 3. Optional Pagination
+    if (filters.page && filters.limit) {
+      const page = Math.max(1, parseInt(filters.page, 10) || 1);
+      const limit = Math.max(1, Math.min(5000, parseInt(filters.limit, 10) || 50));
+      const offset = (page - 1) * limit;
+      result = result.slice(offset, offset + limit);
+    } else if (filters.limit && !isNaN(parseInt(filters.limit, 10))) {
+      const limit = Math.max(1, parseInt(filters.limit, 10));
+      result = result.slice(0, limit);
+    }
+
+    // 4. Lightweight Format Projections
+    if (filters.format === 'compact') {
+      return result.map(c => [
+        c.id,
+        c.camera_code,
+        c.name,
+        c.latitude,
+        c.longitude,
+        c.status === 'ACTIVE' ? 1 : (c.status === 'MAINTENANCE' ? 2 : 0),
+        c.department_id,
+        c.district,
+        c.camera_type,
+        c.detection_mode
+      ]);
+    } else if (filters.format === 'lightweight') {
+      return result.map(c => ({
+        id: c.id,
+        camera_code: c.camera_code,
+        name: c.name,
+        latitude: c.latitude,
+        longitude: c.longitude,
+        status: c.status,
+        department_id: c.department_id,
+        department_name: c.department_name,
+        district: c.district,
+        camera_type: c.camera_type,
+        detection_mode: c.detection_mode
+      }));
+    }
+
     return result;
+  }
+
+  getSpatialCameras(options = {}) {
+    const zoom = options.zoom ? parseInt(options.zoom, 10) : 7;
+    const allFiltered = this.getAll({
+      ...options,
+      page: undefined,
+      limit: undefined,
+      format: undefined
+    });
+
+    const total = allFiltered.length;
+
+    // Server-side District Aggregation when zoom < 10 and large camera count (> 100)
+    if (zoom < 10 && total > 100) {
+      const districtMap = new Map();
+      allFiltered.forEach(c => {
+        const distKey = c.district || 'Gujarat';
+        if (!districtMap.has(distKey)) {
+          districtMap.set(distKey, {
+            id: `cluster-${distKey.toLowerCase().replace(/\s+/g, '-')}`,
+            district: distKey,
+            count: 0,
+            activeCount: 0,
+            offlineCount: 0,
+            sumLat: 0,
+            sumLng: 0,
+            sampleCameras: []
+          });
+        }
+        const cluster = districtMap.get(distKey);
+        cluster.count++;
+        if (c.status === 'ACTIVE') cluster.activeCount++;
+        else if (c.status === 'OFFLINE') cluster.offlineCount++;
+        cluster.sumLat += c.latitude;
+        cluster.sumLng += c.longitude;
+        if (cluster.sampleCameras.length < 5) {
+          cluster.sampleCameras.push({
+            id: c.id,
+            camera_code: c.camera_code,
+            name: c.name
+          });
+        }
+      });
+
+      const clusters = Array.from(districtMap.values()).map(cl => ({
+        id: cl.id,
+        district: cl.district,
+        count: cl.count,
+        active: cl.activeCount,
+        offline: cl.offlineCount,
+        latitude: cl.sumLat / cl.count,
+        longitude: cl.sumLng / cl.count,
+        sample_cameras: cl.sampleCameras
+      }));
+
+      return {
+        clustered: true,
+        zoom,
+        total_cameras: total,
+        cluster_count: clusters.length,
+        clusters: clusters
+      };
+    }
+
+    // High Zoom (>= 10) or standard dataset: Return lightweight point geometries
+    const points = allFiltered.slice(0, 5000).map(c => ({
+      id: c.id,
+      camera_code: c.camera_code,
+      name: c.name,
+      district: c.district,
+      department_id: c.department_id,
+      department_name: c.department_name,
+      camera_type: c.camera_type,
+      detection_mode: c.detection_mode,
+      status: c.status,
+      latitude: c.latitude,
+      longitude: c.longitude,
+      stream_url: c.stream_url,
+      whep_url: c.whep_url || (c.urls && c.urls.whep)
+    }));
+
+    return {
+      clustered: false,
+      zoom,
+      total_cameras: total,
+      returned_cameras: points.length,
+      cameras: points
+    };
   }
 
   getById(id) {

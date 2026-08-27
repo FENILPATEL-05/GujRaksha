@@ -2,9 +2,16 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import { useTheme } from '../context/ThemeContext';
 import { IncidentRadarPanel } from './IncidentRadarPanel';
-import { Plus, Minus, Crosshair, Radio, ShieldAlert } from 'lucide-react';
+import { PoliceTacticalDock } from './PoliceTacticalDock';
+import { Plus, Minus, Crosshair, Radio, ShieldAlert, Layers, Eye, MapPin, Shield } from 'lucide-react';
 
-export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, onClearTrackVehicle }) => {
+export const MapView = ({ 
+  cameras, 
+  filters = {}, 
+  onCameraSelect, 
+  activeTrackVehicle = null, 
+  onClearTrackVehicle 
+}) => {
   const mapRef = useRef(null);
   const leafletMap = useRef(null);
   const tileLayerRef = useRef(null);
@@ -16,6 +23,12 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
   // Active Real-Time Incidents State (Fed directly from Real-Time AI / Watchlist Engine)
   const [incidents, setIncidents] = useState([]);
   const [trajectoryData, setTrajectoryData] = useState(null);
+  const [spatialData, setSpatialData] = useState(null);
+  const spatialAbortRef = useRef(null);
+
+  // Police Command HUD & Tactical Dock State
+  const [selectedDockCamera, setSelectedDockCamera] = useState(null);
+  const [mapLayerMode, setMapLayerMode] = useState('dark'); // 'dark', 'satellite', 'street'
 
   const camerasRef = useRef(cameras);
   useEffect(() => {
@@ -130,29 +143,40 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
   const handleLocateIncident = (incident) => {
     const cam = incident.camera || cameras.find(c => c.id === incident.cameraId);
     if (cam && leafletMap.current && cam.latitude && cam.longitude) {
+      setSelectedDockCamera(cam);
       leafletMap.current.flyTo([cam.latitude, cam.longitude], 15, {
         duration: 1.2,
         easeLinearity: 0.25
       });
-
-      setTimeout(() => {
-        const marker = markersMapRef.current[cam.id];
-        if (marker) marker.openPopup();
-      }, 1250);
     }
   };
 
-  // Open Live Stream for Incident Camera
-  const handleOpenStreamIncident = (incident) => {
+  // Open Live Stream for Incident Camera & Dismiss in Database
+  const handleOpenStreamIncident = async (incident) => {
+    setIncidents(prev => prev.filter(inc => inc.id !== incident.id));
     const cam = incident.camera || cameras.find(c => c.id === incident.cameraId);
     if (cam) {
-      onCameraSelect(cam);
+      setSelectedDockCamera(cam);
+    }
+    try {
+      await fetch(`/api/v1/anpr/alerts/${encodeURIComponent(incident.id)}/dismiss`, {
+        method: 'PATCH'
+      });
+    } catch (err) {
+      console.error('Error updating dismissed alert in database:', err);
     }
   };
 
-  // Dismiss / Clear Incident
-  const handleDismissIncident = (incidentId) => {
+  // Dismiss / Clear Incident Permanently in Database
+  const handleDismissIncident = async (incidentId) => {
     setIncidents(prev => prev.filter(inc => inc.id !== incidentId));
+    try {
+      await fetch(`/api/v1/anpr/alerts/${encodeURIComponent(incidentId)}/dismiss`, {
+        method: 'PATCH'
+      });
+    } catch (err) {
+      console.error('Error updating dismissed alert in database:', err);
+    }
   };
 
   // Initialize Map
@@ -177,42 +201,28 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
       trajectoryLayer.current = L.layerGroup().addTo(leafletMap.current);
     }
 
-    // Dynamic Light / Dark Tile Layer
+    // Dynamic Police Layer (Night Ops Dark / Satellite Hybrid / Street GIS)
     if (tileLayerRef.current) {
       leafletMap.current.removeLayer(tileLayerRef.current);
     }
 
-    const cartoKey = import.meta.env.VITE_CARTO_API_KEY || import.meta.env.VITE_CARTO_KEY;
-    const customDarkUrl = import.meta.env.VITE_MAP_DARK_TILE_URL;
-    const customLightUrl = import.meta.env.VITE_MAP_LIGHT_TILE_URL;
-
     let tileUrl;
-    let tileAttribution = '&copy; Government of Gujarat GIS Control Command Center';
+    let tileAttribution = '&copy; Gujarat Police Netram GIS CCC';
     let tileSubdomains = 'abcd';
 
-    if (theme === 'dark') {
-      if (customDarkUrl) {
-        tileUrl = customDarkUrl;
-      } else if (cartoKey) {
-        tileUrl = `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=${cartoKey}`;
-        tileAttribution += ' &copy; CARTO';
-      } else {
-        // High-quality open dark basemap without API key requirement
-        tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
-        tileAttribution += ' &copy; Esri';
-        tileSubdomains = '';
-      }
+    if (mapLayerMode === 'satellite') {
+      tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+      tileAttribution += ' &copy; Esri World Imagery';
+      tileSubdomains = '';
+    } else if (mapLayerMode === 'street') {
+      tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+      tileAttribution += ' &copy; OpenStreetMap';
+      tileSubdomains = 'abc';
     } else {
-      if (customLightUrl) {
-        tileUrl = customLightUrl;
-      } else if (cartoKey) {
-        tileUrl = `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${cartoKey}`;
-        tileAttribution += ' &copy; CARTO';
-      } else {
-        tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-        tileAttribution += ' &copy; OpenStreetMap contributors';
-        tileSubdomains = 'abc';
-      }
+      // Default: High-tech Police Night Ops Dark Mode
+      tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+      tileAttribution += ' &copy; Esri Dark Canvas';
+      tileSubdomains = '';
     }
 
     tileLayerRef.current = L.tileLayer(tileUrl, {
@@ -231,7 +241,7 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [theme]);
+  }, [theme, mapLayerMode]);
 
   // Helper for short camera number / ID (e.g. 1, 2, 3, 4, 31)
   const getShortCamId = (cam) => {
@@ -264,7 +274,7 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
           <div class="popup-head" style="margin-top: 8px;">
             <div>
               <div class="pname" style="color: #f43f5e;">${activeThreat.title || 'Security Incident'}</div>
-              <div class="pid">Camera #${shortId} · ${cam.camera_code || cam.id} · ${cam.name}</div>
+              <div class="pid">${cam.camera_code || cam.id} · ${cam.name}</div>
             </div>
           </div>
           ${activeThreat.vehicleNo ? `
@@ -291,7 +301,7 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
       <div class="popup-card">
         <div class="popup-head">
           <div>
-            <div class="pname">Camera #${shortId} · ${cam.name}</div>
+            <div class="pname">${cam.name}</div>
             <div class="pid">${cam.camera_code || cam.id}</div>
           </div>
           <span class="status-chip ${isActive ? 'active' : 'offline'}">${cam.status}</span>
@@ -319,8 +329,8 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
         <div class="popup-head" style="border-bottom: 1px solid var(--panel-border-strong); padding-bottom: 8px; margin-bottom: 8px;">
           <div>
             <div class="pname" style="display: flex; align-items: center; gap: 6px;">
-              <span>${hasAlarm ? '🚨' : '🎥'}</span>
-              <span>Cluster: ${count} CCTV Feeds</span>
+              ${hasAlarm ? '<span>🚨</span>' : ''}
+              <span>${count} Cameras Grouped</span>
             </div>
             <div class="pid">${clusterCameras[0]?.district || 'Gujarat'} Area · Co-located Cameras</div>
           </div>
@@ -347,7 +357,69 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
     `;
   };
 
-  // Render Clustered / Individual Markers on Map (Intelligent Distance Clustering)
+  // High-Scale Viewport-Aware Camera Fetcher (/api/v1/cameras/spatial)
+  const fetchSpatialCameras = useCallback(async () => {
+    if (!leafletMap.current) return;
+    const map = leafletMap.current;
+    const bounds = map.getBounds();
+    const zoom = map.getZoom();
+    const bbox = [
+      bounds.getWest().toFixed(4),
+      bounds.getSouth().toFixed(4),
+      bounds.getEast().toFixed(4),
+      bounds.getNorth().toFixed(4)
+    ].join(',');
+
+    const params = new URLSearchParams();
+    params.set('bbox', bbox);
+    params.set('zoom', zoom);
+    if (filters.department && filters.department !== 'ALL') params.set('department', filters.department);
+    if (filters.district && filters.district !== 'ALL') params.set('district', filters.district);
+    if (filters.status && filters.status !== 'ALL') params.set('status', filters.status);
+    if (filters.search && filters.search.trim() !== '') params.set('search', filters.search.trim());
+
+    if (spatialAbortRef.current) {
+      spatialAbortRef.current.abort();
+    }
+    spatialAbortRef.current = new AbortController();
+
+    try {
+      const res = await fetch(`/api/v1/cameras/spatial?${params.toString()}`, {
+        signal: spatialAbortRef.current.signal
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setSpatialData(json.data);
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        // silent fallback to prop cameras
+      }
+    }
+  }, [filters]);
+
+  // Hook live spatial querying on pan, zoom, and filter changes
+  useEffect(() => {
+    if (!leafletMap.current) return;
+    const map = leafletMap.current;
+    let timer = setTimeout(fetchSpatialCameras, 100);
+
+    const handleMove = () => {
+      clearTimeout(timer);
+      timer = setTimeout(fetchSpatialCameras, 200);
+    };
+
+    map.on('moveend zoomend', handleMove);
+    return () => {
+      clearTimeout(timer);
+      map.off('moveend zoomend', handleMove);
+      if (spatialAbortRef.current) spatialAbortRef.current.abort();
+    };
+  }, [fetchSpatialCameras]);
+
+  // Render Clustered / Individual Markers on Map (Ultra-Fast O(N) Spatial Grid Clustering for 80,000+ scale)
   const renderClusteredMarkers = useCallback(() => {
     if (!leafletMap.current || !markersLayer.current) return;
     const map = leafletMap.current;
@@ -355,46 +427,78 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
     markersMapRef.current = {};
 
     const zoom = map.getZoom();
-    // Dynamic cluster pixel radius based on current map zoom level
-    const clusterRadiusPx = zoom >= 16 ? 15 : zoom >= 13 ? 42 : zoom >= 10 ? 58 : 70;
 
-    const clusters = [];
+    // 1. Server-side Clustered Mode (when zoom < 10 and server returns district cluster aggregations)
+    if (spatialData && spatialData.clustered && Array.isArray(spatialData.clusters) && spatialData.clusters.length > 0) {
+      spatialData.clusters.forEach(cl => {
+        const count = cl.count;
+        const sizeClass = count >= 100 ? 'large' : count >= 20 ? 'medium' : 'small';
+        const sizePx = count >= 100 ? 54 : count >= 20 ? 46 : 40;
+        const clusterHtml = `
+          <div class="cctv-cluster-pin ${sizeClass}" title="${count} Cameras in ${cl.district} · Click to Zoom & Explore">
+            <div class="cluster-halo"></div>
+            <div class="cluster-core">
+              <span class="cluster-num">${count}</span>
+              <span class="cluster-tag-sub">${cl.district}</span>
+            </div>
+          </div>
+        `;
 
-    cameras.forEach(cam => {
+        const icon = L.divIcon({
+          html: clusterHtml,
+          className: 'custom-leaflet-cluster',
+          iconSize: [sizePx, sizePx],
+          iconAnchor: [sizePx / 2, sizePx / 2]
+        });
+
+        const clusterMarker = L.marker([cl.latitude, cl.longitude], { icon, zIndexOffset: 50 });
+        clusterMarker.on('click', () => {
+          map.flyTo([cl.latitude, cl.longitude], Math.min(13, zoom + 3), { duration: 0.9 });
+        });
+        markersLayer.current.addLayer(clusterMarker);
+      });
+
+      if (leafletMap.current) leafletMap.current.invalidateSize();
+      return;
+    }
+
+    // 2. Individual Nodes / Local Spatial Grid Mode
+    const activeCameras = (spatialData && Array.isArray(spatialData.cameras)) ? spatialData.cameras : cameras;
+    const mapBounds = map.getBounds().pad(0.15);
+    const clusterRadiusPx = zoom >= 16 ? 16 : zoom >= 13 ? 42 : zoom >= 10 ? 56 : 68;
+
+    const grid = new Map();
+
+    activeCameras.forEach(cam => {
       if (!cam.latitude || !cam.longitude) return;
+      if (!mapBounds.contains([cam.latitude, cam.longitude])) return;
+
       const pt = map.latLngToLayerPoint([cam.latitude, cam.longitude]);
+      const cellX = Math.floor(pt.x / clusterRadiusPx);
+      const cellY = Math.floor(pt.y / clusterRadiusPx);
+      const cellKey = `${cellX}_${cellY}`;
 
-      let added = false;
-      if (zoom < 16) {
-        for (const cl of clusters) {
-          const dist = pt.distanceTo(cl.centerPt);
-          if (dist < clusterRadiusPx) {
-            cl.cameras.push(cam);
-            const n = cl.cameras.length;
-            cl.centerLat = cl.cameras.reduce((sum, c) => sum + c.latitude, 0) / n;
-            cl.centerLng = cl.cameras.reduce((sum, c) => sum + c.longitude, 0) / n;
-            cl.centerPt = map.latLngToLayerPoint([cl.centerLat, cl.centerLng]);
-            added = true;
-            break;
-          }
-        }
-      }
-
-      if (!added) {
-        clusters.push({
+      if (grid.has(cellKey)) {
+        const cl = grid.get(cellKey);
+        cl.cameras.push(cam);
+        const n = cl.cameras.length;
+        cl.centerLat = (cl.centerLat * (n - 1) + cam.latitude) / n;
+        cl.centerLng = (cl.centerLng * (n - 1) + cam.longitude) / n;
+      } else {
+        grid.set(cellKey, {
           centerLat: cam.latitude,
           centerLng: cam.longitude,
-          centerPt: pt,
           cameras: [cam]
         });
       }
     });
 
+    const clusters = Array.from(grid.values());
+
     clusters.forEach(cl => {
       if (cl.cameras.length === 1) {
         // Individual Numbered Camera Marker (e.g. 1, 2, 3, 4...)
         const cam = cl.cameras[0];
-        const shortId = getShortCamId(cam);
         const activeThreat = incidents.find(inc => inc.cameraId === cam.id);
         const isAlarmActive = !!activeThreat;
         const isActive = cam.status === 'ACTIVE';
@@ -406,20 +510,20 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
         if (isAlarmActive) {
           const severityClass = (activeThreat.severity || 'high').toLowerCase();
           markerHtml = `
-            <div class="cam-pin cam-badge-pin alarm-active ${severityClass}" title="Camera #${shortId}: ${cam.name} · 🚨 Real-Time Threat Active">
+            <div class="cam-pin cam-badge-pin alarm-active ${severityClass}" title="${cam.name} (${cam.camera_code || cam.id}) · 🚨 Real-Time Threat Active">
               <div class="alarm-tight-pulse"></div>
               <div class="cam-badge-core alarm-core">
-                <span class="cam-badge-num">${shortId}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
               </div>
               <div class="alarm-pip"></div>
             </div>
           `;
         } else {
           markerHtml = `
-            <div class="cam-pin cam-badge-pin ${statusClass}" title="Camera #${shortId}: ${cam.name} (${cam.camera_code || cam.id})">
+            <div class="cam-pin cam-badge-pin ${statusClass}" title="${cam.name} (${cam.camera_code || cam.id})">
               <div class="ring"></div>
               <div class="cam-badge-core">
-                <span class="cam-badge-num">${shortId}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
               </div>
             </div>
           `;
@@ -428,8 +532,8 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
         const customIcon = L.divIcon({
           html: markerHtml,
           className: `custom-leaflet-marker ${isAlarmActive ? 'has-alarm' : ''}`,
-          iconSize: [44, 44],
-          iconAnchor: [22, 22]
+          iconSize: [38, 38],
+          iconAnchor: [19, 19]
         });
 
         const marker = L.marker([cam.latitude, cam.longitude], {
@@ -437,10 +541,8 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
           zIndexOffset: isAlarmActive ? 1000 : 100
         });
 
-        marker.bindPopup(renderSingleCameraPopup(cam, activeThreat, shortId));
-        marker.on('popupopen', () => {
-          const btn = document.getElementById(`stream-btn-${cam.id}`);
-          if (btn) btn.onclick = () => onCameraSelect(cam);
+        marker.on('click', () => {
+          setSelectedDockCamera(cam);
         });
 
         markersLayer.current.addLayer(marker);
@@ -451,16 +553,15 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
         const alarmCameras = cl.cameras.filter(c => incidents.some(inc => inc.cameraId === c.id));
         const hasAlarm = alarmCameras.length > 0;
 
-        const sizeClass = count >= 20 ? 'large' : count >= 6 ? 'medium' : 'small';
-        const sizePx = count >= 20 ? 76 : count >= 6 ? 64 : 52;
+        const sizeClass = count >= 20 ? 'large' : count >= 8 ? 'medium' : 'small';
+        const sizePx = count >= 20 ? 52 : count >= 8 ? 44 : 38;
 
         const clusterHtml = `
-          <div class="map-cluster-badge ${sizeClass} ${hasAlarm ? 'has-alarm' : ''}" title="${count} Cameras Clustered · Click to Zoom & Separate">
-            <div class="cluster-pulse-ring"></div>
-            <div class="cluster-inner">
-              <div class="cluster-top-icon">${hasAlarm ? '🚨' : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>'}</div>
-              <div class="cluster-count">${count}</div>
-              <div class="cluster-tag">CAMS</div>
+          <div class="cctv-cluster-pin ${sizeClass} ${hasAlarm ? 'has-alarm' : ''}" title="${count} Cameras merged · Click to zoom in & separate">
+            <div class="cluster-halo"></div>
+            <div class="cluster-core">
+              <span class="cluster-num">${count}</span>
+              ${hasAlarm ? '<span class="cluster-alert-dot"></span>' : ''}
             </div>
           </div>
         `;
@@ -477,7 +578,6 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
           zIndexOffset: hasAlarm ? 900 : 50
         });
 
-        // Click on cluster -> Smoothly fly to bounding box to expand/separate cameras
         clusterMarker.on('click', (e) => {
           L.DomEvent.stopPropagation(e);
           const latLngs = cl.cameras.map(c => [c.latitude, c.longitude]);
@@ -499,7 +599,10 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
         clusterMarker.on('popupopen', () => {
           cl.cameras.forEach(c => {
             const btn = document.getElementById(`cluster-stream-btn-${c.id}`);
-            if (btn) btn.onclick = () => onCameraSelect(c);
+            if (btn) btn.onclick = () => {
+              setSelectedDockCamera(c);
+              onCameraSelect(c);
+            };
           });
         });
 
@@ -511,7 +614,7 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
     });
 
     if (leafletMap.current) leafletMap.current.invalidateSize();
-  }, [cameras, incidents, onCameraSelect]);
+  }, [cameras, spatialData, incidents, onCameraSelect]);
 
   // Hook clustering to cameras, incidents, and map zoom/move events
   useEffect(() => {
@@ -526,6 +629,15 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
     };
   }, [renderClusteredMarkers]);
 
+  // Focus and Center Camera on Map
+  const handleFocusCam = (cam) => {
+    if (leafletMap.current && cam && cam.latitude && cam.longitude) {
+      leafletMap.current.flyTo([cam.latitude, cam.longitude], 16, {
+        duration: 0.9,
+        easeLinearity: 0.25
+      });
+    }
+  };
 
   // Render Vehicle Trajectory Route on GIS Map
   useEffect(() => {
@@ -559,9 +671,6 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
 
           // Draw Numbered Waypoint Pins along the Path
           waypoints.forEach((wp) => {
-            const isStart = wp.sequence === 1;
-            const isEnd = wp.sequence === waypoints.length;
-
             const waypointHtml = `
               <div class="cam-pin alarm-active critical" style="width: 32px; height: 32px;" title="Checkpoint #${wp.sequence}: ${wp.camera_name}">
                 <div class="alarm-tight-pulse"></div>
@@ -632,6 +741,14 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
     }
   };
 
+  const handleToggleMapLayer = () => {
+    setMapLayerMode(prev => {
+      if (prev === 'dark') return 'satellite';
+      if (prev === 'satellite') return 'street';
+      return 'dark';
+    });
+  };
+
   return (
     <main className="map-hero-workspace">
       <div id="gis-map" ref={mapRef}></div>
@@ -692,23 +809,44 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
         onDismiss={handleDismissIncident}
       />
 
-      {/* Map Custom Controls */}
+      {/* Police Tactical CCTV Intercept Dock (Slide-out Monitor HUD on Bottom-Right) */}
+      <PoliceTacticalDock
+        camera={selectedDockCamera}
+        onClose={() => setSelectedDockCamera(null)}
+        onOpenFullScreen={(cam) => onCameraSelect(cam)}
+        onFocusMap={handleFocusCam}
+      />
+
+      {/* Map Custom Controls with Police Layer Switcher */}
       <div className="map-controls">
+        <button 
+          onClick={handleToggleMapLayer} 
+          title={`Switch Map Layer (Current: ${mapLayerMode.toUpperCase()} Mode)`}
+          style={{ 
+            color: mapLayerMode === 'satellite' ? '#38bdf8' : mapLayerMode === 'street' ? '#fbbf24' : 'var(--accent)',
+            borderColor: mapLayerMode === 'satellite' ? '#38bdf8' : 'var(--panel-border)'
+          }}
+        >
+          {mapLayerMode === 'satellite' ? <Layers size={17} /> : mapLayerMode === 'street' ? <MapPin size={17} /> : <Eye size={17} />}
+        </button>
         <button onClick={handleZoomIn} title="Zoom in"><Plus size={18} strokeWidth={2.4} /></button>
         <button onClick={handleZoomOut} title="Zoom out"><Minus size={18} strokeWidth={2.4} /></button>
-        <button onClick={handleRecenter} title="Recenter to Gujarat"><Crosshair size={18} strokeWidth={2} /></button>
+        <button onClick={handleRecenter} title="Reset to Gujarat State View"><Crosshair size={18} strokeWidth={2} /></button>
       </div>
 
       {/* Floating Tactical Map Legend */}
       <div className="floating legend-panel">
-        <div className="legend-title">Map Security Matrix</div>
+        <div className="legend-title">
+          <Shield size={12} style={{ color: 'var(--accent)' }} />
+          <span>Security Matrix</span>
+        </div>
         <div className="legend-row">
           <span className="legend-dot alarm-pulse-dot"></span>
-          <b>AI Detection / Alert</b>
+          <b>Real-time AI Threat</b>
         </div>
         <div className="legend-row">
           <span className="legend-dot" style={{ background: 'var(--success)', boxShadow: '0 0 0 3px var(--success-glow)' }}></span>
-          Active Camera
+          Active CCTV Node
         </div>
         <div className="legend-row">
           <span className="legend-dot" style={{ background: 'var(--danger)', boxShadow: '0 0 0 3px var(--danger-glow)' }}></span>

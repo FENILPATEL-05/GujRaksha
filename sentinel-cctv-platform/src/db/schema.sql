@@ -48,12 +48,14 @@ CREATE TABLE IF NOT EXISTS cameras (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexes for high-speed search and filtering
+-- Indexes for high-speed search and filtering on 80,000+ camera nodes
 CREATE INDEX IF NOT EXISTS idx_cameras_dept ON cameras(department_id);
 CREATE INDEX IF NOT EXISTS idx_cameras_district ON cameras(district);
 CREATE INDEX IF NOT EXISTS idx_cameras_status ON cameras(status);
 CREATE INDEX IF NOT EXISTS idx_cameras_detection_mode ON cameras(detection_mode);
 CREATE INDEX IF NOT EXISTS idx_cameras_lat_lng ON cameras(latitude, longitude);
+CREATE INDEX IF NOT EXISTS idx_cameras_dept_dist_status ON cameras(department_id, district, status);
+CREATE INDEX IF NOT EXISTS idx_cameras_created ON cameras(created_at DESC);
 
 -- 3. Watchlist Master Table
 CREATE TABLE IF NOT EXISTS watchlist (
@@ -89,6 +91,9 @@ CREATE TABLE IF NOT EXISTS anpr_detections (
     is_watchlist_hit BOOLEAN DEFAULT FALSE,
     watchlist_category VARCHAR(100),
     watchlist_fir VARCHAR(100),
+    is_read BOOLEAN DEFAULT FALSE,
+    is_dismissed BOOLEAN DEFAULT FALSE,
+    dismissed_at TIMESTAMP WITH TIME ZONE,
     raw_payload JSONB DEFAULT '{}'::jsonb,
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

@@ -105,6 +105,14 @@ class PostgresDatabase extends EventEmitter {
         if (fs.existsSync(schemaPath)) {
           const sql = fs.readFileSync(schemaPath, 'utf8');
           await client.query(sql);
+          
+          // Ensure new notification/alert columns exist
+          await client.query(`
+            ALTER TABLE anpr_detections ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;
+            ALTER TABLE anpr_detections ADD COLUMN IF NOT EXISTS is_dismissed BOOLEAN DEFAULT FALSE;
+            ALTER TABLE anpr_detections ADD COLUMN IF NOT EXISTS dismissed_at TIMESTAMP WITH TIME ZONE;
+          `);
+          
           console.log('⚡ \x1b[36m[PostgreSQL Migrations]\x1b[0m Schema tables & spatial indexes verified [OK]');
         }
       } catch (migrationErr) {

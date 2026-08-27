@@ -41,6 +41,33 @@ router.get("/alerts", authenticateToken, (req, res, next) => {
   }
 });
 
+// PATCH Dismiss specific alert (Marks is_dismissed and is_read in Database)
+router.patch("/alerts/:id/dismiss", authenticateToken, async (req, res, next) => {
+  try {
+    const alertId = req.params.id;
+    const success = await anprStore.dismissAlert(alertId);
+    res.json({
+      success: true,
+      message: success ? "Alert marked as dismissed in database." : "Alert not found or already dismissed."
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST Dismiss all alerts (Marks all active alerts as dismissed in Database)
+router.post("/alerts/dismiss-all", authenticateToken, async (req, res, next) => {
+  try {
+    const count = await anprStore.dismissAllAlerts();
+    res.json({
+      success: true,
+      message: `Dismissed ${count} alerts in database.`
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET live alert stream via Server-Sent Events (SSE)
 router.get("/alerts/live", (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");

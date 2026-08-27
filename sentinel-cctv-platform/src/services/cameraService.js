@@ -1,12 +1,17 @@
 import db from '../db/pool.js';
 
 class CameraService {
-  getCameras(filters) {
+  getCameras(filters = {}) {
     const cameras = db.getAll(filters);
     return {
-      total: cameras.length,
+      total: db.cameras.length,
+      filtered_total: Array.isArray(cameras) ? cameras.length : 0,
       cameras: cameras
     };
+  }
+
+  getSpatialCameras(options = {}) {
+    return db.getSpatialCameras(options);
   }
 
   getCameraById(id) {

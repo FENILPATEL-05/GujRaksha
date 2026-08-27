@@ -120,13 +120,16 @@ class AnprDataStore {
 
   // Returns active real-world alerts for the Radar Panel & Map
   getActiveAlerts() {
-    const hits = this.detections.filter(d => d.is_watchlist_hit);
+    const hits = this.detections.filter(d => d.is_watchlist_hit && !d.is_dismissed);
     return hits.map(d => ({
       id: `alert-${d.id}`,
+      detectionId: d.id,
       type: "ANPR_HOTLIST",
       title: `Watchlist Match — ${d.watchlist_category ? d.watchlist_category.replace("_", " ") : "FLAGGED VEHICLE"}`,
       vehicleNo: d.vehicle_plate,
-      description: `${d.vehicle_plate} (${d.vehicle_type}) · Matched Police Database (${d.watchlist_fir || "Active Watchlist"}) at ${d.speed_kmh} km/h`,
+      vehicle_type: d.vehicle_type,
+      vehicle_color: d.vehicle_color,
+      description: `${d.vehicle_plate} (${d.vehicle_type || 'Vehicle'}) · Matched Police Database (${d.watchlist_fir || "Active Watchlist"}) at ${d.speed_kmh || 45} km/h`,
       severity: d.watchlist_category === "STOLEN_VEHICLE" ? "CRITICAL" : "HIGH",
       cameraId: d.camera_id,
       cameraCode: d.camera_code,
@@ -135,8 +138,67 @@ class AnprDataStore {
       latitude: d.latitude || d.location_lat,
       longitude: d.longitude || d.location_lng,
       createdAt: new Date(d.timestamp).getTime(),
-      timestamp: d.timestamp
+      timestamp: d.timestamp,
+      is_read: !!d.is_read,
+      is_dismissed: !!d.is_dismissed
     }));
+  }
+
+  async dismissAlert(alertId) {
+    if (!alertId) return false;
+    const cleanId = String(alertId).replace(/^alert-/, '');
+    
+    let updatedCount = 0;
+    this.detections.forEach(d => {
+      if (String(d.id) === cleanId || String(d.id) === alertId) {
+        d.is_dismissed = true;
+        d.is_read = true;
+        d.dismissed_at = new Date().toISOString();
+        updatedCount++;
+      }
+    });
+
+    if (updatedCount > 0) {
+      this.saveToFile(this.detections);
+      
+      try {
+        if (pgClient.isConnected()) {
+          await pgClient.query(
+            "UPDATE anpr_detections SET is_read = TRUE, is_dismissed = TRUE, dismissed_at = CURRENT_TIMESTAMP WHERE id = $1",
+            [cleanId]
+          );
+        }
+      } catch (err) {
+        console.warn("⚠️ [AnprStore] Error updating PostgreSQL alert dismissal:", err.message);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  async dismissAllAlerts() {
+    let updatedCount = 0;
+    this.detections.forEach(d => {
+      if (d.is_watchlist_hit && !d.is_dismissed) {
+        d.is_dismissed = true;
+        d.is_read = true;
+        d.dismissed_at = new Date().toISOString();
+        updatedCount++;
+      }
+    });
+
+    this.saveToFile(this.detections);
+
+    try {
+      if (pgClient.isConnected()) {
+        await pgClient.query(
+          "UPDATE anpr_detections SET is_read = TRUE, is_dismissed = TRUE, dismissed_at = CURRENT_TIMESTAMP WHERE is_watchlist_hit = TRUE AND (is_dismissed = FALSE OR is_dismissed IS NULL)"
+        );
+      }
+    } catch (err) {
+      console.warn("⚠️ [AnprStore] Error updating PostgreSQL dismiss-all:", err.message);
+    }
+    return updatedCount;
   }
 
   getTrajectoryForPlate(plateNumber) {

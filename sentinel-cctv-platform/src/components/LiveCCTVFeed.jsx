@@ -295,8 +295,8 @@ export const LiveCCTVFeed = ({
         />
       )}
 
-      {/* Stream Protocol & Status Badge (Top-Left HUD) */}
-      {!streamError && (
+      {/* Stream Protocol & Status Badge (Top-Left HUD - only in detailed modal) */}
+      {isDetailed && !streamError && (
         <div style={{
           position: "absolute",
           top: "8px",

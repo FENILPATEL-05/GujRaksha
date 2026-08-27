@@ -210,9 +210,10 @@ export function AppContent() {
           {/* Floating Top Left Stats Card */}
           <FloatingStatsCard cameras={cameras} />
 
-          {/* Hero Full Map */}
+          {/* Hero Full Map with High-Scale Spatial Viewport & Clustering Engine */}
           <MapView
             cameras={cameras}
+            filters={filters}
             onCameraSelect={(cam) => setSelectedCameraForStream(cam)}
             activeTrackVehicle={activeTrackVehicle}
             onClearTrackVehicle={() => setActiveTrackVehicle(null)}

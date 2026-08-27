@@ -31,6 +31,28 @@ router.get('/sync-list', (req, res, next) => {
   }
 });
 
+// GET Spatial Bounding Box & Zoom Clustering (Optimized for 80,000+ camera assets)
+router.get('/spatial', authenticateToken, (req, res, next) => {
+  try {
+    const options = {
+      bbox: req.query.bbox,
+      zoom: req.query.zoom,
+      department: req.query.department,
+      district: req.query.district,
+      status: req.query.status,
+      search: req.query.search,
+      format: req.query.format
+    };
+    const result = cameraService.getSpatialCameras(options);
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/', authenticateToken, (req, res, next) => {
   try {
     const filters = {
@@ -38,7 +60,12 @@ router.get('/', authenticateToken, (req, res, next) => {
       district: req.query.district,
       status: req.query.status,
       ownership: req.query.ownership,
-      search: req.query.search
+      search: req.query.search,
+      bbox: req.query.bbox,
+      zoom: req.query.zoom,
+      page: req.query.page,
+      limit: req.query.limit,
+      format: req.query.format
     };
     const result = cameraService.getCameras(filters);
     res.json({

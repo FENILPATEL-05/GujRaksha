@@ -27,6 +27,7 @@ import pgClient from './src/db/pgClient.js';
 import pool from './src/db/pool.js';
 import departmentStore from './src/db/departmentStore.js';
 import watchlistStore from './src/db/watchlistStore.js';
+import compression from 'compression';
 import anprStore from './src/db/anprStore.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -34,6 +35,12 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// High-Performance HTTP Response Compression for Large JSON / GIS Datasets
+app.use(compression({
+  threshold: 1024, // compress responses larger than 1KB
+  level: 6
+}));
 
 // Middleware
 app.use(cors());
