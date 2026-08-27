@@ -82,30 +82,51 @@ class CameraDataStore {
     let result = [...this.cameras];
 
     if (filters.department && filters.department !== 'ALL') {
-      result = result.filter(c => (c.department_id || '').toLowerCase() === filters.department.toLowerCase());
+      const dept = filters.department.toLowerCase().trim();
+      result = result.filter(c => {
+        const dId = (c.department_id || '').toLowerCase().trim();
+        const dName = (c.department_name || '').toLowerCase().trim();
+        return dId === dept || 
+               dName === dept ||
+               dId.includes(dept) || 
+               dName.includes(dept) ||
+               (dept === 'home' && (dId.includes('police') || dName.includes('police')));
+      });
     }
 
     if (filters.district && filters.district !== 'ALL') {
-      result = result.filter(c => (c.district || '').toLowerCase() === filters.district.toLowerCase());
+      const targetDistrict = filters.district.toLowerCase().trim();
+      result = result.filter(c => 
+        (c.district || '').toLowerCase().trim() === targetDistrict ||
+        (c.taluka || '').toLowerCase().trim() === targetDistrict
+      );
     }
 
     if (filters.status && filters.status !== 'ALL') {
-      result = result.filter(c => (c.status || '').toLowerCase() === filters.status.toLowerCase());
+      const targetStatus = filters.status.toLowerCase().trim();
+      result = result.filter(c => (c.status || '').toLowerCase().trim() === targetStatus);
     }
 
     if (filters.ownership && filters.ownership !== 'ALL') {
-      result = result.filter(c => (c.ownership_type || '').toLowerCase() === filters.ownership.toLowerCase());
+      const targetOwnership = filters.ownership.toLowerCase().trim();
+      result = result.filter(c => (c.ownership_type || '').toLowerCase().trim() === targetOwnership);
     }
 
     if (filters.search) {
-      const q = filters.search.toLowerCase();
-      result = result.filter(c => 
-        (c.camera_code || '').toLowerCase().includes(q) ||
-        (c.name || '').toLowerCase().includes(q) ||
-        (c.district || '').toLowerCase().includes(q) ||
-        (c.address && c.address.toLowerCase().includes(q)) ||
-        (c.vms_vendor && c.vms_vendor.toLowerCase().includes(q))
-      );
+      const q = filters.search.toLowerCase().trim();
+      if (q) {
+        result = result.filter(c => 
+          (c.camera_code || '').toLowerCase().includes(q) ||
+          (c.name || '').toLowerCase().includes(q) ||
+          (c.district || '').toLowerCase().includes(q) ||
+          (c.taluka && c.taluka.toLowerCase().includes(q)) ||
+          (c.address && c.address.toLowerCase().includes(q)) ||
+          (c.department_name && c.department_name.toLowerCase().includes(q)) ||
+          (c.department_id && c.department_id.toLowerCase().includes(q)) ||
+          (c.vms_vendor && c.vms_vendor.toLowerCase().includes(q)) ||
+          (c.id && c.id.toLowerCase().includes(q))
+        );
+      }
     }
 
     return result;

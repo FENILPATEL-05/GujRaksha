@@ -17,6 +17,11 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
   const [incidents, setIncidents] = useState([]);
   const [trajectoryData, setTrajectoryData] = useState(null);
 
+  const camerasRef = useRef(cameras);
+  useEffect(() => {
+    camerasRef.current = cameras;
+  }, [cameras]);
+
   // Fetch initial real active alerts from database
   const fetchActiveAlerts = useCallback(async () => {
     try {
@@ -26,7 +31,7 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
         const formatted = json.data.map(alert => ({
           ...alert,
           timeAgo: formatTimeAgo(alert.createdAt),
-          camera: cameras.find(c => c.id === alert.cameraId) || {
+          camera: (camerasRef.current || []).find(c => c.id === alert.cameraId) || {
             id: alert.cameraId,
             name: alert.cameraName,
             camera_code: alert.cameraCode,
@@ -40,7 +45,7 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
     } catch (err) {
       console.error('Error fetching real active alerts:', err);
     }
-  }, [cameras]);
+  }, []);
 
   // Connect to Live Server-Sent Events (SSE) Stream for Instant Push Alerts
   useEffect(() => {
@@ -54,7 +59,7 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
         try {
           const data = JSON.parse(event.data);
           if (data && data.type === 'ANPR_HOTLIST') {
-            const cam = cameras.find(c => c.id === data.cameraId) || {
+            const cam = (camerasRef.current || []).find(c => c.id === data.cameraId) || {
               id: data.cameraId,
               name: data.cameraName,
               camera_code: data.cameraCode,
@@ -95,7 +100,7 @@ export const MapView = ({ cameras, onCameraSelect, activeTrackVehicle = null, on
     return () => {
       if (eventSource) eventSource.close();
     };
-  }, [fetchActiveAlerts, cameras]);
+  }, [fetchActiveAlerts]);
 
   // Helper for human-readable relative time
   function formatTimeAgo(timestamp) {

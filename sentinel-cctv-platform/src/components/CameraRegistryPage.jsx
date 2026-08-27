@@ -173,17 +173,26 @@ export const CameraRegistryPage = ({
                       setCurrentPage(1);
                     }}
                   >
-                    <option value="ALL">All Districts</option>
-                    <option value="Gandhinagar">Gandhinagar</option>
-                    <option value="Ahmedabad">Ahmedabad</option>
-                    <option value="Surat">Surat</option>
-                    <option value="Rajkot">Rajkot</option>
-                    <option value="Vadodara">Vadodara</option>
-                    <option value="Junagadh">Junagadh</option>
-                    <option value="Gir Somnath">Gir Somnath</option>
-                    <option value="Navsari">Navsari</option>
-                    <option value="Patan">Patan</option>
-                    <option value="Kutch">Kutch</option>
+                    <option value="ALL">All Districts ({[
+                      'Ahmedabad', 'Amreli', 'Anand', 'Aravalli', 'Banaskantha', 'Bharuch',
+                      'Bhavnagar', 'Botad', 'Chhota Udaipur', 'Dahod', 'Dang', 'Devbhoomi Dwarka',
+                      'Gandhinagar', 'Gir Somnath', 'Jamnagar', 'Junagadh', 'Kheda', 'Kutch',
+                      'Mahisagar', 'Mehsana', 'Morbi', 'Narmada', 'Navsari', 'Panchmahal',
+                      'Patan', 'Porbandar', 'Rajkot', 'Sabarkantha', 'Surat', 'Surendranagar',
+                      'Tapi', 'Vadodara', 'Valsad'
+                    ].length})</option>
+                    {[
+                      'Ahmedabad', 'Amreli', 'Anand', 'Aravalli', 'Banaskantha', 'Bharuch',
+                      'Bhavnagar', 'Botad', 'Chhota Udaipur', 'Dahod', 'Dang', 'Devbhoomi Dwarka',
+                      'Gandhinagar', 'Gir Somnath', 'Jamnagar', 'Junagadh', 'Kheda', 'Kutch',
+                      'Mahisagar', 'Mehsana', 'Morbi', 'Narmada', 'Navsari', 'Panchmahal',
+                      'Patan', 'Porbandar', 'Rajkot', 'Sabarkantha', 'Surat', 'Surendranagar',
+                      'Tapi', 'Vadodara', 'Valsad'
+                    ].map(dist => (
+                      <option key={dist} value={dist}>
+                        {dist}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

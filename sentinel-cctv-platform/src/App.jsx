@@ -64,15 +64,32 @@ export function AppContent() {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  const fetchCameras = useCallback(async () => {
-    const queryParams = new URLSearchParams(filters);
+  const fetchCameras = useCallback(async (signal) => {
+    const params = new URLSearchParams();
+    if (filters.department && filters.department !== 'ALL') params.set('department', filters.department);
+    if (filters.district && filters.district !== 'ALL') params.set('district', filters.district);
+    if (filters.status && filters.status !== 'ALL') params.set('status', filters.status);
+    if (filters.search && filters.search.trim() !== '') params.set('search', filters.search.trim());
+
     try {
-      const res = await fetch(`/api/v1/cameras?${queryParams.toString()}`);
+      const queryStr = params.toString();
+      const url = `/api/v1/cameras${queryStr ? '?' + queryStr : ''}`;
+      const res = await fetch(url, signal ? { signal } : {});
+      if (!res.ok) {
+        throw new Error(`HTTP error ${res.status}`);
+      }
       const json = await res.json();
-      if (json.success) {
-        setCameras(json.data.cameras);
+      if (json && json.success && json.data) {
+        setCameras(json.data.cameras || []);
+      } else if (json && json.error) {
+        console.error('Camera fetch failed with API message:', json.error);
+        addToast(json.error.message || 'Failed to load camera registry dataset.', 'error', 'Fetch Error');
       }
     } catch (err) {
+      if (err.name === 'AbortError') {
+        // Request was aborted by newer filter input, do not show error toast
+        return;
+      }
       console.error('Error fetching cameras:', err);
       addToast('Failed to load camera registry dataset.', 'error', 'Fetch Error');
     }
@@ -83,19 +100,34 @@ export function AppContent() {
       const res = await fetch('/api/v1/departments');
       const json = await res.json();
       if (json.success) {
-        setDepartments(json.data);
+        setDepartments(json.data || []);
       }
     } catch (err) {
       console.error('Error fetching departments:', err);
     }
   }, []);
 
+  // Fetch departments independently on authentication
   useEffect(() => {
     if (isAuthenticated) {
-      fetchCameras();
       fetchDepartments();
     }
-  }, [fetchCameras, fetchDepartments, isAuthenticated]);
+  }, [fetchDepartments, isAuthenticated]);
+
+  // Fetch cameras with debounced search to prevent race conditions and network flooding
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const controller = new AbortController();
+    const delay = filters.search ? 250 : 0;
+    const timer = setTimeout(() => {
+      fetchCameras(controller.signal);
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [fetchCameras, filters, isAuthenticated]);
 
   // Force viewer role to map view only
   useEffect(() => {

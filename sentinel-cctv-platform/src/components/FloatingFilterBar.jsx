@@ -1,7 +1,29 @@
 import React from 'react';
-import { Search, FileSpreadsheet } from 'lucide-react';
+import { Search, FileSpreadsheet, X, RotateCcw } from 'lucide-react';
+
+const GUJARAT_DISTRICTS = [
+  'Ahmedabad', 'Amreli', 'Anand', 'Aravalli', 'Banaskantha', 'Bharuch',
+  'Bhavnagar', 'Botad', 'Chhota Udaipur', 'Dahod', 'Dang', 'Devbhoomi Dwarka',
+  'Gandhinagar', 'Gir Somnath', 'Jamnagar', 'Junagadh', 'Kheda', 'Kutch',
+  'Mahisagar', 'Mehsana', 'Morbi', 'Narmada', 'Navsari', 'Panchmahal',
+  'Patan', 'Porbandar', 'Rajkot', 'Sabarkantha', 'Surat', 'Surendranagar',
+  'Tapi', 'Vadodara', 'Valsad'
+];
 
 export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv, departments = [] }) => {
+  const hasActiveFilters = 
+    (filters.department && filters.department !== 'ALL') ||
+    (filters.district && filters.district !== 'ALL') ||
+    (filters.status && filters.status !== 'ALL') ||
+    (filters.search && filters.search.trim() !== '');
+
+  const handleResetFilters = () => {
+    onFilterChange('department', 'ALL');
+    onFilterChange('district', 'ALL');
+    onFilterChange('status', 'ALL');
+    onFilterChange('search', '');
+  };
+
   return (
     <div className="floating filter-bar">
       <div className="search-box">
@@ -9,10 +31,18 @@ export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv, depart
         <input
           type="text"
           id="mapSearch"
-          placeholder="Search camera name, ID or location…"
+          placeholder="Search camera name, ID, or location…"
           value={filters.search}
           onChange={(e) => onFilterChange('search', e.target.value)}
         />
+        {filters.search && (
+          <X
+            size={14}
+            style={{ cursor: 'pointer', color: 'var(--text-dim)', flexShrink: 0 }}
+            onClick={() => onFilterChange('search', '')}
+            title="Clear Search"
+          />
+        )}
       </div>
 
       <select
@@ -33,17 +63,12 @@ export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv, depart
         value={filters.district}
         onChange={(e) => onFilterChange('district', e.target.value)}
       >
-        <option value="ALL">All Districts</option>
-        <option value="Gandhinagar">Gandhinagar</option>
-        <option value="Ahmedabad">Ahmedabad</option>
-        <option value="Surat">Surat</option>
-        <option value="Rajkot">Rajkot</option>
-        <option value="Vadodara">Vadodara</option>
-        <option value="Junagadh">Junagadh</option>
-        <option value="Gir Somnath">Gir Somnath</option>
-        <option value="Navsari">Navsari</option>
-        <option value="Patan">Patan</option>
-        <option value="Kutch">Kutch</option>
+        <option value="ALL">All Districts ({GUJARAT_DISTRICTS.length})</option>
+        {GUJARAT_DISTRICTS.map((dist) => (
+          <option key={dist} value={dist}>
+            {dist}
+          </option>
+        ))}
       </select>
 
       <select
@@ -56,6 +81,17 @@ export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv, depart
         <option value="MAINTENANCE">Maintenance</option>
         <option value="OFFLINE">Offline</option>
       </select>
+
+      {hasActiveFilters && (
+        <button
+          className="btn btn-sm"
+          onClick={handleResetFilters}
+          title="Reset All Filters"
+          style={{ gap: '4px', color: 'var(--accent)', borderColor: 'rgba(34, 211, 238, 0.3)' }}
+        >
+          <RotateCcw size={12} strokeWidth={2.2} /> Reset
+        </button>
+      )}
 
       <button className="btn btn-sm" onClick={onExportCsv} title="Export CSV Report">
         <FileSpreadsheet size={14} strokeWidth={2} /> CSV
