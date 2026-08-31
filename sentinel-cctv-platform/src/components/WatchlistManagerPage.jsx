@@ -15,6 +15,7 @@ import {
   SlidersHorizontal,
   X
 } from "lucide-react";
+import { Pagination } from "./Pagination";
 
 export const WatchlistManagerPage = ({
   onOpenAddWatchlist,
@@ -317,30 +318,16 @@ export const WatchlistManagerPage = ({
 
       {/* Pagination Footer */}
       {Math.ceil(filteredWatchlist.length / itemsPerPage) > 1 && (
-        <div className="table-pagination-footer" style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--panel-border)", marginTop: "10px" }}>
+        <div className="table-pagination-footer" style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--panel-border)", marginTop: "10px", flexWrap: "wrap", gap: "12px" }}>
           <div style={{ fontSize: "12px", color: "var(--text-dim)" }}>
             Showing {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filteredWatchlist.length)} of {filteredWatchlist.length} targets
           </div>
 
-          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-            <button
-              className="btn btn-sm"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft size={14} /> Previous
-            </button>
-            <span style={{ fontSize: "12px", color: "var(--text-secondary)", fontFamily: "var(--font-mono)", padding: "0 8px" }}>
-              Page {currentPage} of {Math.ceil(filteredWatchlist.length / itemsPerPage)}
-            </span>
-            <button
-              className="btn btn-sm"
-              disabled={currentPage === Math.ceil(filteredWatchlist.length / itemsPerPage)}
-              onClick={() => setCurrentPage((p) => Math.min(Math.ceil(filteredWatchlist.length / itemsPerPage), p + 1))}
-            >
-              Next <ChevronRight size={14} />
-            </button>
-          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={Math.ceil(filteredWatchlist.length / itemsPerPage)}
+            onPageChange={(p) => setCurrentPage(p)}
+          />
         </div>
       )}
     </div>

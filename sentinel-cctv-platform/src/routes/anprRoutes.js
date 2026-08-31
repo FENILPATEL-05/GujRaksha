@@ -68,6 +68,32 @@ router.post("/alerts/dismiss-all", authenticateToken, async (req, res, next) => 
   }
 });
 
+// DELETE Clear all alerts (Permanently removes detection records from Database)
+router.delete("/alerts/clear-all", authenticateToken, async (req, res, next) => {
+  try {
+    await anprStore.clearAllDetections();
+    res.json({
+      success: true,
+      message: "All ANPR alerts & detections cleared from database."
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE Clear all detections
+router.delete("/detections/clear-all", authenticateToken, async (req, res, next) => {
+  try {
+    await anprStore.clearAllDetections();
+    res.json({
+      success: true,
+      message: "All detection records permanently deleted."
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET live alert stream via Server-Sent Events (SSE)
 router.get("/alerts/live", (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
@@ -95,9 +121,9 @@ router.get("/trajectory/:plate", authenticateToken, (req, res, next) => {
 });
 
 // POST Ingestion Endpoint for AI Team Pipeline
-router.post("/ingest", (req, res, next) => {
+router.post("/ingest", async (req, res, next) => {
   try {
-    const detection = anprStore.ingest(req.body);
+    const detection = await anprStore.ingest(req.body);
     res.status(201).json({
       success: true,
       message: detection.is_watchlist_hit
@@ -112,10 +138,10 @@ router.post("/ingest", (req, res, next) => {
 });
 
 // POST Micro-Batch Ingestion Endpoint for High-Throughput Multi-Camera Clusters
-router.post("/ingest-batch", (req, res, next) => {
+router.post("/ingest-batch", async (req, res, next) => {
   try {
     const items = Array.isArray(req.body) ? req.body : (req.body.detections || req.body.items || []);
-    const result = anprStore.ingestBatch(items);
+    const result = await anprStore.ingestBatch(items);
     res.status(201).json({
       success: true,
       message: `⚡ Micro-batch ingestion processed ${result.count} detection event(s).`,

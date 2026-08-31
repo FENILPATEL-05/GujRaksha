@@ -12,8 +12,14 @@ const CAMERAS_FILE = path.join(DATA_DIR, 'cameras.json');
 
 class CameraDataStore {
   constructor() {
+    this.cameras = [];
+    this.cameraMap = new Map();
+    this.spatialGrid = new Map();
+    this.gridResolution = 0.1; // ~10km cell resolution
+
     this.cameras = this.loadFromFile();
-    
+    this.rebuildIndexes();
+
     // Listen for PostgreSQL readiness to sync persisted data
     pgClient.on('ready', () => {
       this.loadFromDatabase();
@@ -21,6 +27,55 @@ class CameraDataStore {
 
     if (pgClient.isConnected()) {
       this.loadFromDatabase();
+    }
+  }
+
+  rebuildIndexes() {
+    this.cameraMap.clear();
+    this.spatialGrid.clear();
+
+    const len = this.cameras.length;
+    for (let i = 0; i < len; i++) {
+      const c = this.cameras[i];
+      if (!c) continue;
+
+      // 1. O(1) ID & Camera Code Map
+      if (c.id) this.cameraMap.set(String(c.id).toLowerCase(), c);
+      if (c.camera_code) this.cameraMap.set(String(c.camera_code).toLowerCase(), c);
+
+      // 2. Pre-computed normalized lowercase fields for zero-allocation instant filtering
+      c._norm_dept = ((c.department_id || '') + ' ' + (c.department_name || '')).toLowerCase();
+      c._norm_dist = ((c.district || '') + ' ' + (c.taluka || '')).toLowerCase();
+      c._norm_status = String(c.status || '').toLowerCase().trim();
+      c._norm_ownership = String(c.ownership_type || '').toLowerCase().trim();
+      c._norm_search = (
+        (c.camera_code || '') + ' ' +
+        (c.name || '') + ' ' +
+        (c.district || '') + ' ' +
+        (c.taluka || '') + ' ' +
+        (c.address || '') + ' ' +
+        (c.department_name || '') + ' ' +
+        (c.department_id || '') + ' ' +
+        (c.vms_vendor || '') + ' ' +
+        (c.id || '')
+      ).toLowerCase();
+
+      // 3. 2D Spatial Grid Bucket Indexing (for 100,000+ camera scale)
+      const lat = typeof c.latitude === 'number' ? c.latitude : parseFloat(c.latitude);
+      const lng = typeof c.longitude === 'number' ? c.longitude : parseFloat(c.longitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        c.latitude = lat;
+        c.longitude = lng;
+        const cellX = Math.floor(lng / this.gridResolution);
+        const cellY = Math.floor(lat / this.gridResolution);
+        const key = `${cellX}_${cellY}`;
+        let bucket = this.spatialGrid.get(key);
+        if (!bucket) {
+          bucket = [];
+          this.spatialGrid.set(key, bucket);
+        }
+        bucket.push(c);
+      }
     }
   }
 
@@ -66,6 +121,7 @@ class CameraDataStore {
             stream_properties: typeof r.stream_properties === 'string' ? JSON.parse(r.stream_properties) : (r.stream_properties || {}),
             urls: typeof r.urls === 'string' ? JSON.parse(r.urls) : (r.urls || {})
           }));
+          this.rebuildIndexes();
           this.saveToFile(this.cameras);
         }
       }
@@ -79,81 +135,107 @@ class CameraDataStore {
   }
 
   getAll(filters = {}) {
-    let result = [...this.cameras];
+    let candidateList = this.cameras;
+    let hasBbox = false;
+    let minLng = 0, minLat = 0, maxLng = 0, maxLat = 0;
 
-    // 1. Spatial Bounding Box Filter (minLng, minLat, maxLng, maxLat)
+    // 1. Spatial Grid Index Retrieval (O(K) lookup instead of scanning 100k records)
     if (filters.bbox) {
       const parts = String(filters.bbox).split(',').map(Number);
       if (parts.length === 4 && parts.every(n => !isNaN(n))) {
-        const [minLng, minLat, maxLng, maxLat] = parts;
-        result = result.filter(c => 
-          c.longitude >= minLng && c.longitude <= maxLng &&
-          c.latitude >= minLat && c.latitude <= maxLat
-        );
+        [minLng, minLat, maxLng, maxLat] = parts;
+        hasBbox = true;
+
+        const minCellX = Math.floor(minLng / this.gridResolution);
+        const maxCellX = Math.floor(maxLng / this.gridResolution);
+        const minCellY = Math.floor(minLat / this.gridResolution);
+        const maxCellY = Math.floor(maxLat / this.gridResolution);
+
+        candidateList = [];
+        for (let x = minCellX; x <= maxCellX; x++) {
+          for (let y = minCellY; y <= maxCellY; y++) {
+            const bucket = this.spatialGrid.get(`${x}_${y}`);
+            if (bucket && bucket.length > 0) {
+              for (let b = 0; b < bucket.length; b++) {
+                candidateList.push(bucket[b]);
+              }
+            }
+          }
+        }
       }
     }
 
-    // 2. Standard Filters
-    if (filters.department && filters.department !== 'ALL') {
-      const dept = filters.department.toLowerCase().trim();
-      result = result.filter(c => {
-        const dId = (c.department_id || '').toLowerCase().trim();
-        const dName = (c.department_name || '').toLowerCase().trim();
-        return dId === dept || 
-               dName === dept ||
-               dId.includes(dept) || 
-               dName.includes(dept) ||
-               (dept === 'home' && (dId.includes('police') || dName.includes('police')));
-      });
-    }
+    // 2. Normalize filter conditions once
+    const hasDept = Boolean(filters.department && filters.department !== 'ALL');
+    const deptQuery = hasDept ? filters.department.toLowerCase().trim() : '';
 
-    if (filters.district && filters.district !== 'ALL') {
-      const targetDistrict = filters.district.toLowerCase().trim();
-      result = result.filter(c => 
-        (c.district || '').toLowerCase().trim() === targetDistrict ||
-        (c.taluka || '').toLowerCase().trim() === targetDistrict
-      );
-    }
+    const hasDist = Boolean(filters.district && filters.district !== 'ALL');
+    const distQuery = hasDist ? filters.district.toLowerCase().trim() : '';
 
-    if (filters.status && filters.status !== 'ALL') {
-      const targetStatus = filters.status.toLowerCase().trim();
-      result = result.filter(c => (c.status || '').toLowerCase().trim() === targetStatus);
-    }
+    const hasStatus = Boolean(filters.status && filters.status !== 'ALL');
+    const statusQuery = hasStatus ? filters.status.toLowerCase().trim() : '';
 
-    if (filters.ownership && filters.ownership !== 'ALL') {
-      const targetOwnership = filters.ownership.toLowerCase().trim();
-      result = result.filter(c => (c.ownership_type || '').toLowerCase().trim() === targetOwnership);
-    }
+    const hasOwnership = Boolean(filters.ownership && filters.ownership !== 'ALL');
+    const ownershipQuery = hasOwnership ? filters.ownership.toLowerCase().trim() : '';
 
-    if (filters.search) {
-      const q = filters.search.toLowerCase().trim();
-      if (q) {
-        result = result.filter(c => 
-          (c.camera_code || '').toLowerCase().includes(q) ||
-          (c.name || '').toLowerCase().includes(q) ||
-          (c.district || '').toLowerCase().includes(q) ||
-          (c.taluka && c.taluka.toLowerCase().includes(q)) ||
-          (c.address && c.address.toLowerCase().includes(q)) ||
-          (c.department_name && c.department_name.toLowerCase().includes(q)) ||
-          (c.department_id && c.department_id.toLowerCase().includes(q)) ||
-          (c.vms_vendor && c.vms_vendor.toLowerCase().includes(q)) ||
-          (c.id && c.id.toLowerCase().includes(q))
-        );
+    const hasSearch = Boolean(filters.search && filters.search.trim() !== '');
+    const searchQuery = hasSearch ? filters.search.toLowerCase().trim() : '';
+
+    // Fast-path: When no filters applied
+    if (!hasBbox && !hasDept && !hasDist && !hasStatus && !hasOwnership && !hasSearch) {
+      if (filters.page && filters.limit) {
+        const page = Math.max(1, parseInt(filters.page, 10) || 1);
+        const limit = Math.max(1, Math.min(5000, parseInt(filters.limit, 10) || 50));
+        const offset = (page - 1) * limit;
+        return this.cameras.slice(offset, offset + limit);
       }
+      return this.cameras;
     }
 
-    // 3. Optional Pagination
+    // 3. Ultra-Fast Single-Pass Loop with Short-Circuiting
+    const result = [];
+    const totalCandidates = candidateList.length;
+
+    for (let i = 0; i < totalCandidates; i++) {
+      const c = candidateList[i];
+      if (!c) continue;
+
+      if (hasBbox && (c.longitude < minLng || c.longitude > maxLng || c.latitude < minLat || c.latitude > maxLat)) {
+        continue;
+      }
+      if (hasDept && !c._norm_dept.includes(deptQuery)) {
+        if (!(deptQuery === 'home' && c._norm_dept.includes('police'))) {
+          continue;
+        }
+      }
+      if (hasDist && !c._norm_dist.includes(distQuery)) {
+        continue;
+      }
+      if (hasStatus && c._norm_status !== statusQuery) {
+        continue;
+      }
+      if (hasOwnership && c._norm_ownership !== ownershipQuery) {
+        continue;
+      }
+      if (hasSearch && !c._norm_search.includes(searchQuery)) {
+        continue;
+      }
+
+      result.push(c);
+    }
+
+    // 4. Optional Pagination
     if (filters.page && filters.limit) {
       const page = Math.max(1, parseInt(filters.page, 10) || 1);
       const limit = Math.max(1, Math.min(5000, parseInt(filters.limit, 10) || 50));
       const offset = (page - 1) * limit;
-      result = result.slice(offset, offset + limit);
+      return result.slice(offset, offset + limit);
     } else if (filters.limit && !isNaN(parseInt(filters.limit, 10))) {
       const limit = Math.max(1, parseInt(filters.limit, 10));
-      result = result.slice(0, limit);
+      return result.slice(0, limit);
     }
 
-    // 4. Lightweight Format Projections
+    // 5. Lightweight Projections
     if (filters.format === 'compact') {
       return result.map(c => [
         c.id,
@@ -197,51 +279,50 @@ class CameraDataStore {
 
     const total = allFiltered.length;
 
-    // Server-side District Aggregation when zoom < 10 and large camera count (> 100)
-    if (zoom < 10 && total > 100) {
+    // 1. Statewide / District Aggregation when zoom < 10 (State / District Overview)
+    if (zoom < 10) {
       const districtMap = new Map();
-      allFiltered.forEach(c => {
+      const count = allFiltered.length;
+
+      for (let i = 0; i < count; i++) {
+        const c = allFiltered[i];
         const distKey = c.district || 'Gujarat';
-        if (!districtMap.has(distKey)) {
-          districtMap.set(distKey, {
-            id: `cluster-${distKey.toLowerCase().replace(/\s+/g, '-')}`,
+        let cluster = districtMap.get(distKey);
+        if (!cluster) {
+          cluster = {
+            id: `dist-${distKey.toLowerCase().replace(/\s+/g, '-')}`,
             district: distKey,
             count: 0,
             activeCount: 0,
             offlineCount: 0,
             sumLat: 0,
-            sumLng: 0,
-            sampleCameras: []
-          });
+            sumLng: 0
+          };
+          districtMap.set(distKey, cluster);
         }
-        const cluster = districtMap.get(distKey);
         cluster.count++;
         if (c.status === 'ACTIVE') cluster.activeCount++;
         else if (c.status === 'OFFLINE') cluster.offlineCount++;
         cluster.sumLat += c.latitude;
         cluster.sumLng += c.longitude;
-        if (cluster.sampleCameras.length < 5) {
-          cluster.sampleCameras.push({
-            id: c.id,
-            camera_code: c.camera_code,
-            name: c.name
-          });
-        }
-      });
+      }
 
-      const clusters = Array.from(districtMap.values()).map(cl => ({
-        id: cl.id,
-        district: cl.district,
-        count: cl.count,
-        active: cl.activeCount,
-        offline: cl.offlineCount,
-        latitude: cl.sumLat / cl.count,
-        longitude: cl.sumLng / cl.count,
-        sample_cameras: cl.sampleCameras
-      }));
+      const clusters = [];
+      for (const cl of districtMap.values()) {
+        clusters.push({
+          id: cl.id,
+          district: cl.district,
+          count: cl.count,
+          active: cl.activeCount,
+          offline: cl.offlineCount,
+          latitude: cl.sumLat / cl.count,
+          longitude: cl.sumLng / cl.count
+        });
+      }
 
       return {
         clustered: true,
+        cluster_level: 'DISTRICT',
         zoom,
         total_cameras: total,
         cluster_count: clusters.length,
@@ -249,22 +330,24 @@ class CameraDataStore {
       };
     }
 
-    // High Zoom (>= 10) or standard dataset: Return lightweight point geometries
-    const points = allFiltered.slice(0, 5000).map(c => ({
-      id: c.id,
-      camera_code: c.camera_code,
-      name: c.name,
-      district: c.district,
-      department_id: c.department_id,
-      department_name: c.department_name,
-      camera_type: c.camera_type,
-      detection_mode: c.detection_mode,
-      status: c.status,
-      latitude: c.latitude,
-      longitude: c.longitude,
-      stream_url: c.stream_url,
-      whep_url: c.whep_url || (c.urls && c.urls.whep)
-    }));
+    // 2. City, Area & Street View (zoom >= 10): Return viewport camera points
+    const maxPoints = Math.min(allFiltered.length, 5000);
+    const points = new Array(maxPoints);
+    for (let i = 0; i < maxPoints; i++) {
+      const c = allFiltered[i];
+      points[i] = {
+        id: c.id,
+        camera_code: c.camera_code,
+        name: c.name,
+        district: c.district,
+        department_id: c.department_id,
+        camera_type: c.camera_type,
+        detection_mode: c.detection_mode,
+        status: c.status,
+        latitude: c.latitude,
+        longitude: c.longitude
+      };
+    }
 
     return {
       clustered: false,
@@ -276,7 +359,9 @@ class CameraDataStore {
   }
 
   getById(id) {
-    return this.cameras.find(c => c.id === id || c.camera_code === id);
+    if (!id) return null;
+    const key = String(id).toLowerCase().trim();
+    return this.cameraMap.get(key) || this.cameras.find(c => c.id === id || c.camera_code === id);
   }
 
   getNextCameraIdentifiers() {
@@ -424,6 +509,7 @@ class CameraDataStore {
     } else {
       this.cameras.push(newCamera);
     }
+    this.rebuildIndexes();
     this.saveToFile();
 
     // Direct Database Persistence (PostgreSQL)
@@ -520,6 +606,7 @@ class CameraDataStore {
     };
 
     this.cameras[idx] = updated;
+    this.rebuildIndexes();
     this.saveToFile();
 
     // Direct Database Persistence (PostgreSQL)
@@ -559,6 +646,7 @@ class CameraDataStore {
     let removed = null;
     if (idx !== -1) {
       removed = this.cameras.splice(idx, 1)[0];
+      this.rebuildIndexes();
       this.saveToFile();
     }
 
@@ -568,6 +656,7 @@ class CameraDataStore {
         const res = await pgClient.query('DELETE FROM cameras WHERE id = $1 OR camera_code = $1 RETURNING *', [id]);
         if (!removed && res && res.rows && res.rows.length > 0) {
           removed = res.rows[0];
+          this.rebuildIndexes();
           this.saveToFile();
         }
       } catch (err) {

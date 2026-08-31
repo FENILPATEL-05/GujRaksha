@@ -53,7 +53,7 @@ router.post('/register', (req, res, next) => {
 });
 
 // POST Batch Telemetry Sync from District Edge Node
-router.post('/sync', (req, res, next) => {
+router.post('/sync', async (req, res, next) => {
   try {
     const { node_id, district, detections, telemetry } = req.body;
     if (node_id && registeredEdgeNodes.has(node_id)) {
@@ -66,7 +66,7 @@ router.post('/sync', (req, res, next) => {
     }
 
     const items = Array.isArray(detections) ? detections : [];
-    const result = anprStore.ingestBatch(items);
+    const result = await anprStore.ingestBatch(items);
 
     res.status(200).json({
       success: true,

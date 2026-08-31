@@ -17,6 +17,7 @@ import {
   SlidersHorizontal,
   X
 } from "lucide-react";
+import { Pagination } from "./Pagination";
 
 export const DepartmentDirectoryPage = ({
   departments = [],
@@ -347,30 +348,16 @@ export const DepartmentDirectoryPage = ({
 
       {/* Pagination Footer */}
       {totalPages > 1 && (
-        <div className="table-pagination-footer" style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--panel-border)" }}>
+        <div className="table-pagination-footer" style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--panel-border)", flexWrap: "wrap", gap: "12px" }}>
           <div style={{ fontSize: "12px", color: "var(--text-dim)" }}>
             Showing {startIndex + 1}–{Math.min(startIndex + itemsPerPage, filteredDepartments.length)} of {filteredDepartments.length} departments
           </div>
 
-          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-            <button
-              className="btn btn-sm"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft size={14} /> Previous
-            </button>
-            <span style={{ fontSize: "12px", color: "var(--text-secondary)", fontFamily: "var(--font-mono)", padding: "0 8px" }}>
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              className="btn btn-sm"
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            >
-              Next <ChevronRight size={14} />
-            </button>
-          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(p) => setCurrentPage(p)}
+          />
         </div>
       )}
     </div>

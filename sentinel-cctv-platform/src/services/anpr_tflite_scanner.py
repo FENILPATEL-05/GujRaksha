@@ -19,6 +19,10 @@ import re
 import urllib.request
 import json
 import threading
+try:
+    threading.stack_size(262144)  # 256 KB stack per thread (prevents memory exhaustion)
+except Exception:
+    pass
 
 # Suppress noisy OpenCV / FFMPEG probing logs and force RTSP over TCP
 os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
@@ -593,9 +597,10 @@ class AsyncBatchIngestBuffer:
             return
         items_to_send = list(self.buffer)
         self.buffer.clear()
-
-        # Send micro-batch in background thread
-        threading.Thread(target=self._send_batch, args=(items_to_send,), daemon=True).start()
+        try:
+            self._send_batch(items_to_send)
+        except Exception:
+            pass
 
     def _send_batch(self, items: list):
         payload = json.dumps(items).encode("utf-8")
@@ -833,33 +838,117 @@ class CameraWorkerThread(threading.Thread):
 
 class DynamicCameraManager:
     """Continuously monitors CCTV registry and auto-attaches workers to cameras with ANPR enabled."""
-    def __init__(self, api_url: str, det_model: str, ocr_model: str, threads: int, conf: float, iou: float, backend: str = "auto", frame_stride: int = 3, motion_gate: bool = False):
+    def __init__(self, api_url: str, det_model: str, ocr_model: str, threads: int, conf: float, iou: float, backend: str = "auto", frame_stride: int = 3, motion_gate: bool = False, max_workers: int = 16, partition_index: int = 0, partition_total: int = 1, district: str = None, worker_id: str = None):
         self.api_url = api_url
         self.detector, self.ocr, self.accel_mode = create_anpr_pipeline(backend, det_model, ocr_model, num_threads=threads)
         self.conf = conf
         self.iou = iou
         self.frame_stride = frame_stride
         self.motion_gate = motion_gate
+        self.max_workers = max(1, max_workers)
+        self.partition_index = max(0, partition_index)
+        self.partition_total = max(1, partition_total)
+        self.district = district
+        self.worker_id = worker_id
         self.workers = {}  # camera_code -> CameraWorkerThread
         self.running = True
         self.initial_synced = False
 
+        if self.worker_id:
+            self.register_with_central()
+
+    def register_with_central(self):
+        """Registers this worker node with Central GujRaksha Orchestrator."""
+        try:
+            import socket
+            hostname = socket.gethostname()
+            reg_url = f"{self.api_url}/workers/register"
+            payload = {
+                "worker_id": self.worker_id,
+                "hostname": hostname,
+                "district": self.district or "All",
+                "max_capacity": self.max_workers,
+                "hardware": self.accel_mode
+            }
+            res = requests.post(reg_url, json=payload, timeout=3.0)
+            if res.ok:
+                data = res.json().get("data", {})
+                print(f"📡 [Central Orchestrator] Worker \x1b[36m{self.worker_id}\x1b[0m successfully registered with Central CCC! (Assigned: {len(data.get('assigned_cameras', []))} cameras)", flush=True)
+            else:
+                print(f"⚠️ [Central Orchestrator] Registration response status: {res.status_code}", flush=True)
+        except Exception as e:
+            print(f"⚠️ [Central Orchestrator] Central registration error: {e}", flush=True)
+
+    def heartbeat_central(self):
+        """Sends heartbeat telemetry and fetches dynamically assigned cameras from Central."""
+        if not self.worker_id:
+            return None
+        try:
+            hb_url = f"{self.api_url}/workers/heartbeat"
+            payload = {
+                "worker_id": self.worker_id,
+                "stats": {
+                    "active_streams": len(self.workers),
+                    "max_capacity": self.max_workers
+                }
+            }
+            res = requests.post(hb_url, json=payload, timeout=3.0)
+            if res.ok:
+                return res.json().get("assigned_cameras", [])
+        except Exception:
+            pass
+        return None
+
     def sync_cameras(self):
-        cameras = fetch_all_cameras(self.api_url)
         current_anpr_codes = set()
 
-        for cam in cameras:
-            # Match camera if detection_mode is ANPR or features contain ANPR
-            mode = str(cam.get("detection_mode", "")).upper()
-            features = [str(f).upper() for f in cam.get("features", [])]
-            is_anpr = ("ANPR" in mode) or ("ANPR" in features) or ("PLATE" in mode) or (cam.get("is_active") and not mode)
+        # If running in Central Orchestrator mode, fetch directly assigned cameras from Central
+        if self.worker_id:
+            assigned = self.heartbeat_central()
+            if assigned is not None:
+                candidate_cameras = assigned
+            else:
+                candidate_cameras = []
+        else:
+            # Standalone / Legacy Partition Mode
+            cameras = fetch_all_cameras(self.api_url)
 
-            if is_anpr:
-                code = cam.get("camera_code") or cam.get("code") or f"CAM-{cam.get('id')}"
-                current_anpr_codes.add(code)
-                rtsp = cam.get("rtsp_url") or cam.get("stream_url") or cam.get("url") or "0"
+            # 0. District Filter (if specified)
+            if self.district:
+                cameras = [c for c in cameras if str(c.get("district", "")).lower() == self.district.lower()]
 
-                if code not in self.workers or not self.workers[code].is_alive():
+            # 1. Filter candidate cameras
+            candidate_cameras = []
+            for cam in cameras:
+                mode = str(cam.get("detection_mode", "")).upper()
+                features = [str(f).upper() for f in cam.get("features", [])]
+                is_anpr = ("ANPR" in mode) or ("ANPR" in features) or ("PLATE" in mode)
+                if is_anpr:
+                    candidate_cameras.append(cam)
+
+            # If no explicit ANPR mode found, fall back to active cameras
+            if not candidate_cameras and cameras:
+                active_cams = [c for c in cameras if c.get("is_active")]
+                candidate_cameras = active_cams if active_cams else cameras
+
+            # 2. Distributed Partition Sharding (Shard across worker nodes)
+            if self.partition_total > 1:
+                candidate_cameras = [
+                    cam for i, cam in enumerate(candidate_cameras)
+                    if (i % self.partition_total) == self.partition_index
+                ]
+
+        # Attach workers up to max_workers limit
+        for cam in candidate_cameras:
+            code = cam.get("camera_code") or cam.get("code") or f"CAM-{cam.get('id')}"
+            current_anpr_codes.add(code)
+            rtsp = cam.get("rtsp_url") or cam.get("stream_url") or cam.get("url") or "0"
+
+            if code not in self.workers or not self.workers[code].is_alive():
+                if len(self.workers) >= self.max_workers:
+                    break
+
+                try:
                     worker = CameraWorkerThread(
                         {"id": cam.get("id"), "camera_code": code, "rtsp_url": rtsp},
                         self.detector, self.ocr, self.api_url, self.conf, self.iou,
@@ -869,19 +958,24 @@ class DynamicCameraManager:
                     self.workers[code] = worker
                     if self.initial_synced:
                         print(f"⚡ [Auto-Discovery] Attached real-time AI worker to ANPR camera: \x1b[36m{code}\x1b[0m ({cam.get('name')})", flush=True)
+                except (RuntimeError, threading.ThreadError, Exception) as e:
+                    print(f"⚠️ [Dynamic Camera Manager] Could not attach worker to {code}: {e}", flush=True)
+                    break
 
         if not self.initial_synced:
             self.initial_synced = True
             opt_info = f"1/{self.frame_stride} Frame Stride" + (" + Motion Gate" if self.motion_gate else "")
+            mode_tag = f"Managed Node: {self.worker_id}" if self.worker_id else (f"Partition {self.partition_index+1}/{self.partition_total}" if self.partition_total > 1 else "Standalone")
+            district_info = f" | District: {self.district}" if self.district else ""
             if len(self.workers) > 0:
-                print(f"🚀 [Dynamic Camera Manager] Initialized {len(self.workers)} ANPR camera worker(s) in parallel ({self.accel_mode} | {opt_info}). Standing by for active feeds...", flush=True)
+                print(f"🚀 [Dynamic Camera Manager] Initialized {len(self.workers)} ANPR camera worker(s) [{mode_tag}{district_info}] (Max cap: {self.max_workers} | {self.accel_mode} | {opt_info}). Standing by for active feeds...", flush=True)
             else:
-                print(f"🚀 [Dynamic Camera Manager] Auto-discovery active ({self.accel_mode} | {opt_info}). Standing by for cameras with 'ANPR Detection' enabled in registry...", flush=True)
+                print(f"🚀 [Dynamic Camera Manager] Standing by for assigned cameras from Central Orchestrator [{mode_tag}{district_info}] (Max cap: {self.max_workers} | {self.accel_mode} | {opt_info})...", flush=True)
 
-        # Detach workers from cameras that were deleted or whose detection_mode was changed away from ANPR
+        # Detach workers from cameras that were removed or revoked by Central
         for code in list(self.workers.keys()):
             if code not in current_anpr_codes:
-                print(f"⏹️ [Dynamic Camera Manager] Detaching AI worker from camera \x1b[36m{code}\x1b[0m (ANPR disabled)", flush=True)
+                print(f"⏹️ [Dynamic Camera Manager] Detaching AI worker from camera \x1b[36m{code}\x1b[0m (Unassigned by Central)", flush=True)
                 self.workers[code].stop()
                 del self.workers[code]
 
@@ -905,6 +999,11 @@ def main():
     parser = argparse.ArgumentParser(description="GujRaksha High-Scale Adaptive ANPR AI Scanner (ONNX GPU + TFLite CPU)")
     parser.add_argument("--source", default="0", help="Webcam index, RTSP stream URL, or image file path")
     parser.add_argument("--all-cameras", action="store_true", help="Scan all registered cameras dynamically in parallel")
+    parser.add_argument("--worker-id", default=None, help="Managed Worker Node ID (e.g. 'node-1', 'node-2'). Central CCC will auto-manage camera assignments.")
+    parser.add_argument("--max-workers", type=int, default=16, help="Maximum concurrent camera stream worker threads (default: 16)")
+    parser.add_argument("--partition-index", type=int, default=0, help="Zero-based worker node partition index (e.g. 0 to 23)")
+    parser.add_argument("--partition-total", type=int, default=1, help="Total number of distributed worker nodes (e.g. 24)")
+    parser.add_argument("--district", default=None, help="Filter cameras by district name (e.g. 'Ahmedabad', 'Surat')")
     parser.add_argument("--camera-code", default="GJ-GOV-001", help="Associated CCTV Camera Code")
     parser.add_argument("--camera-id", default="gov-feed-1", help="Associated CCTV Camera ID")
     parser.add_argument("--api-url", default="http://localhost:3000/api/v1", help="GujRaksha Express API base URL")
@@ -922,10 +1021,12 @@ def main():
     print(" 🚔 GujRaksha High-Scale Adaptive AI ANPR Engine (ONNX GPU / TFLite CPU)")
     print("=================================================================")
 
-    if args.all_cameras:
+    if args.all_cameras or args.worker_id:
         manager = DynamicCameraManager(
             args.api_url, args.det_model, args.ocr_model, args.threads, args.conf, args.iou, backend=args.backend,
-            frame_stride=args.frame_stride, motion_gate=args.motion_gate
+            frame_stride=args.frame_stride, motion_gate=args.motion_gate, max_workers=args.max_workers,
+            partition_index=args.partition_index, partition_total=args.partition_total, district=args.district,
+            worker_id=args.worker_id
         )
         manager.start()
         return

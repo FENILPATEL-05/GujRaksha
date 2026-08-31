@@ -12,8 +12,10 @@ import {
   ChevronRight,
   Plus,
   SlidersHorizontal,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
+import { Pagination } from './Pagination';
 
 export const CameraRegistryPage = ({
   cameras,
@@ -24,7 +26,8 @@ export const CameraRegistryPage = ({
   onDeleteCamera,
   onExportCsv,
   onAddCamera,
-  departments = []
+  departments = [],
+  isLoading = false
 }) => {
   const [expandedCameraId, setExpandedCameraId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -72,10 +75,14 @@ export const CameraRegistryPage = ({
         {/* Left Side: Search & Popover Filter Button */}
         <div className="toolbar-filters-group">
           <div className="search-box">
-            <Search size={14} strokeWidth={2.2} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+            {isLoading ? (
+              <Loader2 size={14} strokeWidth={2.5} className="animate-spin" style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            ) : (
+              <Search size={14} strokeWidth={2.2} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+            )}
             <input
               type="text"
-              placeholder="Search ID, Location, District, VMS..."
+              placeholder={isLoading ? "Searching statewide cameras..." : "Search ID, Location, District, VMS..."}
               value={filters.search}
               onChange={(e) => {
                 onFilterChange('search', e.target.value);
@@ -451,34 +458,11 @@ export const CameraRegistryPage = ({
         </div>
 
         {totalPages > 1 && (
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <button
-              className="btn btn-sm"
-              disabled={currentPage === 1}
-              onClick={() => handlePageChange(currentPage - 1)}
-            >
-              <ChevronLeft size={14} strokeWidth={2} /> Prev
-            </button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-              <button
-                key={page}
-                className={`btn btn-sm ${currentPage === page ? 'btn-primary' : ''}`}
-                style={{ minWidth: '32px' }}
-                onClick={() => handlePageChange(page)}
-              >
-                {page}
-              </button>
-            ))}
-
-            <button
-              className="btn btn-sm"
-              disabled={currentPage === totalPages}
-              onClick={() => handlePageChange(currentPage + 1)}
-            >
-              Next <ChevronRight size={14} strokeWidth={2} />
-            </button>
-          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
         )}
       </div>
     </div>

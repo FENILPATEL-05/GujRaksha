@@ -16,14 +16,19 @@ export const IncidentRadarPanel = ({
   incidents = [],
   onLocate,
   onOpenStream,
-  onDismiss
+  onDismiss,
+  onDismissAll
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const activeCount = incidents.length;
 
   const handleDismissAll = () => {
-    incidents.forEach(inc => onDismiss(inc.id));
+    if (typeof onDismissAll === 'function') {
+      onDismissAll();
+    } else {
+      incidents.forEach(inc => onDismiss(inc.id));
+    }
   };
 
   return (

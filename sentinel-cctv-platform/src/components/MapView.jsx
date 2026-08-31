@@ -5,6 +5,42 @@ import { IncidentRadarPanel } from './IncidentRadarPanel';
 import { PoliceTacticalDock } from './PoliceTacticalDock';
 import { Plus, Minus, Crosshair, Radio, ShieldAlert, Layers, Eye, MapPin, Shield } from 'lucide-react';
 
+const GUJARAT_DISTRICT_COORDS = {
+  'Ahmedabad': [23.0225, 72.5714],
+  'Surat': [21.1702, 72.8311],
+  'Vadodara': [22.3072, 73.1812],
+  'Rajkot': [22.3039, 70.8022],
+  'Gandhinagar': [23.2156, 72.6369],
+  'Bhavnagar': [21.7645, 72.1519],
+  'Jamnagar': [22.4707, 70.0577],
+  'Junagadh': [21.5222, 70.4579],
+  'Kutch': [23.242, 69.6669],
+  'Bharuch': [21.7051, 72.9959],
+  'Navsari': [20.9467, 72.952],
+  'Valsad': [20.5992, 72.9342],
+  'Anand': [22.5645, 72.9289],
+  'Kheda': [22.7533, 72.6844],
+  'Mehsana': [23.588, 72.3693],
+  'Banaskantha': [24.1724, 72.4346],
+  'Sabarkantha': [23.5977, 73.0645],
+  'Aravalli': [23.4608, 73.3235],
+  'Patan': [23.8493, 72.1266],
+  'Surendranagar': [22.7275, 71.6375],
+  'Morbi': [22.812, 70.8385],
+  'Porbandar': [21.6417, 69.6293],
+  'Devbhoomi Dwarka': [22.2442, 68.9685],
+  'Gir Somnath': [20.9042, 70.3667],
+  'Amreli': [21.6032, 71.2221],
+  'Botad': [22.1704, 71.6664],
+  'Panchmahal': [22.7756, 73.6149],
+  'Dahod': [22.8398, 74.2546],
+  'Mahisagar': [23.1432, 73.6166],
+  'Narmada': [21.8711, 73.5042],
+  'Chhota Udaipur': [22.3081, 74.0125],
+  'Tapi': [21.2562, 73.3986],
+  'Dang': [20.7533, 73.7027]
+};
+
 export const MapView = ({ 
   cameras, 
   filters = {}, 
@@ -24,6 +60,7 @@ export const MapView = ({
   const [incidents, setIncidents] = useState([]);
   const [trajectoryData, setTrajectoryData] = useState(null);
   const [spatialData, setSpatialData] = useState(null);
+  const [isSpatialLoading, setIsSpatialLoading] = useState(false);
   const spatialAbortRef = useRef(null);
 
   // Police Command HUD & Tactical Dock State
@@ -179,6 +216,18 @@ export const MapView = ({
     }
   };
 
+  // Dismiss / Clear All Incidents in Database (Atomic Operation)
+  const handleDismissAllIncidents = async () => {
+    setIncidents([]);
+    try {
+      await fetch('/api/v1/anpr/alerts/dismiss-all', {
+        method: 'POST'
+      });
+    } catch (err) {
+      console.error('Error updating dismiss-all in database:', err);
+    }
+  };
+
   // Initialize Map
   useEffect(() => {
     if (!leafletMap.current && mapRef.current) {
@@ -191,6 +240,7 @@ export const MapView = ({
         center: [22.35, 70.6],
         zoom: 7,
         minZoom: 6,
+        maxZoom: 20,
         maxBounds: mapBounds,
         maxBoundsViscosity: 0.9,
         zoomControl: false
@@ -209,26 +259,31 @@ export const MapView = ({
     let tileUrl;
     let tileAttribution = '&copy; Gujarat Police Netram GIS CCC';
     let tileSubdomains = 'abcd';
+    let maxNativeZoom = 16;
 
     if (mapLayerMode === 'satellite') {
       tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
       tileAttribution += ' &copy; Esri World Imagery';
       tileSubdomains = '';
+      maxNativeZoom = 18;
     } else if (mapLayerMode === 'street') {
       tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
       tileAttribution += ' &copy; OpenStreetMap';
       tileSubdomains = 'abc';
+      maxNativeZoom = 19;
     } else {
       // Default: High-tech Police Night Ops Dark Mode
       tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
       tileAttribution += ' &copy; Esri Dark Canvas';
       tileSubdomains = '';
+      maxNativeZoom = 16;
     }
 
     tileLayerRef.current = L.tileLayer(tileUrl, {
       attribution: tileAttribution,
       subdomains: tileSubdomains || 'abcd',
-      maxZoom: 19
+      maxZoom: 20,
+      maxNativeZoom: maxNativeZoom
     }).addTo(leafletMap.current);
 
     setTimeout(() => {
@@ -383,6 +438,7 @@ export const MapView = ({
     }
     spatialAbortRef.current = new AbortController();
 
+    setIsSpatialLoading(true);
     try {
       const res = await fetch(`/api/v1/cameras/spatial?${params.toString()}`, {
         signal: spatialAbortRef.current.signal
@@ -397,6 +453,8 @@ export const MapView = ({
       if (err.name !== 'AbortError') {
         // silent fallback to prop cameras
       }
+    } finally {
+      setIsSpatialLoading(false);
     }
   }, [filters]);
 
@@ -419,6 +477,30 @@ export const MapView = ({
     };
   }, [fetchSpatialCameras]);
 
+  // Smooth Auto-Focus Pan when user selects a specific district filter
+  useEffect(() => {
+    if (!leafletMap.current) return;
+    if (filters.district && filters.district !== 'ALL') {
+      const coords = GUJARAT_DISTRICT_COORDS[filters.district];
+      if (coords) {
+        leafletMap.current.flyTo(coords, 12, { duration: 0.9 });
+      }
+    } else if (filters.district === 'ALL' && filters.department === 'ALL' && (!filters.search || filters.search.trim() === '')) {
+      // Zoom out to statewide view
+      if (leafletMap.current.getZoom() > 8) {
+        leafletMap.current.flyTo([22.35, 70.6], 7, { duration: 0.9 });
+      }
+    }
+  }, [filters.district]);
+
+  // Helper for human-readable cluster camera count badges
+  const formatClusterCount = (num) => {
+    if (!num) return '0';
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(num >= 10000 ? 0 : 1) + 'k';
+    return String(num);
+  };
+
   // Render Clustered / Individual Markers on Map (Ultra-Fast O(N) Spatial Grid Clustering for 80,000+ scale)
   const renderClusteredMarkers = useCallback(() => {
     if (!leafletMap.current || !markersLayer.current) return;
@@ -428,17 +510,25 @@ export const MapView = ({
 
     const zoom = map.getZoom();
 
-    // 1. Server-side Clustered Mode (when zoom < 10 and server returns district cluster aggregations)
+    // 1. Statewide District Hubs (when zoom < 10)
     if (spatialData && spatialData.clustered && Array.isArray(spatialData.clusters) && spatialData.clusters.length > 0) {
       spatialData.clusters.forEach(cl => {
         const count = cl.count;
-        const sizeClass = count >= 100 ? 'large' : count >= 20 ? 'medium' : 'small';
-        const sizePx = count >= 100 ? 54 : count >= 20 ? 46 : 40;
+        const sizeClass = count >= 500 ? 'large' : count >= 50 ? 'medium' : 'small';
+        const sizePx = count >= 500 ? 54 : count >= 50 ? 46 : 40;
+
         const clusterHtml = `
-          <div class="cctv-cluster-pin ${sizeClass}" title="${count} Cameras in ${cl.district} · Click to Zoom & Explore">
+          <div class="cctv-cluster-pin ${sizeClass}" title="${count} Cameras in ${cl.district} · Click to Zoom in & Explore">
             <div class="cluster-halo"></div>
             <div class="cluster-core">
-              <span class="cluster-num">${count}</span>
+              <svg width="${sizePx >= 50 ? 22 : 18}" height="${sizePx >= 50 ? 22 : 18}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cluster-multi-cam-svg">
+                <!-- Back Camera -->
+                <rect x="7" y="3" width="11" height="9" rx="2" stroke="currentColor" opacity="0.65" fill="rgba(255,255,255,0.18)"/>
+                <path d="m18 5.5 4-2.5v6l-4-2.5" stroke="currentColor" opacity="0.65" fill="rgba(255,255,255,0.25)"/>
+                <!-- Front Camera -->
+                <rect x="2" y="9" width="12" height="10" rx="2" fill="#091322" stroke="currentColor" stroke-width="2.2"/>
+                <path d="m14 11.5 5-3v7l-5-3" fill="currentColor"/>
+              </svg>
               <span class="cluster-tag-sub">${cl.district}</span>
             </div>
           </div>
@@ -453,7 +543,7 @@ export const MapView = ({
 
         const clusterMarker = L.marker([cl.latitude, cl.longitude], { icon, zIndexOffset: 50 });
         clusterMarker.on('click', () => {
-          map.flyTo([cl.latitude, cl.longitude], Math.min(13, zoom + 3), { duration: 0.9 });
+          map.flyTo([cl.latitude, cl.longitude], 12, { duration: 0.85, easeLinearity: 0.25 });
         });
         markersLayer.current.addLayer(clusterMarker);
       });
@@ -462,42 +552,63 @@ export const MapView = ({
       return;
     }
 
-    // 2. Individual Nodes / Local Spatial Grid Mode
-    const activeCameras = (spatialData && Array.isArray(spatialData.cameras)) ? spatialData.cameras : cameras;
-    const mapBounds = map.getBounds().pad(0.15);
-    const clusterRadiusPx = zoom >= 16 ? 16 : zoom >= 13 ? 42 : zoom >= 10 ? 56 : 68;
+    // 2. Adaptive Viewport Clustering with STRICT MAX 100 MARKERS LIMIT
+    const activeCameras = (spatialData && Array.isArray(spatialData.cameras)) ? spatialData.cameras : (zoom >= 10 ? cameras : []);
+    const mapBounds = map.getBounds().pad(0.08);
 
-    const grid = new Map();
-
-    activeCameras.forEach(cam => {
-      if (!cam.latitude || !cam.longitude) return;
-      if (!mapBounds.contains([cam.latitude, cam.longitude])) return;
-
-      const pt = map.latLngToLayerPoint([cam.latitude, cam.longitude]);
-      const cellX = Math.floor(pt.x / clusterRadiusPx);
-      const cellY = Math.floor(pt.y / clusterRadiusPx);
-      const cellKey = `${cellX}_${cellY}`;
-
-      if (grid.has(cellKey)) {
-        const cl = grid.get(cellKey);
-        cl.cameras.push(cam);
-        const n = cl.cameras.length;
-        cl.centerLat = (cl.centerLat * (n - 1) + cam.latitude) / n;
-        cl.centerLng = (cl.centerLng * (n - 1) + cam.longitude) / n;
-      } else {
-        grid.set(cellKey, {
-          centerLat: cam.latitude,
-          centerLng: cam.longitude,
-          cameras: [cam]
-        });
+    const visibleCameras = [];
+    for (let i = 0; i < activeCameras.length; i++) {
+      const cam = activeCameras[i];
+      if (cam.latitude && cam.longitude && mapBounds.contains([cam.latitude, cam.longitude])) {
+        visibleCameras.push(cam);
       }
-    });
+    }
 
-    const clusters = Array.from(grid.values());
+    // Base initial clustering radius by zoom
+    let clusterRadiusPx = zoom >= 17 ? 4 : zoom === 16 ? 10 : zoom === 15 ? 18 : zoom === 14 ? 30 : zoom === 13 ? 45 : zoom === 12 ? 65 : zoom === 11 ? 90 : 120;
+
+    // Dynamically expand cluster radius if total marker count would exceed MAX_VIEW_LIMIT (100)
+    const MAX_VIEW_LIMIT = 100;
+    let clusters = [];
+    let attempts = 0;
+
+    while (attempts < 12) {
+      const grid = new Map();
+      for (let i = 0; i < visibleCameras.length; i++) {
+        const cam = visibleCameras[i];
+        const pt = map.latLngToLayerPoint([cam.latitude, cam.longitude]);
+        const cellX = Math.floor(pt.x / clusterRadiusPx);
+        const cellY = Math.floor(pt.y / clusterRadiusPx);
+        const cellKey = `${cellX}_${cellY}`;
+
+        const existing = grid.get(cellKey);
+        if (existing) {
+          existing.cameras.push(cam);
+          const n = existing.cameras.length;
+          existing.centerLat = (existing.centerLat * (n - 1) + cam.latitude) / n;
+          existing.centerLng = (existing.centerLng * (n - 1) + cam.longitude) / n;
+        } else {
+          grid.set(cellKey, {
+            centerLat: cam.latitude,
+            centerLng: cam.longitude,
+            cameras: [cam]
+          });
+        }
+      }
+
+      clusters = Array.from(grid.values());
+      if (clusters.length <= MAX_VIEW_LIMIT || visibleCameras.length <= MAX_VIEW_LIMIT) {
+        break;
+      }
+
+      // If over 100 markers, increase radius proportionally to fuse nearby cameras into groups
+      clusterRadiusPx = Math.ceil(clusterRadiusPx * 1.3);
+      attempts++;
+    }
 
     clusters.forEach(cl => {
       if (cl.cameras.length === 1) {
-        // Individual Numbered Camera Marker (e.g. 1, 2, 3, 4...)
+        // Individual Camera Pin (Single Camera displayed directly when separated)
         const cam = cl.cameras[0];
         const activeThreat = incidents.find(inc => inc.cameraId === cam.id);
         const isAlarmActive = !!activeThreat;
@@ -513,7 +624,7 @@ export const MapView = ({
             <div class="cam-pin cam-badge-pin alarm-active ${severityClass}" title="${cam.name} (${cam.camera_code || cam.id}) · 🚨 Real-Time Threat Active">
               <div class="alarm-tight-pulse"></div>
               <div class="cam-badge-core alarm-core">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
               </div>
               <div class="alarm-pip"></div>
             </div>
@@ -523,7 +634,7 @@ export const MapView = ({
             <div class="cam-pin cam-badge-pin ${statusClass}" title="${cam.name} (${cam.camera_code || cam.id})">
               <div class="ring"></div>
               <div class="cam-badge-core">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
               </div>
             </div>
           `;
@@ -532,8 +643,8 @@ export const MapView = ({
         const customIcon = L.divIcon({
           html: markerHtml,
           className: `custom-leaflet-marker ${isAlarmActive ? 'has-alarm' : ''}`,
-          iconSize: [38, 38],
-          iconAnchor: [19, 19]
+          iconSize: [36, 36],
+          iconAnchor: [18, 18]
         });
 
         const marker = L.marker([cam.latitude, cam.longitude], {
@@ -541,28 +652,44 @@ export const MapView = ({
           zIndexOffset: isAlarmActive ? 1000 : 100
         });
 
-        marker.on('click', () => {
+        marker.on('click', async () => {
           setSelectedDockCamera(cam);
+          try {
+            const res = await fetch(`/api/v1/cameras/${cam.id}`);
+            if (res.ok) {
+              const json = await res.json();
+              if (json.success && json.data) {
+                setSelectedDockCamera(json.data);
+              }
+            }
+          } catch (e) {}
         });
 
         markersLayer.current.addLayer(marker);
         markersMapRef.current[cam.id] = marker;
       } else {
-        // Multi-Camera Cluster Badge with Total Count & Click-to-Zoom Expansion
+        // Multi-Camera Merged Cluster Badge with Multi-Camera Icon (No Text Tag) & Click-to-Zoom Expansion
         const count = cl.cameras.length;
         const alarmCameras = cl.cameras.filter(c => incidents.some(inc => inc.cameraId === c.id));
         const hasAlarm = alarmCameras.length > 0;
 
-        const sizeClass = count >= 20 ? 'large' : count >= 8 ? 'medium' : 'small';
-        const sizePx = count >= 20 ? 52 : count >= 8 ? 44 : 38;
+        const sizeClass = count >= 50 ? 'large' : count >= 10 ? 'medium' : 'small';
+        const sizePx = count >= 50 ? 52 : count >= 10 ? 44 : 38;
 
         const clusterHtml = `
           <div class="cctv-cluster-pin ${sizeClass} ${hasAlarm ? 'has-alarm' : ''}" title="${count} Cameras merged · Click to zoom in & separate">
             <div class="cluster-halo"></div>
             <div class="cluster-core">
-              <span class="cluster-num">${count}</span>
-              ${hasAlarm ? '<span class="cluster-alert-dot"></span>' : ''}
+              <svg width="${sizePx >= 48 ? 22 : 18}" height="${sizePx >= 48 ? 22 : 18}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cluster-multi-cam-svg">
+                <!-- Back Camera -->
+                <rect x="7" y="3" width="11" height="9" rx="2" stroke="currentColor" opacity="0.65" fill="rgba(255,255,255,0.18)"/>
+                <path d="m18 5.5 4-2.5v6l-4-2.5" stroke="currentColor" opacity="0.65" fill="rgba(255,255,255,0.25)"/>
+                <!-- Front Camera -->
+                <rect x="2" y="9" width="12" height="10" rx="2" fill="${hasAlarm ? '#4c0519' : '#091322'}" stroke="currentColor" stroke-width="2.2"/>
+                <path d="m14 11.5 5-3v7l-5-3" fill="currentColor"/>
+              </svg>
             </div>
+            ${hasAlarm ? '<span class="cluster-alert-dot"></span>' : ''}
           </div>
         `;
 
@@ -584,13 +711,13 @@ export const MapView = ({
           const bounds = L.latLngBounds(latLngs);
 
           const isCoLocated = bounds.getNorthEast().equals(bounds.getSouthWest());
-          if (isCoLocated || map.getZoom() >= 16) {
+          if (isCoLocated || map.getZoom() >= 18) {
             clusterMarker.openPopup();
           } else {
             map.flyToBounds(bounds.pad(0.35), {
               duration: 0.85,
               easeLinearity: 0.25,
-              maxZoom: 17
+              maxZoom: 19
             });
           }
         });
@@ -753,6 +880,14 @@ export const MapView = ({
     <main className="map-hero-workspace">
       <div id="gis-map" ref={mapRef}></div>
 
+      {/* Real-time High-Tech Grid Scanning Indicator */}
+      {isSpatialLoading && (
+        <div className="spatial-scanning-badge">
+          <Radio size={13} className="animate-pulse" style={{ color: 'var(--accent)' }} />
+          <span>Scanning Gujarat GIS Grid...</span>
+        </div>
+      )}
+
       {/* Floating Active Vehicle Trajectory HUD Banner (Model 2 Test Case) */}
       {trajectoryData && (
         <div
@@ -807,6 +942,7 @@ export const MapView = ({
         onLocate={handleLocateIncident}
         onOpenStream={handleOpenStreamIncident}
         onDismiss={handleDismissIncident}
+        onDismissAll={handleDismissAllIncidents}
       />
 
       {/* Police Tactical CCTV Intercept Dock (Slide-out Monitor HUD on Bottom-Right) */}

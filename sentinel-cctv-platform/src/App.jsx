@@ -32,6 +32,7 @@ export function AppContent() {
   const [cameras, setCameras] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [activeTrackVehicle, setActiveTrackVehicle] = useState(null);
+  const [isLoadingCameras, setIsLoadingCameras] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('gujraksha_active_view', activeView);
@@ -65,6 +66,7 @@ export function AppContent() {
   };
 
   const fetchCameras = useCallback(async (signal) => {
+    setIsLoadingCameras(true);
     const params = new URLSearchParams();
     if (filters.department && filters.department !== 'ALL') params.set('department', filters.department);
     if (filters.district && filters.district !== 'ALL') params.set('district', filters.district);
@@ -92,6 +94,8 @@ export function AppContent() {
       }
       console.error('Error fetching cameras:', err);
       addToast('Failed to load camera registry dataset.', 'error', 'Fetch Error');
+    } finally {
+      setIsLoadingCameras(false);
     }
   }, [filters]);
 
@@ -182,6 +186,40 @@ export function AppContent() {
     }
   };
 
+  const handleOpenStreamModal = async (cam) => {
+    if (!cam) {
+      setSelectedCameraForStream(null);
+      return;
+    }
+    setSelectedCameraForStream(cam);
+    try {
+      const res = await fetch(`/api/v1/cameras/${cam.id}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setSelectedCameraForStream(json.data);
+        }
+      }
+    } catch (e) {}
+  };
+
+  const handleOpenEditModal = async (cam) => {
+    if (!cam) {
+      setSelectedCameraForEdit(null);
+      return;
+    }
+    setSelectedCameraForEdit(cam);
+    try {
+      const res = await fetch(`/api/v1/cameras/${cam.id}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setSelectedCameraForEdit(json.data);
+        }
+      }
+    } catch (e) {}
+  };
+
   // If not authenticated, show login page
   if (!isAuthenticated) {
     return <LoginPage />;
@@ -205,6 +243,7 @@ export function AppContent() {
             onFilterChange={handleFilterChange}
             onExportCsv={() => setIsExportOpen(true)}
             departments={departments}
+            isLoading={isLoadingCameras}
           />
 
           {/* Floating Top Left Stats Card */}
@@ -214,7 +253,7 @@ export function AppContent() {
           <MapView
             cameras={cameras}
             filters={filters}
-            onCameraSelect={(cam) => setSelectedCameraForStream(cam)}
+            onCameraSelect={handleOpenStreamModal}
             activeTrackVehicle={activeTrackVehicle}
             onClearTrackVehicle={() => setActiveTrackVehicle(null)}
           />
@@ -224,12 +263,13 @@ export function AppContent() {
           cameras={cameras}
           filters={filters}
           onFilterChange={handleFilterChange}
-          onCameraSelect={(cam) => setSelectedCameraForStream(cam)}
-          onEditCamera={(cam) => setSelectedCameraForEdit(cam)}
+          onCameraSelect={handleOpenStreamModal}
+          onEditCamera={handleOpenEditModal}
           onDeleteCamera={handleDeleteCamera}
           onExportCsv={() => setIsExportOpen(true)}
           onAddCamera={() => setIsOnboardOpen(true)}
           departments={departments}
+          isLoading={isLoadingCameras}
         />
       ) : activeView === 'departments' && isAdmin ? (
         <DepartmentDirectoryPage

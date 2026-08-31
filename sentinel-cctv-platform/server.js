@@ -20,6 +20,7 @@ import departmentRoutes from './src/routes/departmentRoutes.js';
 import watchlistRoutes from './src/routes/watchlistRoutes.js';
 import anprRoutes from './src/routes/anprRoutes.js';
 import edgeRoutes from './src/routes/edgeRoutes.js';
+import workerRoutes from './src/routes/workerRoutes.js';
 import anprEngineService from './src/services/anprEngineService.js';
 import streamAnprScanner from './src/services/streamAnprScanner.js';
 import mediamtxService from './src/services/mediamtxService.js';
@@ -54,6 +55,7 @@ const mountApiEndpoints = (prefix = '') => {
   app.use(`${prefix}/api/v1/departments`, departmentRoutes);
   app.use(`${prefix}/api/v1/watchlist`, watchlistRoutes);
   app.use(`${prefix}/api/v1/anpr`, anprRoutes);
+  app.use(`${prefix}/api/v1/workers`, workerRoutes);
   app.use(`${prefix}/api/v1/edge`, edgeRoutes);
   app.use(`${prefix}/api/v1/onboarding`, onboardingRoutes);
   app.use(`${prefix}/api/v1/analytics`, analyticsRoutes);

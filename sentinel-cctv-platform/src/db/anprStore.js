@@ -15,15 +15,6 @@ class AnprDataStore {
   constructor() {
     this.detections = this.loadFromFile();
     this.alertSubscribers = [];
-    
-    // Listen for PostgreSQL readiness to sync persisted data
-    pgClient.on("ready", () => {
-      this.loadFromDatabase();
-    });
-
-    if (pgClient.isConnected()) {
-      this.loadFromDatabase();
-    }
   }
 
   loadFromFile() {
@@ -61,7 +52,9 @@ class AnprDataStore {
           this.detections = res.rows.map(r => ({
             ...r,
             latitude: r.location_lat,
-            longitude: r.location_lng
+            longitude: r.location_lng,
+            is_read: !!r.is_read,
+            is_dismissed: !!r.is_dismissed
           }));
           this.saveToFile(this.detections);
         }
@@ -201,6 +194,38 @@ class AnprDataStore {
     return updatedCount;
   }
 
+  async clearAllDetections() {
+    this.detections = [];
+    this.saveToFile([]);
+    try {
+      if (pgClient.isConnected()) {
+        await pgClient.query("DELETE FROM anpr_detections");
+      }
+    } catch (err) {
+      console.warn("⚠️ [AnprStore] Error clearing PostgreSQL detections:", err.message);
+    }
+    return true;
+  }
+
+  async deleteDetection(id) {
+    if (!id) return false;
+    const cleanId = String(id).replace(/^alert-/, '');
+    const initialLen = this.detections.length;
+    this.detections = this.detections.filter(d => String(d.id) !== cleanId && String(d.id) !== id);
+    if (this.detections.length !== initialLen) {
+      this.saveToFile(this.detections);
+      try {
+        if (pgClient.isConnected()) {
+          await pgClient.query("DELETE FROM anpr_detections WHERE id = $1", [cleanId]);
+        }
+      } catch (err) {
+        console.warn("⚠️ [AnprStore] Error deleting PostgreSQL detection:", err.message);
+      }
+      return true;
+    }
+    return false;
+  }
+
   getTrajectoryForPlate(plateNumber) {
     if (!plateNumber) return { vehicle_plate: "", detections: [], waypoints: [] };
     const cleanSearch = plateNumber.toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -236,7 +261,7 @@ class AnprDataStore {
     };
   }
 
-  ingest(payload) {
+  async ingest(payload) {
     if (!payload.vehicle_plate) {
       const err = new Error("vehicle_plate is required in detection payload.");
       err.statusCode = 400;
@@ -272,7 +297,10 @@ class AnprDataStore {
       watchlist_ps: watchlistHit ? watchlistHit.police_station : null,
       watchlist_priority: watchlistHit ? watchlistHit.priority : null,
       timestamp: payload.timestamp || new Date().toISOString(),
-      stored: true
+      stored: true,
+      is_read: false,
+      is_dismissed: false,
+      dismissed_at: null
     };
 
     if (watchlistHit) {
@@ -297,21 +325,26 @@ class AnprDataStore {
 
       // Direct Database Persistence (PostgreSQL)
       if (pgClient.isConnected()) {
-        pgClient.query(
-          `INSERT INTO anpr_detections (
-            id, vehicle_plate, confidence, camera_id, camera_code, camera_name,
-            district, location_lat, location_lng, speed_kmh, vehicle_type,
-            is_watchlist_hit, watchlist_category, watchlist_fir, raw_payload, timestamp
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-          ON CONFLICT (id) DO NOTHING`,
-          [
-            newDetection.id, newDetection.vehicle_plate, parseInt(newDetection.confidence, 10) || 95,
-            newDetection.camera_id, newDetection.camera_code, newDetection.camera_name, newDetection.district,
-            newDetection.latitude, newDetection.longitude, newDetection.speed_kmh, newDetection.vehicle_type,
-            true, newDetection.watchlist_category, newDetection.watchlist_fir, JSON.stringify(newDetection),
-            newDetection.timestamp
-          ]
-        ).catch(err => console.warn("PG ANPR Detection Insert Error:", err.message));
+        try {
+          await pgClient.query(
+            `INSERT INTO anpr_detections (
+              id, vehicle_plate, confidence, camera_id, camera_code, camera_name,
+              district, location_lat, location_lng, speed_kmh, vehicle_type,
+              is_watchlist_hit, watchlist_category, watchlist_fir, raw_payload, timestamp,
+              is_read, is_dismissed
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, FALSE, FALSE)
+            ON CONFLICT (id) DO NOTHING`,
+            [
+              newDetection.id, newDetection.vehicle_plate, parseInt(newDetection.confidence, 10) || 95,
+              newDetection.camera_id, newDetection.camera_code, newDetection.camera_name, newDetection.district,
+              newDetection.latitude, newDetection.longitude, newDetection.speed_kmh, newDetection.vehicle_type,
+              true, newDetection.watchlist_category, newDetection.watchlist_fir, JSON.stringify(newDetection),
+              newDetection.timestamp
+            ]
+          );
+        } catch (err) {
+          console.warn("PG ANPR Detection Insert Error:", err.message);
+        }
       }
 
       // Broadcast ONLY watchlist hits to live SSE radar/alerts
@@ -348,11 +381,14 @@ class AnprDataStore {
     }
   }
 
-  ingestBatch(payloads = []) {
+  async ingestBatch(payloads = []) {
     if (!Array.isArray(payloads) || payloads.length === 0) {
       return { success: true, count: 0, results: [] };
     }
-    const results = payloads.map(p => this.ingest(p));
+    const results = [];
+    for (const p of payloads) {
+      results.push(await this.ingest(p));
+    }
     return {
       success: true,
       count: results.length,
