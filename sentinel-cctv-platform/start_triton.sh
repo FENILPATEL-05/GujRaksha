@@ -15,10 +15,24 @@ fi
 
 mkdir -p triton_repository/yolo_detector/1
 
+# Auto-detect docker command (handle permission without sudo if needed)
+DOCKER_CMD="docker"
+DOCKER_COMPOSE_CMD="docker-compose"
+
+if ! docker info &>/dev/null; then
+    if sudo docker info &>/dev/null; then
+        DOCKER_CMD="sudo docker"
+        DOCKER_COMPOSE_CMD="sudo docker-compose"
+    fi
+fi
+
 if [ ! -f "triton_repository/yolo_detector/1/model.onnx" ]; then
     echo "💡 Model file not found at triton_repository/yolo_detector/1/model.onnx"
-    echo "Copying sample/dummy ONNX or default model if present..."
-    if [ -f "3_ANPR_EDGE_WORKER/models/yolov9_anpr.onnx" ]; then
+    echo "Copying sample/default ONNX model if present..."
+    if [ -f "3_ANPR_EDGE_WORKER/models/onnx/plate_detector.onnx" ]; then
+        cp 3_ANPR_EDGE_WORKER/models/onnx/plate_detector.onnx triton_repository/yolo_detector/1/model.onnx
+        echo "✅ Copied plate_detector.onnx to triton_repository/yolo_detector/1/model.onnx"
+    elif [ -f "3_ANPR_EDGE_WORKER/models/yolov9_anpr.onnx" ]; then
         cp 3_ANPR_EDGE_WORKER/models/yolov9_anpr.onnx triton_repository/yolo_detector/1/model.onnx
         echo "✅ Copied yolov9_anpr.onnx to triton_repository/yolo_detector/1/model.onnx"
     else
@@ -27,13 +41,11 @@ if [ ! -f "triton_repository/yolo_detector/1/model.onnx" ]; then
 fi
 
 echo "⚡ Starting NVIDIA Triton Server Container..."
-if command -v docker-compose &> /dev/null; then
-    docker-compose -f docker-compose.triton.yml up -d
-elif docker compose version &> /dev/null; then
-    docker compose -f docker-compose.triton.yml up -d
+if command -v docker-compose &> /dev/null || command -v sudo &> /dev/null; then
+    $DOCKER_COMPOSE_CMD -f docker-compose.triton.yml up -d
 else
     echo "⚙️ Running standard docker run..."
-    docker run -d --gpus all \
+    $DOCKER_CMD run -d --gpus all \
         --name gujraksha_triton_server \
         -p 8000:8000 -p 8001:8001 -p 8002:8002 \
         -v "$(pwd)/triton_repository:/models" \

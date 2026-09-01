@@ -32,3 +32,8 @@ data/
 
 # Public built assets
 public/assets/
+
+# Triton generated binary models
+triton_repository/**/*.onnx
+triton_repository/**/*.plan
+triton_repository/**/*.engine
