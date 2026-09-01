@@ -666,12 +666,74 @@ class ObjectDetectorTFLite:
         return detections
 
 
-def create_anpr_pipeline(backend: str = "auto", num_threads: int = 4):
+class PlateDetectorTriton:
+    """YOLO License Plate Detector using NVIDIA Triton Inference Server (gRPC)."""
+    def __init__(self, triton_url: str = "localhost:8001", model_name: str = "yolo_detector"):
+        from triton_client import TritonInferenceClient
+        self.triton_client = TritonInferenceClient(url=triton_url, model_name=model_name, use_grpc=True)
+        self.accel_mode = f"GPU Cluster (NVIDIA Triton Server @ {triton_url})"
+
+    def preprocess(self, img: np.ndarray):
+        h, w = img.shape[:2]
+        scale = DET_SIZE / max(h, w)
+        new_w, new_h = int(w * scale), int(h * scale)
+
+        resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+        pad_w = (DET_SIZE - new_w) // 2
+        pad_h = (DET_SIZE - new_h) // 2
+
+        canvas = np.full((DET_SIZE, DET_SIZE, 3), 114, dtype=np.uint8)
+        canvas[pad_h : pad_h + new_h, pad_w : pad_w + new_w] = resized
+
+        canvas_rgb = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
+        blob = (canvas_rgb.astype(np.float32) / 255.0)
+        blob = np.transpose(blob, (2, 0, 1))[np.newaxis, :]  # NCHW
+        return blob, scale, (pad_w, pad_h)
+
+    def detect(self, img: np.ndarray, conf_thresh: float = 0.20, iou_thresh: float = 0.45):
+        blob, scale, (pad_w, pad_h) = self.preprocess(img)
+        try:
+            preds_raw = self.triton_client.infer(blob, input_name="images", output_name="output0")
+            preds = preds_raw[0].T if preds_raw.ndim == 3 else preds_raw.T
+            mask = preds[:, 4] >= conf_thresh
+            filtered = preds[mask]
+            if len(filtered) == 0:
+                return []
+
+            cx, cy, bw, bh = filtered[:, 0], filtered[:, 1], filtered[:, 2], filtered[:, 3]
+            x1 = cx - bw / 2.0
+            y1 = cy - bh / 2.0
+            x2 = cx + bw / 2.0
+            y2 = cy + bh / 2.0
+
+            orig_h, orig_w = img.shape[:2]
+            x1 = np.clip((x1 - pad_w) / scale, 0, orig_w)
+            y1 = np.clip((y1 - pad_h) / scale, 0, orig_h)
+            x2 = np.clip((x2 - pad_w) / scale, 0, orig_w)
+            y2 = np.clip((y2 - pad_h) / scale, 0, orig_h)
+
+            boxes = np.stack([x1, y1, x2 - x1, y2 - y1], axis=1).tolist()
+            scores = filtered[:, 4].astype(float).tolist()
+
+            indices = cv2.dnn.NMSBoxes(boxes, scores, conf_thresh, iou_thresh)
+            detections = []
+            if len(indices) > 0:
+                for idx in indices.flatten():
+                    bx, by, bw_b, bh_b = boxes[idx]
+                    detections.append((
+                        int(bx), int(by), int(bx + bw_b), int(by + bh_b), float(scores[idx])
+                    ))
+            return detections
+        except Exception:
+            return []
+
+
+def create_anpr_pipeline(backend: str = "auto", num_threads: int = 4, triton_url: str = "localhost:8001"):
     """
     Adaptive GPU-First Pipeline Factory:
+    - If backend is 'triton', connects to NVIDIA Triton Server via gRPC.
     - Auto-probes NVIDIA CUDA / TensorRT ONNX GPU acceleration.
-    - If GPU models exist and GPU is detected, loads ONNX GPU engine.
-    - Otherwise gracefully falls back to multi-threaded TFLite CPU.
+    - Fallback to multi-threaded TFLite CPU engine if GPU is unavailable.
     """
     det_onnx_path = DEFAULT_DET_ONNX
     ocr_onnx_path = DEFAULT_OCR_ONNX
@@ -679,6 +741,15 @@ def create_anpr_pipeline(backend: str = "auto", num_threads: int = 4):
     det_tflite_path = DEFAULT_DET_TFLITE
     ocr_tflite_path = DEFAULT_OCR_TFLITE
     obj_tflite_path = DEFAULT_OBJ_TFLITE
+
+    if backend == "triton":
+        try:
+            detector = PlateDetectorTriton(triton_url=triton_url)
+            ocr = PlateOCRTFLite(ocr_tflite_path, num_threads=num_threads)
+            obj_det = ObjectDetectorTFLite(obj_tflite_path, num_threads=num_threads) if os.path.exists(obj_tflite_path) else None
+            return detector, ocr, obj_det, detector.accel_mode
+        except Exception as err:
+            print(f"⚠️ Triton Server connection failed ({err}). Falling back to local engine...")
 
     gpu_available = False
     if HAS_ONNXRUNTIME:
@@ -1284,13 +1355,14 @@ def main():
     parser.add_argument("--max-capacity", type=int, default=100, help="Maximum concurrent cameras to process (default: 100)")
     parser.add_argument("--source", default=None, help="Optional: Direct RTSP URL or webcam (0) for standalone single camera mode")
     parser.add_argument("--camera-code", default="GJ-GOV-001", help="Camera code for standalone single camera mode")
-    parser.add_argument("--backend", default="auto", choices=["auto", "onnx", "tflite"], help="AI inference backend (auto probes GPU first)")
+    parser.add_argument("--backend", default="auto", choices=["auto", "triton", "onnx", "tflite"], help="AI inference backend (auto probes GPU first)")
+    parser.add_argument("--triton-url", default="localhost:8001", help="NVIDIA Triton Server gRPC URL (e.g. 'localhost:8001')")
     parser.add_argument("--threads", type=int, default=4, help="CPU threads for AI inference")
     args = parser.parse_args()
 
     if args.source:
         # Standalone direct stream mode
-        detector, ocr, obj_det, accel_mode = create_anpr_pipeline(args.backend, num_threads=args.threads)
+        detector, ocr, obj_det, accel_mode = create_anpr_pipeline(args.backend, num_threads=args.threads, triton_url=args.triton_url)
         print(f"🚀 [AI Engine Active] Mode: {accel_mode}")
         watchlist_mgr = CentralWatchlistManager(args.central_url)
         watchlist_mgr.fetch_from_api()
@@ -1309,11 +1381,10 @@ def main():
         # Central Orchestrated 100-Camera Distributed Cluster Mode
         node_id = args.worker_id or f"node-{socket.gethostname()[:8]}"
         manager = DistributedWorkerManager(
-            args.central_url, node_id, max_capacity=args.max_capacity, threads=args.threads, backend=args.backend
+            args.central_url, node_id, max_capacity=args.max_capacity, threads=args.threads, backend=args.backend, triton_url=args.triton_url
         )
         manager.start()
 
 
 if __name__ == "__main__":
     main()
-

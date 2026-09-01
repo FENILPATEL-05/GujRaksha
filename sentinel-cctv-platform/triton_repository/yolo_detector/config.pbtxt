@@ -1,0 +1,43 @@
+name: "yolo_detector"
+platform: "onnxruntime_onnx"
+max_batch_size: 32
+
+input [
+  {
+    name: "images"
+    data_type: TYPE_FP32
+    dims: [ 3, 640, 640 ]
+  }
+]
+
+output [
+  {
+    name: "output0"
+    data_type: TYPE_FP32
+    dims: [ -1, -1 ]
+  }
+]
+
+# Dynamic Batching Configuration for High Concurrency Video Streams
+dynamic_batching {
+  max_queue_delay_microseconds: 5000
+  preferred_batch_size: [ 4, 8, 16, 32 ]
+}
+
+# GPU Acceleration with TensorRT Execution Provider
+optimization {
+  execution_accelerators {
+    gpu_execution_accelerator : [ {
+      name : "tensorrt"
+      parameters { key: "precision_mode" value: "FP16" }
+      parameters { key: "max_workspace_size_bytes" value: "1073741824" }
+    }]
+  }
+}
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+  }
+]

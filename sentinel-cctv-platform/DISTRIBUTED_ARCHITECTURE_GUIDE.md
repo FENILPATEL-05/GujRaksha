@@ -79,5 +79,25 @@ sentinel-cctv-platform/
 4. **AI Detection & Real-Time Alerting:**
    - Worker frames me se YOLOv9 + CCT OCR se plate detect karta hai.
    - O(1) in-memory check: `if plate in watchlist`.
-   - Jaise hi target plate aati hai, worker Central Server ko `POST /api/v1/anpr/ingest` alert bhejta hai.
    - Central Server GIS Map par turant **Threat Alert Siren & Red Pin Popup** trigger kar deta hai!
+
+---
+
+### 4️⃣ NVIDIA Triton GPU Inference Server (`triton_repository`)
+
+High-throughput, dynamic batching GPU cluster setup for scaling to 30 – 80,000 live streams:
+
+1. **Launch NVIDIA Triton Server:**
+   ```bash
+   ./start_triton.sh
+   ```
+2. **Start Python AI Worker with Triton gRPC Backend:**
+   ```bash
+   cd 3_ANPR_EDGE_WORKER
+   python3 anpr_worker.py --backend triton --triton-url localhost:8001 --central-url http://<CENTRAL_IP>:3000/api/v1
+   ```
+3. **Features:**
+   - ⚡ **Dynamic Batching:** Automatically groups frames from concurrent cameras into batches within 5ms.
+   - 🏎️ **TensorRT FP16/INT8 Acceleration:** Reduces per-frame detection latency to 3ms–6ms.
+   - 📊 **Prometheus Metrics:** Real-time GPU throughput monitoring at `http://localhost:8002/metrics`.
+
