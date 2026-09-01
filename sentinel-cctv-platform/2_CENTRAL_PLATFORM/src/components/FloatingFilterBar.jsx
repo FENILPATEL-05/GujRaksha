@@ -1,5 +1,6 @@
 import React from 'react';
-import { Search, FileSpreadsheet, X, RotateCcw, Loader2 } from 'lucide-react';
+import { Search, FileSpreadsheet, X, RotateCcw, Loader2, Lock } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const GUJARAT_DISTRICTS = [
   'Ahmedabad', 'Amreli', 'Anand', 'Aravalli', 'Banaskantha', 'Bharuch',
@@ -11,15 +12,21 @@ const GUJARAT_DISTRICTS = [
 ];
 
 export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv, departments = [], isLoading = false }) => {
+  const { isDeptAdmin, userDepartmentId, userDepartmentName } = useAuth();
+
   const hasActiveFilters = 
-    (filters.department && filters.department !== 'ALL') ||
+    (!isDeptAdmin && filters.department && filters.department !== 'ALL') ||
     (filters.district && filters.district !== 'ALL') ||
     (filters.status && filters.status !== 'ALL') ||
     (filters.detection_mode && filters.detection_mode !== 'ALL') ||
     (filters.search && filters.search.trim() !== '');
 
   const handleResetFilters = () => {
-    onFilterChange('department', 'ALL');
+    if (isDeptAdmin && userDepartmentId !== 'ALL') {
+      onFilterChange('department', userDepartmentId);
+    } else {
+      onFilterChange('department', 'ALL');
+    }
     onFilterChange('district', 'ALL');
     onFilterChange('status', 'ALL');
     onFilterChange('detection_mode', 'ALL');
@@ -52,18 +59,27 @@ export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv, depart
         )}
       </div>
 
-      <select
-        className="filter-select"
-        value={filters.department}
-        onChange={(e) => onFilterChange('department', e.target.value)}
-      >
-        <option value="ALL">All Departments ({departments.length || '26+'})</option>
-        {departments.map((d) => (
-          <option key={d.code} value={d.code}>
-            {d.name}
-          </option>
-        ))}
-      </select>
+      {isDeptAdmin && userDepartmentId !== 'ALL' ? (
+        <div className="filter-select" style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.9, cursor: 'not-allowed', background: 'var(--input-bg)' }}>
+          <Lock size={12} style={{ color: 'var(--accent)' }} />
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>
+            {userDepartmentName || userDepartmentId}
+          </span>
+        </div>
+      ) : (
+        <select
+          className="filter-select"
+          value={filters.department}
+          onChange={(e) => onFilterChange('department', e.target.value)}
+        >
+          <option value="ALL">All Departments ({departments.length || '26+'})</option>
+          {departments.map((d) => (
+            <option key={d.code} value={d.code}>
+              {d.name}
+            </option>
+          ))}
+        </select>
+      )}
 
       <select
         className="filter-select"

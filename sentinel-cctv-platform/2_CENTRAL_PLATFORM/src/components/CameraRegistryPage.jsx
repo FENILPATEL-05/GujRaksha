@@ -17,8 +17,11 @@ import {
   Zap,
   Activity,
   Layers,
-  Eye
+  Eye,
+  Building2,
+  Lock
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { Pagination } from './Pagination';
 
 const renderDetectionModeBadge = (mode) => {
@@ -66,6 +69,7 @@ export const CameraRegistryPage = ({
   departments = [],
   isLoading = false
 }) => {
+  const { isSuperAdmin, isDeptAdmin, isViewer, userDepartmentId, userDepartmentName, canManageCameras } = useAuth();
   const [expandedCameraId, setExpandedCameraId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
@@ -89,13 +93,17 @@ export const CameraRegistryPage = ({
   };
 
   let activeFilterCount = 0;
-  if (filters.department && filters.department !== 'ALL') activeFilterCount++;
+  if (!isDeptAdmin && filters.department && filters.department !== 'ALL') activeFilterCount++;
   if (filters.district && filters.district !== 'ALL') activeFilterCount++;
   if (filters.status && filters.status !== 'ALL') activeFilterCount++;
   if (filters.detection_mode && filters.detection_mode !== 'ALL') activeFilterCount++;
 
   const handleResetFilters = () => {
-    onFilterChange('department', 'ALL');
+    if (isDeptAdmin && userDepartmentId !== 'ALL') {
+      onFilterChange('department', userDepartmentId);
+    } else {
+      onFilterChange('department', 'ALL');
+    }
     onFilterChange('district', 'ALL');
     onFilterChange('status', 'ALL');
     onFilterChange('detection_mode', 'ALL');
@@ -107,9 +115,16 @@ export const CameraRegistryPage = ({
       {/* Unified Single-Row Search, Filter & Action Toolbar */}
       <div className="table-unified-toolbar">
         {/* Title */}
-        <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 800, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "6px" }}>
-          Cameras
-        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 800, whiteSpace: "nowrap" }}>
+            Cameras
+          </h2>
+          {isDeptAdmin && (
+            <span className="badge" style={{ background: 'rgba(34, 211, 238, 0.15)', color: '#22d3ee', border: '1px solid rgba(34, 211, 238, 0.3)', fontSize: '11px', gap: '4px' }}>
+              <Building2 size={11} strokeWidth={2.5} /> {userDepartmentName || userDepartmentId}
+            </span>
+          )}
+        </div>
 
         {/* Left Side: Search & Popover Filter Button */}
         <div className="toolbar-filters-group">
@@ -192,21 +207,28 @@ export const CameraRegistryPage = ({
 
                 <div className="filter-popover-field">
                   <label className="filter-popover-label">Department</label>
-                  <select
-                    className="filter-popover-select"
-                    value={filters.department}
-                    onChange={(e) => {
-                      onFilterChange('department', e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value="ALL">All Departments ({departments.length || '26+'})</option>
-                    {departments.map((d) => (
-                      <option key={d.code} value={d.code}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
+                  {isDeptAdmin && userDepartmentId !== 'ALL' ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', background: 'var(--panel-bg)', borderRadius: '6px', border: '1px solid var(--panel-border)', fontSize: '12px', color: 'var(--accent)' }}>
+                      <Lock size={12} />
+                      <span style={{ fontWeight: 600 }}>{userDepartmentName || userDepartmentId}</span>
+                    </div>
+                  ) : (
+                    <select
+                      className="filter-popover-select"
+                      value={filters.department}
+                      onChange={(e) => {
+                        onFilterChange('department', e.target.value);
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <option value="ALL">All Departments ({departments.length || '26+'})</option>
+                      {departments.map((d) => (
+                        <option key={d.code} value={d.code}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div className="filter-popover-field">
@@ -296,9 +318,11 @@ export const CameraRegistryPage = ({
             <FileSpreadsheet size={14} strokeWidth={2.2} /> Export Report
           </button>
           
-          <button className="btn btn-primary" onClick={onAddCamera} title="Onboard New Camera Node" style={{ padding: '7px 14px', gap: '6px' }}>
-            <Plus size={15} strokeWidth={2.4} /> Add Camera
-          </button>
+          {canManageCameras && (
+            <button className="btn btn-primary" onClick={onAddCamera} title="Onboard New Camera Node" style={{ padding: '7px 14px', gap: '6px' }}>
+              <Plus size={15} strokeWidth={2.4} /> Add Camera
+            </button>
+          )}
         </div>
       </div>
 
@@ -384,24 +408,28 @@ export const CameraRegistryPage = ({
                             <Play size={13} strokeWidth={2} />
                           </button>
 
-                          <button
-                            title="Edit Details"
-                            onClick={() => onEditCamera(cam)}
-                          >
-                            <SquarePen size={13} strokeWidth={2} />
-                          </button>
+                          {canManageCameras && (
+                            <>
+                              <button
+                                title="Edit Details"
+                                onClick={() => onEditCamera(cam)}
+                              >
+                                <SquarePen size={13} strokeWidth={2} />
+                              </button>
 
-                          {onDeleteCamera && (
-                            <button
-                              title="Delete Camera Asset"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onDeleteCamera(cam);
-                              }}
-                              style={{ color: 'var(--danger)' }}
-                            >
-                              <Trash2 size={13} strokeWidth={2} />
-                            </button>
+                              {onDeleteCamera && (
+                                <button
+                                  title="Delete Camera Asset"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDeleteCamera(cam);
+                                  }}
+                                  style={{ color: 'var(--danger)' }}
+                                >
+                                  <Trash2 size={13} strokeWidth={2} />
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       </td>

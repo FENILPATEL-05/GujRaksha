@@ -22,12 +22,29 @@ import {
   LogOut,
   ChevronDown,
   Shield,
-  Eye
+  Eye,
+  Crown,
+  Users,
+  ShieldCheck
 } from 'lucide-react';
 
-export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, departmentCount = 26 }) => {
+export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, onOpenUserMgmt, departmentCount = 26 }) => {
   const { theme, toggleTheme } = useTheme();
-  const { user, logout, isAdmin } = useAuth();
+  const {
+    user,
+    logout,
+    isSuperAdmin,
+    isDeptAdmin,
+    isViewer,
+    isAdmin,
+    canManageDepartments,
+    canManageWatchlist,
+    canManageUsers,
+    canSyncFeeds,
+    userDepartmentId,
+    userDepartmentName
+  } = useAuth();
+
   const [isSyncing, setIsSyncing] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef(null);
@@ -73,49 +90,74 @@ export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, depar
           >
             <MapPin size={15} strokeWidth={2} /> GIS Map
           </button>
-          {isAdmin && (
-            <>
-              <button
-                className={activeView === 'registry' ? 'active' : ''}
-                onClick={() => onViewChange('registry')}
-              >
-                <Camera size={15} strokeWidth={2} /> Cameras
-              </button>
-              <button
-                className={activeView === 'departments' ? 'active' : ''}
-                onClick={() => onViewChange('departments')}
-              >
-                <Building2 size={15} strokeWidth={2} /> Departments ({departmentCount})
-              </button>
-              <button
-                className={activeView === 'videowall' ? 'active' : ''}
-                onClick={() => onViewChange('videowall')}
-              >
-                <LayoutGrid size={15} strokeWidth={2} /> Video Wall
-              </button>
-              <button
-                className={activeView === 'anpr' ? 'active' : ''}
-                onClick={() => onViewChange('anpr')}
-              >
-                <Car size={15} strokeWidth={2} /> ANPR & Watchlist
-              </button>
-            </>
+
+          {/* Cameras View: Accessible to Superadmin and Dept Admin */}
+          {(isSuperAdmin || isDeptAdmin) && (
+            <button
+              className={activeView === 'registry' ? 'active' : ''}
+              onClick={() => onViewChange('registry')}
+            >
+              <Camera size={15} strokeWidth={2} /> Cameras {isDeptAdmin && `(${userDepartmentId})`}
+            </button>
+          )}
+
+          {/* Departments Directory: Superadmin only */}
+          {canManageDepartments && (
+            <button
+              className={activeView === 'departments' ? 'active' : ''}
+              onClick={() => onViewChange('departments')}
+            >
+              <Building2 size={15} strokeWidth={2} /> Departments ({departmentCount})
+            </button>
+          )}
+
+          {/* Video Wall: Accessible to all logged-in roles */}
+          <button
+            className={activeView === 'videowall' ? 'active' : ''}
+            onClick={() => onViewChange('videowall')}
+          >
+            <LayoutGrid size={15} strokeWidth={2} /> Video Wall
+          </button>
+
+          {/* ANPR & Watchlist: Superadmin or Police/Home Department Admin */}
+          {canManageWatchlist && (
+            <button
+              className={activeView === 'anpr' ? 'active' : ''}
+              onClick={() => onViewChange('anpr')}
+            >
+              <Car size={15} strokeWidth={2} /> ANPR & Watchlist
+            </button>
           )}
         </div>
       </div>
 
       <div className="header-actions">
-        {isAdmin && (
-          <>
-            <button className="btn" onClick={handleSyncClick} disabled={isSyncing}>
-              <RefreshCw size={15} strokeWidth={2} style={{ animation: isSyncing ? 'radarSpin 1s linear infinite' : 'none' }} />
-              {isSyncing ? 'Syncing...' : 'Sync Feeds'}
-            </button>
+        {/* User Management Button for Superadmin */}
+        {canManageUsers && (
+          <button
+            className="btn"
+            onClick={onOpenUserMgmt}
+            title="Manage Department Users & Role-Based Access"
+            style={{ borderColor: 'rgba(34, 211, 238, 0.35)', color: 'var(--accent)' }}
+          >
+            <Users size={15} strokeWidth={2.2} />
+            <span>Manage Users</span>
+          </button>
+        )}
 
-            <button className="btn" onClick={onOpenGap}>
-              <PieChart size={15} strokeWidth={2} /> Gap Analysis
-            </button>
-          </>
+        {/* Sync Feeds Button for Superadmin */}
+        {canSyncFeeds && (
+          <button className="btn" onClick={handleSyncClick} disabled={isSyncing}>
+            <RefreshCw size={15} strokeWidth={2} style={{ animation: isSyncing ? 'radarSpin 1s linear infinite' : 'none' }} />
+            {isSyncing ? 'Syncing...' : 'Sync Feeds'}
+          </button>
+        )}
+
+        {/* Gap Analysis for Superadmin */}
+        {isSuperAdmin && (
+          <button className="btn" onClick={onOpenGap}>
+            <PieChart size={15} strokeWidth={2} /> Gap Analysis
+          </button>
         )}
 
         {/* Profile Dropdown */}
@@ -130,7 +172,9 @@ export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, depar
             <div className="profile-info">
               <span className="profile-name">{user?.name || 'User'}</span>
               <span className="profile-role-badge">
-                {isAdmin ? <><Shield size={10} strokeWidth={2.5} /> ADMIN</> : <><Eye size={10} strokeWidth={2.5} /> VIEWER</>}
+                {isSuperAdmin && <><Crown size={10} strokeWidth={2.5} /> SUPERADMIN</>}
+                {isDeptAdmin && <><Building2 size={10} strokeWidth={2.5} /> {userDepartmentId} ADMIN</>}
+                {isViewer && <><Eye size={10} strokeWidth={2.5} /> VIEWER</>}
               </span>
             </div>
             <ChevronDown size={14} strokeWidth={2} className={`profile-chevron ${isProfileOpen ? 'open' : ''}`} />
@@ -144,11 +188,29 @@ export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, depar
                 </div>
                 <div>
                   <div className="profile-dropdown-name">{user?.name}</div>
-                  <div className="profile-dropdown-dept">{user?.department}</div>
+                  <div className="profile-dropdown-dept" style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>
+                    {isSuperAdmin ? 'Statewide (All Departments)' : userDepartmentName}
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+                    Role: {user?.role || 'USER'}
+                  </div>
                 </div>
               </div>
 
               <div className="profile-dropdown-divider"></div>
+
+              {canManageUsers && (
+                <button
+                  className="profile-dropdown-item"
+                  onClick={() => {
+                    setIsProfileOpen(false);
+                    onOpenUserMgmt();
+                  }}
+                >
+                  <Users size={15} strokeWidth={2} style={{ color: 'var(--accent)' }} />
+                  <span>Manage Users & Roles</span>
+                </button>
+              )}
 
               <button className="profile-dropdown-item" onClick={() => { toggleTheme(); setIsProfileOpen(false); }}>
                 {theme === 'dark' ? <Moon size={15} strokeWidth={2} /> : <Sun size={15} strokeWidth={2} />}
@@ -169,3 +231,4 @@ export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, depar
     </header>
   );
 };
+

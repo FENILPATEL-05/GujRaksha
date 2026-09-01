@@ -41,12 +41,56 @@ const GUJARAT_DISTRICT_COORDS = {
   'Dang': [20.7533, 73.7027]
 };
 
+// Helper to play synthesized emergency siren tone for watchlist alerts
+const playEmergencySiren = () => {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(440, ctx.currentTime + 0.25);
+    osc.frequency.linearRampToValueAtTime(880, ctx.currentTime + 0.5);
+    osc.frequency.linearRampToValueAtTime(440, ctx.currentTime + 0.75);
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.95);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 1.0);
+  } catch (e) {
+    // Autoplay restrictions or unsupported audio context
+  }
+};
+
+// Robust Camera-to-Alert matching helper (matches by ID, camera_code, or numeric index)
+const isIncidentForCam = (inc, cam) => {
+  if (!inc || !cam) return false;
+  const incCamId = String(inc.cameraId || '').toLowerCase().trim();
+  const incCamCode = String(inc.cameraCode || '').toLowerCase().trim();
+  const cId = String(cam.id || '').toLowerCase().trim();
+  const cCode = String(cam.camera_code || '').toLowerCase().trim();
+
+  if (incCamId && (incCamId === cId || incCamId === cCode)) return true;
+  if (incCamCode && (incCamCode === cId || incCamCode === cCode)) return true;
+
+  // Compare trailing numeric identifiers (e.g. '100' in 'gj-gov-100' or 'gov-feed-100' or 'CAM100')
+  const incNum = (incCamId + ' ' + incCamCode).match(/\d+/)?.[0];
+  const camNum = (cId + ' ' + cCode).match(/\d+/)?.[0];
+  if (incNum && camNum && parseInt(incNum, 10) === parseInt(camNum, 10)) return true;
+
+  return false;
+};
+
 export const MapView = ({ 
   cameras, 
   filters = {}, 
   onCameraSelect, 
   activeTrackVehicle = null, 
-  onClearTrackVehicle 
+  onClearTrackVehicle,
+  addToast
 }) => {
   const mapRef = useRef(null);
   const leafletMap = useRef(null);
@@ -58,6 +102,7 @@ export const MapView = ({
 
   // Active Real-Time Incidents State (Fed directly from Real-Time AI / Watchlist Engine)
   const [incidents, setIncidents] = useState([]);
+  const [latestLiveHit, setLatestLiveHit] = useState(null);
   const [trajectoryData, setTrajectoryData] = useState(null);
   const [spatialData, setSpatialData] = useState(null);
   const [isSpatialLoading, setIsSpatialLoading] = useState(false);
@@ -72,6 +117,16 @@ export const MapView = ({
     camerasRef.current = cameras;
   }, [cameras]);
 
+  // Auto-dismiss floating emergency banner after 15s
+  useEffect(() => {
+    if (latestLiveHit) {
+      const timer = setTimeout(() => {
+        setLatestLiveHit(null);
+      }, 15000);
+      return () => clearTimeout(timer);
+    }
+  }, [latestLiveHit]);
+
   // Fetch initial real active alerts from database
   const fetchActiveAlerts = useCallback(async () => {
     try {
@@ -81,7 +136,7 @@ export const MapView = ({
         const formatted = json.data.map(alert => ({
           ...alert,
           timeAgo: formatTimeAgo(alert.createdAt),
-          camera: (camerasRef.current || []).find(c => c.id === alert.cameraId) || {
+          camera: (camerasRef.current || []).find(c => isIncidentForCam(alert, c)) || {
             id: alert.cameraId,
             name: alert.cameraName,
             camera_code: alert.cameraCode,
@@ -108,14 +163,14 @@ export const MapView = ({
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data && data.type === 'ANPR_HOTLIST') {
-            const cam = (camerasRef.current || []).find(c => c.id === data.cameraId) || {
-              id: data.cameraId,
-              name: data.cameraName,
-              camera_code: data.cameraCode,
-              district: data.district,
-              latitude: data.latitude,
-              longitude: data.longitude
+          if (data && (data.type === 'ANPR_HOTLIST' || data.is_watchlist_hit)) {
+            const cam = (camerasRef.current || []).find(c => isIncidentForCam(data, c)) || {
+              id: data.cameraId || data.cameraCode || 'gov-feed-1',
+              name: data.cameraName || data.cameraCode || 'CCTV Surveillance Node',
+              camera_code: data.cameraCode || data.cameraId || 'GJ-GOV-001',
+              district: data.district || 'Ahmedabad',
+              latitude: parseFloat(data.latitude) || 23.0225,
+              longitude: parseFloat(data.longitude) || 72.5714
             };
 
             const incomingAlert = {
@@ -126,10 +181,23 @@ export const MapView = ({
             };
 
             setIncidents(prev => [incomingAlert, ...prev.filter(a => a.id !== incomingAlert.id)]);
+            setLatestLiveHit(incomingAlert);
+
+            // Play emergency siren tone
+            playEmergencySiren();
+
+            // Display Toast notification
+            if (typeof addToast === 'function') {
+              addToast(
+                `🚨 POLICE WATCHLIST HIT: ${data.vehicleNo || data.vehicle_plate} spotted at ${cam.name} (${cam.district || 'Gujarat'})`,
+                'error',
+                'CRITICAL SECURITY THREAT'
+              );
+            }
 
             // Auto-pan to camera location on real incoming alert
             if (leafletMap.current && cam.latitude && cam.longitude) {
-              leafletMap.current.flyTo([cam.latitude, cam.longitude], 14, {
+              leafletMap.current.flyTo([cam.latitude, cam.longitude], 15, {
                 duration: 1.2,
                 easeLinearity: 0.25
               });
@@ -150,7 +218,7 @@ export const MapView = ({
     return () => {
       if (eventSource) eventSource.close();
     };
-  }, [fetchActiveAlerts]);
+  }, [fetchActiveAlerts, addToast]);
 
   // Helper for human-readable relative time
   function formatTimeAgo(timestamp) {
@@ -610,7 +678,7 @@ export const MapView = ({
       if (cl.cameras.length === 1) {
         // Individual Camera Pin (Single Camera displayed directly when separated)
         const cam = cl.cameras[0];
-        const activeThreat = incidents.find(inc => inc.cameraId === cam.id);
+        const activeThreat = incidents.find(inc => isIncidentForCam(inc, cam));
         const isAlarmActive = !!activeThreat;
         const isActive = cam.status === 'ACTIVE';
         const isMaint = cam.status === 'MAINTENANCE';
@@ -670,7 +738,7 @@ export const MapView = ({
       } else {
         // Multi-Camera Merged Cluster Badge with Multi-Camera Icon (No Text Tag) & Click-to-Zoom Expansion
         const count = cl.cameras.length;
-        const alarmCameras = cl.cameras.filter(c => incidents.some(inc => inc.cameraId === c.id));
+        const alarmCameras = cl.cameras.filter(c => incidents.some(inc => isIncidentForCam(inc, c)));
         const hasAlarm = alarmCameras.length > 0;
 
         const sizeClass = count >= 50 ? 'large' : count >= 10 ? 'medium' : 'small';
@@ -933,6 +1001,67 @@ export const MapView = ({
           >
             ✕ Exit Route Mode
           </button>
+        </div>
+      )}
+
+      {/* Real-Time Emergency Live Watchlist Hit Floating Alert Banner */}
+      {latestLiveHit && (
+        <div
+          className="emergency-hit-banner"
+          style={{
+            position: 'absolute',
+            top: '76px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1100,
+            background: 'linear-gradient(135deg, rgba(225, 29, 72, 0.96), rgba(159, 18, 57, 0.98))',
+            color: '#fff',
+            borderRadius: '12px',
+            padding: '10px 18px',
+            boxShadow: '0 12px 35px rgba(225, 29, 72, 0.65), 0 0 0 2px rgba(255, 255, 255, 0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            animation: 'pulse 1.2s infinite ease-in-out',
+            maxWidth: '92vw'
+          }}
+        >
+          <div style={{ background: '#fff', color: '#e11d48', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '18px', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+            🚨
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '13px', fontWeight: 900, letterSpacing: '0.5px' }}>
+                WATCHLIST TARGET DETECTED: {latestLiveHit.vehicleNo || latestLiveHit.vehicle_plate}
+              </span>
+              <span style={{ background: '#000', color: '#fbbf24', fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(251, 191, 36, 0.4)' }}>
+                {latestLiveHit.watchlist_category || 'STOLEN VEHICLE'}
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', opacity: 0.95, marginTop: '2px' }}>
+              📍 Spotted at <b>{latestLiveHit.camera?.name || latestLiveHit.cameraName || 'Gujarat CCTV Node'}</b> [{latestLiveHit.camera?.camera_code || latestLiveHit.cameraCode || 'GJ-GOV'}] ({latestLiveHit.district || 'Gujarat'})
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+            <button
+              className="btn btn-sm"
+              onClick={() => {
+                handleLocateIncident(latestLiveHit);
+                onCameraSelect(latestLiveHit.camera || { id: latestLiveHit.cameraId, name: latestLiveHit.cameraName, camera_code: latestLiveHit.cameraCode, stream_url: latestLiveHit.stream_url });
+                setLatestLiveHit(null);
+              }}
+              style={{ background: '#fff', color: '#e11d48', fontWeight: 800, fontSize: '11.5px', padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
+            >
+              <Video size={13} /> Intercept & Watch Live
+            </button>
+            <button
+              onClick={() => setLatestLiveHit(null)}
+              style={{ background: 'rgba(0,0,0,0.3)', border: 'none', color: '#fff', borderRadius: '6px', padding: '5px 7px', cursor: 'pointer' }}
+              title="Dismiss Banner"
+            >
+              <X size={14} />
+            </button>
+          </div>
         </div>
       )}
 

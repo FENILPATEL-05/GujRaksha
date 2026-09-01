@@ -21,6 +21,7 @@ import watchlistRoutes from './src/routes/watchlistRoutes.js';
 import anprRoutes from './src/routes/anprRoutes.js';
 import edgeRoutes from './src/routes/edgeRoutes.js';
 import workerRoutes from './src/routes/workerRoutes.js';
+import authRoutes from './src/routes/authRoutes.js';
 import pgClient from './src/db/pgClient.js';
 import pool from './src/db/pool.js';
 import departmentStore from './src/db/departmentStore.js';
@@ -48,6 +49,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Mount Routes Helper for both Root and /gujraksha Subpath
 const mountApiEndpoints = (prefix = '') => {
+  app.use(`${prefix}/api/v1/auth`, authRoutes);
   app.use(`${prefix}/api/v1/cameras`, cameraRoutes);
   app.use(`${prefix}/api/v1/departments`, departmentRoutes);
   app.use(`${prefix}/api/v1/watchlist`, watchlistRoutes);

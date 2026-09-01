@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { Video, AlertTriangle, RefreshCw, ExternalLink, Radio, Zap, ShieldCheck, Play } from "lucide-react";
+import { Video, VideoOff, AlertTriangle, RefreshCw, ExternalLink, Radio, Zap, ShieldCheck, Play } from "lucide-react";
 
 export const LiveCCTVFeed = ({
   camera,
@@ -318,49 +318,41 @@ export const LiveCCTVFeed = ({
 
       {/* Loading Indicator */}
       {isLoading && !streamError && (
-        <div style={{ position: "absolute", zIndex: 5, display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", color: "var(--accent)" }}>
-          <RefreshCw size={22} className="spin-animation" style={{ animation: "radarSpin 1.2s linear infinite" }} />
-          <span style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--text-dim)" }}>Connecting WebRTC Stream...</span>
+        <div style={{ position: "absolute", zIndex: 5, display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", color: "var(--accent)" }}>
+          <RefreshCw size={18} className="spin-animation" style={{ animation: "radarSpin 1.2s linear infinite" }} />
+          <span style={{ fontSize: "10.5px", fontFamily: "var(--font-mono)", color: "rgba(255, 255, 255, 0.45)" }}>Connecting...</span>
         </div>
       )}
 
-      {/* Stream Offline / Connection Error State */}
+      {/* Clean Black Screen Connection Lost State */}
       {streamError && (
-        <div style={{ position: "relative", zIndex: 5, padding: "16px", textAlign: "center", color: "var(--text-secondary)", maxWidth: "88%" }}>
-          <AlertTriangle size={26} style={{ color: "var(--warning)", marginBottom: "6px" }} />
-          <div style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--text-primary)" }}>
-            Stream Feed Offline / Unreachable
-          </div>
-          <div style={{ fontSize: "10.5px", color: "var(--text-dim)", fontFamily: "var(--font-mono)", wordBreak: "break-all", margin: "4px 0 8px" }}>
-            {whepApiUrl || rawStreamUrl || "No stream URL configured"}
-          </div>
-          {errorMessage && (
-            <div style={{ fontSize: "10px", color: "var(--danger)", marginBottom: "10px" }}>
-              {errorMessage}
-            </div>
-          )}
-          <div style={{ display: "flex", justifyContent: "center", gap: "6px", flexWrap: "wrap" }}>
-            <button
-              className="btn btn-sm btn-primary"
-              onClick={() => {
-                setStreamError(false);
-                setIsLoading(true);
-                if (iframeRef.current) {
-                  iframeRef.current.src = webRtcEmbedUrl;
-                }
-              }}
-              style={{ fontSize: "10.5px", padding: "3px 10px", gap: "4px" }}
-            >
-              <RefreshCw size={12} /> Retry Stream
-            </button>
-            <button
-              className="btn btn-sm"
-              onClick={() => window.open(webRtcEmbedUrl, '_blank')}
-              style={{ fontSize: "10.5px", padding: "3px 10px", gap: "4px" }}
-            >
-              <ExternalLink size={12} /> Open Direct Stream
-            </button>
-          </div>
+        <div 
+          style={{ 
+            position: "absolute", 
+            inset: 0, 
+            zIndex: 5, 
+            display: "flex", 
+            flexDirection: "column", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            background: "#000000",
+            gap: "8px",
+            userSelect: "none"
+          }}
+        >
+          <VideoOff size={22} style={{ color: "rgba(255, 255, 255, 0.35)", strokeWidth: 1.8 }} />
+          <span 
+            style={{ 
+              fontSize: "11px", 
+              fontWeight: 700, 
+              letterSpacing: "1px", 
+              color: "rgba(255, 255, 255, 0.45)", 
+              fontFamily: "var(--font-mono, monospace)",
+              textTransform: "uppercase"
+            }}
+          >
+            Connection Lost
+          </span>
         </div>
       )}
     </div>

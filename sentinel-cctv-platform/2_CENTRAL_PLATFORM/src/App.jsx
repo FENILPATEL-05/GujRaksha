@@ -24,10 +24,26 @@ import { AddDepartmentModal } from './components/AddDepartmentModal';
 import { AddWatchlistModal } from './components/AddWatchlistModal';
 import { GapAnalysisModal } from './components/GapAnalysisModal';
 import { ExportModal } from './components/ExportModal';
+import { UserManagementModal } from './components/UserManagementModal';
 import { ToastContainer } from './components/Toast';
 
 export function AppContent() {
-  const { isAuthenticated, isAdmin } = useAuth();
+  const {
+    isAuthenticated,
+    isSuperAdmin,
+    isDeptAdmin,
+    isViewer,
+    isAdmin,
+    userDepartmentId,
+    userDepartmentName,
+    canManageUsers,
+    canManageDepartments,
+    canManageCameras,
+    canManageWatchlist,
+    canSyncFeeds,
+    user
+  } = useAuth();
+
   const [activeView, setActiveView] = useState(() => localStorage.getItem('gujraksha_active_view') || 'map'); // 'map', 'registry', 'departments', 'videowall', 'anpr'
   const [cameras, setCameras] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -37,6 +53,7 @@ export function AppContent() {
   useEffect(() => {
     localStorage.setItem('gujraksha_active_view', activeView);
   }, [activeView]);
+
   const [filters, setFilters] = useState({
     department: 'ALL',
     district: 'ALL',
@@ -44,6 +61,7 @@ export function AppContent() {
     detection_mode: 'ALL',
     search: ''
   });
+
   const [selectedCameraForStream, setSelectedCameraForStream] = useState(null);
   const [selectedCameraForEdit, setSelectedCameraForEdit] = useState(null);
   const [selectedDeptForEdit, setSelectedDeptForEdit] = useState(null);
@@ -52,7 +70,15 @@ export function AppContent() {
   const [isAddWatchlistOpen, setIsAddWatchlistOpen] = useState(false);
   const [isGapOpen, setIsGapOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isUserMgmtOpen, setIsUserMgmtOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
+
+  // Auto-scope department filter when Department Admin logs in
+  useEffect(() => {
+    if (isDeptAdmin && userDepartmentId && userDepartmentId !== 'ALL') {
+      setFilters(prev => ({ ...prev, department: userDepartmentId }));
+    }
+  }, [isDeptAdmin, userDepartmentId]);
 
   const addToast = (message, type = 'info', title = '') => {
     const id = Date.now() + Math.random();
@@ -91,7 +117,6 @@ export function AppContent() {
       }
     } catch (err) {
       if (err.name === 'AbortError') {
-        // Request was aborted by newer filter input, do not show error toast
         return;
       }
       console.error('Error fetching cameras:', err);
@@ -120,7 +145,7 @@ export function AppContent() {
     }
   }, [fetchDepartments, isAuthenticated]);
 
-  // Fetch cameras with debounced search to prevent race conditions and network flooding
+  // Fetch cameras with debounced search
   useEffect(() => {
     if (!isAuthenticated) return;
     const controller = new AbortController();
@@ -135,18 +160,21 @@ export function AppContent() {
     };
   }, [fetchCameras, filters, isAuthenticated]);
 
-  // Force viewer role to map view only
+  // Role based route permission enforcement
   useEffect(() => {
-    if (!isAdmin && activeView !== 'map') {
+    if (isViewer && activeView !== 'map' && activeView !== 'videowall') {
+      setActiveView('map');
+    } else if (isDeptAdmin && (activeView === 'departments' || (activeView === 'anpr' && !canManageWatchlist))) {
       setActiveView('map');
     }
-  }, [isAdmin, activeView]);
+  }, [isViewer, isDeptAdmin, canManageWatchlist, activeView]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
   const handleSyncGovFeeds = async () => {
+    if (!canSyncFeeds) return;
     try {
       const res = await fetch('/api/v1/onboarding/sync-gov-feeds', { method: 'POST' });
       const data = await res.json();
@@ -169,7 +197,10 @@ export function AppContent() {
   };
 
   const handleDeleteCamera = async (cam) => {
-    if (!isAdmin) return;
+    if (!canManageCameras) {
+      addToast('Only authorized department administrators can delete cameras.', 'error', 'Permission Denied');
+      return;
+    }
     if (!window.confirm(`Are you sure you want to remove '${cam.name}' (${cam.camera_code || cam.id}) from the Gujarat CCTV Registry?`)) {
       return;
     }
@@ -206,6 +237,10 @@ export function AppContent() {
   };
 
   const handleOpenEditModal = async (cam) => {
+    if (!canManageCameras) {
+      addToast('Viewer role does not have camera editing privileges.', 'error', 'Read-Only Access');
+      return;
+    }
     if (!cam) {
       setSelectedCameraForEdit(null);
       return;
@@ -234,6 +269,7 @@ export function AppContent() {
         onViewChange={(view) => setActiveView(view)}
         onSyncFeeds={handleSyncGovFeeds}
         onOpenGap={() => setIsGapOpen(true)}
+        onOpenUserMgmt={() => setIsUserMgmtOpen(true)}
         departmentCount={departments.length || 26}
       />
 
@@ -258,9 +294,10 @@ export function AppContent() {
             onCameraSelect={handleOpenStreamModal}
             activeTrackVehicle={activeTrackVehicle}
             onClearTrackVehicle={() => setActiveTrackVehicle(null)}
+            addToast={addToast}
           />
         </div>
-      ) : activeView === 'registry' && isAdmin ? (
+      ) : activeView === 'registry' && canManageCameras ? (
         <CameraRegistryPage
           cameras={cameras}
           filters={filters}
@@ -273,7 +310,7 @@ export function AppContent() {
           departments={departments}
           isLoading={isLoadingCameras}
         />
-      ) : activeView === 'departments' && isAdmin ? (
+      ) : activeView === 'departments' && canManageDepartments ? (
         <DepartmentDirectoryPage
           departments={departments}
           onRefresh={fetchDepartments}
@@ -291,14 +328,14 @@ export function AppContent() {
           }}
           addToast={addToast}
         />
-      ) : activeView === 'videowall' && isAdmin ? (
+      ) : activeView === 'videowall' ? (
         <VideoWallPage
           cameras={cameras}
           departments={departments}
           onCameraSelect={handleOpenStreamModal}
           addToast={addToast}
         />
-      ) : activeView === 'anpr' && isAdmin ? (
+      ) : activeView === 'anpr' && canManageWatchlist ? (
         <ANPRIntelligencePage
           onTrackVehicleOnMap={handleTrackVehicleOnMap}
           onOpenAddWatchlist={() => setIsAddWatchlistOpen(true)}
@@ -339,7 +376,6 @@ export function AppContent() {
         departments={departments}
       />
 
-
       <AddDepartmentModal
         isOpen={isAddDeptOpen}
         onClose={() => {
@@ -373,6 +409,13 @@ export function AppContent() {
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
         cameras={cameras}
+        addToast={addToast}
+      />
+
+      <UserManagementModal
+        isOpen={isUserMgmtOpen}
+        onClose={() => setIsUserMgmtOpen(false)}
+        departments={departments}
         addToast={addToast}
       />
 

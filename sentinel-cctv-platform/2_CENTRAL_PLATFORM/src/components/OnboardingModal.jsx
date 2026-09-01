@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { Camera, X, Check, FileSpreadsheet, CheckCircle2, Radio, Sliders, Layers } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Camera, X, Check, FileSpreadsheet, CheckCircle2, Radio, Sliders, Layers, Lock } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, departments = [] }) => {
+  const { isDeptAdmin, userDepartmentId, userDepartmentName } = useAuth();
   const [activeTab, setActiveTab] = useState('manual');
   const [bulkResult, setBulkResult] = useState(null);
   const [showAdvancedStream, setShowAdvancedStream] = useState(false);
@@ -9,7 +11,7 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
   const [form, setForm] = useState({
     name: '',
     camera_code: '',
-    department_id: departments.length > 0 ? departments[0].code : 'HOME',
+    department_id: (isDeptAdmin && userDepartmentId !== 'ALL') ? userDepartmentId : (departments.length > 0 ? departments[0].code : 'HOME'),
     district: '',
     taluka: '',
     latitude: '',
@@ -30,6 +32,12 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
     bitrate: '4Mbps',
     retention_days: 15
   });
+
+  useEffect(() => {
+    if (isOpen && isDeptAdmin && userDepartmentId !== 'ALL') {
+      setForm(prev => ({ ...prev, department_id: userDepartmentId }));
+    }
+  }, [isOpen, isDeptAdmin, userDepartmentId]);
 
   if (!isOpen) return null;
 
@@ -176,16 +184,23 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
 
                 <div className="form-field">
                   <label>Department Ownership *</label>
-                  <select
-                    value={form.department_id}
-                    onChange={(e) => setForm({ ...form, department_id: e.target.value })}
-                  >
-                    {departments.map((d) => (
-                      <option key={d.code} value={d.code}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
+                  {isDeptAdmin && userDepartmentId !== 'ALL' ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--panel-bg)', borderRadius: '8px', border: '1px solid var(--panel-border)', fontSize: '13px', color: 'var(--accent)' }}>
+                      <Lock size={14} />
+                      <span style={{ fontWeight: 600 }}>{userDepartmentName || userDepartmentId}</span>
+                    </div>
+                  ) : (
+                    <select
+                      value={form.department_id}
+                      onChange={(e) => setForm({ ...form, department_id: e.target.value })}
+                    >
+                      {departments.map((d) => (
+                        <option key={d.code} value={d.code}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div className="form-field">

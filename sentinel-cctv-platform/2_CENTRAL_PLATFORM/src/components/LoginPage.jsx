@@ -19,11 +19,17 @@ export const LoginPage = () => {
     // Simulate brief auth delay
     await new Promise(r => setTimeout(r, 600));
 
-    const result = login(username, password);
+    const result = await login(username, password);
     if (!result.success) {
-      setError(result.error);
+      setError(result.error || 'Invalid credentials. Access denied.');
     }
     setIsLoading(false);
+  };
+
+  const handleFillCredentials = (u, p) => {
+    setUsername(u);
+    setPassword(p);
+    setError('');
   };
 
   return (
@@ -44,10 +50,10 @@ export const LoginPage = () => {
 
         <form onSubmit={handleSubmit} className="login-form">
           <div className="login-field">
-            <label>Username</label>
+            <label>Username / Email ID</label>
             <input
               type="text"
-              placeholder="Enter username"
+              placeholder="e.g. superadmin, police_admin, rto_admin"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoFocus
@@ -88,9 +94,23 @@ export const LoginPage = () => {
 
         <div className="login-footer">
           <div className="login-creds">
-            <div className="login-cred-title"><ShieldCheck size={12} strokeWidth={2.2} /> Default Access Credentials</div>
-            <div className="login-cred-row"><span className="login-cred-role">Admin</span> <code>admin</code> / <code>admin123</code></div>
-            <div className="login-cred-row"><span className="login-cred-role">Viewer</span> <code>viewer</code> / <code>viewer123</code></div>
+            <div className="login-cred-title"><ShieldCheck size={12} strokeWidth={2.2} /> Quick Access Role Credentials (Click to fill)</div>
+            <div className="login-cred-row" style={{ cursor: 'pointer' }} onClick={() => handleFillCredentials('superadmin', 'admin123')}>
+              <span className="login-cred-role" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171' }}>Superadmin</span>
+              <code>superadmin</code> / <code>admin123</code>
+            </div>
+            <div className="login-cred-row" style={{ cursor: 'pointer' }} onClick={() => handleFillCredentials('police_admin', 'police123')}>
+              <span className="login-cred-role" style={{ background: 'rgba(34, 211, 238, 0.15)', color: '#22d3ee' }}>Police Admin</span>
+              <code>police_admin</code> / <code>police123</code>
+            </div>
+            <div className="login-cred-row" style={{ cursor: 'pointer' }} onClick={() => handleFillCredentials('rto_admin', 'rto123')}>
+              <span className="login-cred-role" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24' }}>Transport Admin</span>
+              <code>rto_admin</code> / <code>rto123</code>
+            </div>
+            <div className="login-cred-row" style={{ cursor: 'pointer' }} onClick={() => handleFillCredentials('viewer', 'viewer123')}>
+              <span className="login-cred-role">Viewer (Read-Only)</span>
+              <code>viewer</code> / <code>viewer123</code>
+            </div>
           </div>
         </div>
       </div>
