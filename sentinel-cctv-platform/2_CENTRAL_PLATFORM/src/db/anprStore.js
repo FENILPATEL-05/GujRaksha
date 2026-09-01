@@ -15,6 +15,40 @@ class AnprDataStore {
   constructor() {
     this.detections = this.loadFromFile();
     this.alertSubscribers = [];
+    this.liveCameraDetections = new Map();
+    this.activeVisionCameraCode = "GJ-GOV-001";
+  }
+
+  setActiveVisionCamera(camCode) {
+    if (camCode) {
+      this.activeVisionCameraCode = String(camCode);
+    }
+  }
+
+  getActiveVisionCamera() {
+    return this.activeVisionCameraCode || "GJ-GOV-001";
+  }
+
+  updateLiveDetections(payload) {
+    if (!payload || !payload.camera_code) return;
+    const camCode = payload.camera_code;
+    this.liveCameraDetections.set(camCode, {
+      camera_code: camCode,
+      camera_id: payload.camera_id,
+      timestamp: payload.timestamp || new Date().toISOString(),
+      detections: payload.detections || [],
+      counts: payload.counts || {
+        total: (payload.detections || []).length,
+        vehicles: (payload.detections || []).filter(d => ['CAR', 'TRUCK', 'BUS', 'MOTORCYCLE', 'BICYCLE'].includes(String(d.label).toUpperCase())).length,
+        persons: (payload.detections || []).filter(d => String(d.label).toUpperCase() === 'PERSON').length,
+        plates: (payload.detections || []).filter(d => d.type === 'PLATE' || String(d.label).includes('PLATE')).length
+      }
+    });
+  }
+
+  getLiveDetections(cameraCode) {
+    if (!cameraCode) return null;
+    return this.liveCameraDetections.get(cameraCode) || null;
   }
 
   loadFromFile() {
@@ -85,6 +119,71 @@ class AnprDataStore {
         console.error("Error sending SSE alert:", err.message);
       }
     });
+  }
+
+  // Ingest & Cache Real-Time Live Camera Detections (Object & Plate Bounding Boxes)
+  updateLiveDetections(payload) {
+    if (!payload || (!payload.camera_code && !payload.camera_id)) return null;
+    const cameraCode = payload.camera_code || payload.camera_id;
+    const items = Array.isArray(payload.detections) ? payload.detections : [];
+    
+    // Calculate category breakdown
+    const counts = {
+      total: items.length,
+      vehicles: items.filter(d => ['CAR', 'TRUCK', 'BUS', 'MOTORCYCLE', 'BICYCLE', 'VEHICLE'].includes(String(d.label).toUpperCase())).length,
+      persons: items.filter(d => String(d.label).toUpperCase() === 'PERSON').length,
+      plates: items.filter(d => d.type === 'PLATE' || d.plate || String(d.label).toUpperCase().includes('PLATE')).length
+    };
+
+    const record = {
+      camera_code: cameraCode,
+      camera_id: payload.camera_id || cameraCode,
+      timestamp: payload.timestamp || new Date().toISOString(),
+      updated_at: Date.now(),
+      frame_width: payload.frame_width || 1920,
+      frame_height: payload.frame_height || 1080,
+      detections: items,
+      counts: counts
+    };
+
+    this.liveCameraDetections.set(cameraCode, record);
+    if (payload.camera_id && payload.camera_id !== cameraCode) {
+      this.liveCameraDetections.set(payload.camera_id, record);
+    }
+
+    // Broadcast live detections to SSE subscribers
+    this.broadcastAlert({
+      type: "STREAM_AI_DETECTIONS",
+      ...record
+    });
+
+    return record;
+  }
+
+  getLiveDetections(cameraCode) {
+    if (!cameraCode) return { camera_code: "", detections: [], counts: { total: 0, vehicles: 0, persons: 0, plates: 0 } };
+    const clean = String(cameraCode).trim();
+    const data = this.liveCameraDetections.get(clean) || this.liveCameraDetections.get(`gov-feed-${clean}`) || this.liveCameraDetections.get(clean.replace('gov-feed-', ''));
+    if (!data) return { camera_code: cameraCode, detections: [], counts: { total: 0, vehicles: 0, persons: 0, plates: 0 } };
+    
+    // Check if stale (> 8 seconds)
+    if (Date.now() - data.updated_at > 8000) {
+      return { ...data, stale: true };
+    }
+    return data;
+  }
+
+  getAllLiveDetections() {
+    const list = [];
+    const now = Date.now();
+    const seen = new Set();
+    for (const [code, data] of this.liveCameraDetections.entries()) {
+      if (!seen.has(data.camera_code) && now - data.updated_at <= 8000) {
+        seen.add(data.camera_code);
+        list.push(data);
+      }
+    }
+    return list;
   }
 
   getAll(filters = {}) {
@@ -274,42 +373,21 @@ class AnprDataStore {
     const watchlistHit = watchlistStore.getByPlate(cleanPlate);
 
     let camMeta = null;
-    const rawCamKey = payload.camera_id || payload.camera_code || "";
-    if (rawCamKey) {
-      camMeta = db.getById(rawCamKey);
-      if (!camMeta) {
-        // Try normalized variations like "gj-gov-100" -> "GJ-GOV-CAM100" or "gov-feed-100"
-        const numMatch = String(rawCamKey).match(/\d+/);
-        if (numMatch) {
-          const num = parseInt(numMatch[0], 10);
-          camMeta = db.getById(`gov-feed-${num}`) || 
-                    db.getById(`GJ-GOV-CAM${String(num).padStart(2, '0')}`) || 
-                    db.getById(`GJ-GOV-CAM${num}`) || 
-                    db.getById(`cam-${num}`) || 
-                    db.getById(`cam${num}`) ||
-                    db.getById(`feed-${num}`);
-        }
-      }
+    if (payload.camera_id || payload.camera_code) {
+      camMeta = db.getById(payload.camera_id || payload.camera_code);
     }
-
-    const resolvedCamId = camMeta ? camMeta.id : (payload.camera_id || "gov-feed-1");
-    const resolvedCamCode = camMeta ? camMeta.camera_code : (payload.camera_code || "GJ-GOV-001");
-    const resolvedCamName = payload.camera_name || (camMeta ? camMeta.name : `CCTV Node [${resolvedCamCode}]`);
-    const resolvedDistrict = payload.district || (camMeta ? camMeta.district : "Ahmedabad");
-    const resolvedLat = payload.latitude !== undefined ? parseFloat(payload.latitude) : (camMeta ? camMeta.latitude : 23.0225);
-    const resolvedLng = payload.longitude !== undefined ? parseFloat(payload.longitude) : (camMeta ? camMeta.longitude : 72.5714);
 
     const newDetection = {
       id: payload.id || `det-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       vehicle_plate: cleanPlate,
       vehicle_type: payload.vehicle_type || (watchlistHit ? watchlistHit.vehicle_type : "Motor Vehicle"),
       vehicle_color: payload.vehicle_color || "Standard",
-      camera_id: resolvedCamId,
-      camera_code: resolvedCamCode,
-      camera_name: resolvedCamName,
-      district: resolvedDistrict,
-      latitude: resolvedLat,
-      longitude: resolvedLng,
+      camera_id: payload.camera_id || (camMeta ? camMeta.id : "gov-feed-1"),
+      camera_code: payload.camera_code || (camMeta ? camMeta.camera_code : "GJ-GOV-001"),
+      camera_name: payload.camera_name || (camMeta ? camMeta.name : "State CCTV Node"),
+      district: payload.district || (camMeta ? camMeta.district : "Ahmedabad"),
+      latitude: payload.latitude !== undefined ? parseFloat(payload.latitude) : (camMeta ? camMeta.latitude : 23.0225),
+      longitude: payload.longitude !== undefined ? parseFloat(payload.longitude) : (camMeta ? camMeta.longitude : 72.5714),
       speed_kmh: payload.speed_kmh ? parseInt(payload.speed_kmh, 10) : Math.floor(40 + Math.random() * 45),
       confidence: payload.confidence ? parseFloat(payload.confidence) : parseFloat((95 + Math.random() * 4.8).toFixed(1)),
       is_watchlist_hit: !!watchlistHit,

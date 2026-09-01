@@ -55,12 +55,15 @@ class WorkerOrchestratorService {
         allCams = allCams.filter(c => String(c.district || "").toLowerCase() === district.toLowerCase());
       }
 
-      // ONLY allocate cameras that strictly have ANPR detection mode enabled
-      const anprCams = allCams.filter(c => {
+      // ONLY assign cameras that are explicitly configured for AI detection (OBJECT_DETECTION or ANPR_DETECTION)
+      const aiCams = allCams.filter(c => {
         const mode = String(c.detection_mode || "").toUpperCase();
-        return mode === "ANPR_DETECTION" || mode === "ANPR" || mode.includes("ANPR") || mode.includes("PLATE");
+        return mode === "OBJECT_DETECTION" || 
+               mode === "AI_OBJECT_DETECTION" ||
+               mode === "ANPR_DETECTION" || 
+               mode === "ANPR";
       });
-      const candidates = anprCams;
+      const candidates = aiCams;
       const maxToTake = Math.min(capacity, candidates.length);
 
       assigned = candidates.slice(0, maxToTake).map(c => ({
@@ -68,7 +71,7 @@ class WorkerOrchestratorService {
         camera_code: c.camera_code || c.code || `CAM-${c.id}`,
         name: c.name || `Camera ${c.id}`,
         district: c.district || district || "All",
-        detection_mode: c.detection_mode || "ANPR_DETECTION",
+        detection_mode: c.detection_mode || "OBJECT_DETECTION",
         rtsp_url: c.rtsp_url || c.stream_url || c.url || "0",
         latitude: c.latitude,
         longitude: c.longitude
@@ -150,18 +153,21 @@ class WorkerOrchestratorService {
         allCams = allCams.filter(c => String(c.district || "").toLowerCase() === worker.district.toLowerCase());
       }
 
-      const anprCams = allCams.filter(c => {
+      const aiCams = allCams.filter(c => {
         const mode = String(c.detection_mode || "").toUpperCase();
-        return mode === "ANPR_DETECTION" || mode === "ANPR" || mode.includes("ANPR") || mode.includes("PLATE");
+        return mode === "OBJECT_DETECTION" || 
+               mode === "AI_OBJECT_DETECTION" ||
+               mode === "ANPR_DETECTION" || 
+               mode === "ANPR";
       });
 
-      const maxToTake = Math.min(worker.max_capacity, anprCams.length);
-      worker.assigned_cameras = anprCams.slice(0, maxToTake).map(c => ({
+      const maxToTake = Math.min(worker.max_capacity, aiCams.length);
+      worker.assigned_cameras = aiCams.slice(0, maxToTake).map(c => ({
         id: c.id,
         camera_code: c.camera_code || c.code || `CAM-${c.id}`,
         name: c.name || `Camera ${c.id}`,
         district: c.district || worker.district || "All",
-        detection_mode: c.detection_mode || "ANPR_DETECTION",
+        detection_mode: c.detection_mode || "OBJECT_DETECTION",
         rtsp_url: c.rtsp_url || c.stream_url || c.url || "0",
         latitude: c.latitude,
         longitude: c.longitude
@@ -222,14 +228,17 @@ class WorkerOrchestratorService {
       allCams = allCams.filter(c => String(c.district || "").toLowerCase() === district.toLowerCase());
     }
 
-    // Filter & prioritize ANPR cameras for AI Workers
+    // Filter & prioritize AI cameras (Object Detection, ANPR) for AI Workers
     let candidateCams = allCams;
     if (anpr_only !== false) {
-      const anprCams = allCams.filter(c => {
+      const aiCams = allCams.filter(c => {
         const mode = String(c.detection_mode || "").toUpperCase();
-        return mode === "ANPR_DETECTION" || mode === "ANPR" || mode.includes("ANPR") || mode.includes("PLATE");
+        return mode === "OBJECT_DETECTION" || 
+               mode === "AI_OBJECT_DETECTION" ||
+               mode === "ANPR_DETECTION" || 
+               mode === "ANPR";
       });
-      candidateCams = anprCams;
+      candidateCams = aiCams;
     }
 
     let selectedCams = [];
@@ -248,7 +257,7 @@ class WorkerOrchestratorService {
       camera_code: c.camera_code || c.code || `CAM-${c.id}`,
       name: c.name || `Camera ${c.id}`,
       district: c.district || worker.district,
-      detection_mode: c.detection_mode || "ANPR_DETECTION",
+      detection_mode: c.detection_mode || "OBJECT_DETECTION",
       rtsp_url: c.rtsp_url || c.stream_url || c.url || "0",
       latitude: c.latitude,
       longitude: c.longitude
@@ -258,7 +267,7 @@ class WorkerOrchestratorService {
     worker.state = worker.assigned_cameras.length > 0 ? "SCANNING" : "STANDBY";
     worker.stats.active_streams = worker.assigned_cameras.length;
 
-    console.log(`🎯 [Worker Orchestrator] Central Admin assigned ${worker.assigned_cameras.length} ANPR cameras to \x1b[36m${worker_id}\x1b[0m!`);
+    console.log(`🎯 [Worker Orchestrator] Central Admin assigned ${worker.assigned_cameras.length} AI vision cameras to \x1b[36m${worker_id}\x1b[0m!`);
 
     return {
       success: true,
@@ -286,7 +295,7 @@ class WorkerOrchestratorService {
   }
 
   /**
-   * Distribute all ANPR cameras evenly across all currently ONLINE workers.
+   * Distribute all AI cameras evenly across all currently ONLINE workers.
    */
   autoDistributeAllWorkers(district = null, anpr_only = true) {
     const onlineWorkers = Array.from(this.workers.values()).filter(w => w.status === "ONLINE");
@@ -301,13 +310,16 @@ class WorkerOrchestratorService {
       allCams = allCams.filter(c => String(c.district || "").toLowerCase() === district.toLowerCase());
     }
 
-    // Filter for ANPR cameras specifically
+    // Filter for all AI-enabled cameras (OBJECT_DETECTION or ANPR_DETECTION)
     if (anpr_only !== false) {
-      const anprCams = allCams.filter(c => {
+      const aiCams = allCams.filter(c => {
         const mode = String(c.detection_mode || "").toUpperCase();
-        return mode === "ANPR_DETECTION" || mode === "ANPR" || mode.includes("ANPR") || mode.includes("PLATE");
+        return mode === "OBJECT_DETECTION" || 
+               mode === "AI_OBJECT_DETECTION" ||
+               mode === "ANPR_DETECTION" || 
+               mode === "ANPR";
       });
-      allCams = anprCams;
+      allCams = aiCams;
     }
 
     onlineWorkers.forEach(w => { 
@@ -323,7 +335,7 @@ class WorkerOrchestratorService {
           camera_code: c.camera_code || c.code || `CAM-${c.id}`,
           name: c.name || `Camera ${c.id}`,
           district: c.district || targetWorker.district,
-          detection_mode: c.detection_mode || "ANPR_DETECTION",
+          detection_mode: c.detection_mode || "OBJECT_DETECTION",
           rtsp_url: c.rtsp_url || c.stream_url || c.url || "0",
           latitude: c.latitude,
           longitude: c.longitude

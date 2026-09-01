@@ -261,12 +261,13 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                   <label>AI Detection & Analytics Mode *</label>
                   <select
                     value={form.detection_mode}
-                    onChange={(e) => setForm({ ...form, detection_mode: e.target.value })}
+                    onChange={(e) => setForm({ ...form, detection_mode: e.target.value, enable_object_detection: e.target.value === 'OBJECT_DETECTION' })}
                   >
-                    <option value="GENERAL_SURVEILLANCE">General Surveillance (Standard Feed / No AI)</option>
+                    <option value="OBJECT_DETECTION">AI Object Detection & Classification (YOLOv9 Live HUD)</option>
                     <option value="ANPR_DETECTION">ANPR Detection (Automatic License Plate Recognition)</option>
-                    <option value="VEHICLE_COUNTING">Vehicle Counting & Classification</option>
                     <option value="TRAFFIC_MONITORING">Traffic Flow & Speed Monitoring</option>
+                    <option value="VEHICLE_COUNTING">Vehicle Counting & Classification</option>
+                    <option value="GENERAL_SURVEILLANCE">General Surveillance (Standard Feed / No AI)</option>
                   </select>
                 </div>
 

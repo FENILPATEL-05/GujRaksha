@@ -182,6 +182,87 @@ router.post("/scanner-config", async (req, res, next) => {
   }
 });
 
+// POST Ingest real-time live stream detections & bounding boxes from AI workers / scanners
+router.post("/live-detections", (req, res, next) => {
+  try {
+    const result = anprStore.updateLiveDetections(req.body);
+    const camCode = req.body.camera_code || 'GJ-GOV-001';
+    const detections = req.body.detections || [];
+    if (detections.length > 0) {
+      const counts = {};
+      for (const d of detections) {
+        const lbl = (d.label || 'OBJECT').toUpperCase();
+        counts[lbl] = (counts[lbl] || 0) + 1;
+      }
+      const summary = Object.entries(counts).map(([k, v]) => `${v}x ${k}`).join(', ');
+      const timeStr = new Date().toLocaleTimeString('en-US', { hour12: false });
+      console.log(`\x1b[35m[AI VISION API]\x1b[0m 🎯 \x1b[33m[${camCode}]\x1b[0m Ingested Objects: \x1b[1m\x1b[37m${summary}\x1b[0m | Time: ${timeStr}`);
+    }
+    res.json({
+      success: true,
+      message: "Live stream AI detections updated successfully.",
+      data: result
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET Live stream detections & bounding boxes for a specific camera
+router.get("/live-detections/:cameraCode", (req, res, next) => {
+  try {
+    const data = anprStore.getLiveDetections(req.params.cameraCode);
+    res.json({
+      success: true,
+      data: data
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET Live stream detections across all active cameras
+router.get("/live-detections", (req, res, next) => {
+  try {
+    const data = anprStore.getAllLiveDetections ? anprStore.getAllLiveDetections() : [];
+    res.json({
+      success: true,
+      total: data.length,
+      data: data
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST Set currently focused camera for live AI object detection
+router.post("/active-vision-camera", (req, res, next) => {
+  try {
+    const { camera_code } = req.body;
+    if (camera_code) {
+      anprStore.setActiveVisionCamera(camera_code);
+    }
+    res.json({
+      success: true,
+      active_camera_code: anprStore.getActiveVisionCamera()
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET currently focused camera for live AI object detection
+router.get("/active-vision-camera", (req, res, next) => {
+  try {
+    res.json({
+      success: true,
+      active_camera_code: anprStore.getActiveVisionCamera()
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST Trigger Native C++ ANPR Inference on All Cameras
 router.post("/run-engine-all", async (req, res, next) => {
   try {

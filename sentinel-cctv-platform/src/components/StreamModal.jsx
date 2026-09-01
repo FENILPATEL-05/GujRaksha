@@ -63,7 +63,7 @@ export const StreamModal = ({ camera, onClose, onEditCamera }) => {
           <div className="stream-modal-layout">
             {/* Left: Stream Monitor Screen */}
             <div className="stream-screen">
-              <LiveCCTVFeed camera={camera} isMuted={true} isDetailed={true} />
+              <LiveCCTVFeed camera={camera} isMuted={true} isDetailed={true} showAiVision={true} />
             </div>
 
             {/* Right: Metadata Grid + PTZ Controls */}
@@ -72,6 +72,7 @@ export const StreamModal = ({ camera, onClose, onEditCamera }) => {
                 <div className="item"><span>District</span><b>{camera.district || '—'}</b></div>
                 <div className="item"><span>Department</span><b>{camera.department_name || camera.department_id || '—'}</b></div>
                 <div className="item"><span>Protocol / SLA</span><b style={{ color: 'var(--success)' }}>WHEP WebRTC (Ultra Low Latency)</b></div>
+                <div className="item"><span>AI Vision Engine</span><b style={{ color: 'var(--accent)' }}>YOLOv9 + COCO 80 + CCT ANPR</b></div>
                 <div className="item"><span>Codec & Res</span><b>{camera.codec || camera.stream_properties?.codec || 'H.264'} · {camera.stream_properties?.resolution || camera.resolution || '1080p FHD'}</b></div>
                 <div className="item"><span>VMS Vendor</span><b>{camera.vms_vendor || 'Live Sentinel Feeder'}</b></div>
                 <div className="item"><span>Status</span><b style={{ color: camera.status === 'ACTIVE' ? 'var(--success)' : 'var(--danger)' }}>{camera.status}</b></div>

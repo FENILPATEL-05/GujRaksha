@@ -1,10 +1,12 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { Video, AlertTriangle, RefreshCw, ExternalLink, Radio, Zap, ShieldCheck, Play } from "lucide-react";
+import { Video, AlertTriangle, RefreshCw, ExternalLink, Radio, Zap, ShieldCheck, Play, Eye, EyeOff, Sparkles, Car, User, Target } from "lucide-react";
+import aiVisionSocket from "../services/aiVisionSocket.js";
 
 export const LiveCCTVFeed = ({
   camera,
   isMuted = true,
-  isDetailed = false
+  isDetailed = false,
+  showAiVision = false
 }) => {
   const videoRef = useRef(null);
   const imgRef = useRef(null);
@@ -16,6 +18,18 @@ export const LiveCCTVFeed = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
   const [activeProtocol, setActiveProtocol] = useState("WHEP WebRTC");
+
+  // AI Object Detection State (Active only when showAiVision=true)
+  const [aiVisionEnabled, setAiVisionEnabled] = useState(() => {
+    try {
+      const stored = localStorage.getItem("gujraksha_ai_vision_boxes");
+      return stored !== null ? stored === "true" : true;
+    } catch {
+      return true;
+    }
+  });
+  const [liveDetections, setLiveDetections] = useState([]);
+  const [detectionCounts, setDetectionCounts] = useState({ total: 0, vehicles: 0, persons: 0, plates: 0 });
 
   const getCleanId = useCallback((cam) => {
     if (!cam) return "1";
@@ -78,24 +92,83 @@ export const LiveCCTVFeed = ({
     return `http://${currentHost}:8889/${path}/whep`;
   }, [resolveStreamPath, getCleanId]);
 
-  // Resolve MediaMTX WebRTC Embed URL
+  // Resolve MediaMTX WebRTC Embed URL (Never show timeline/controls)
   const resolveWebRtcUrl = useCallback((cam) => {
     if (!cam) return "";
     const whep = resolveWhepApiUrl(cam);
     if (whep) {
       const embedBase = whep.replace(/\/whep$/, "");
-      return `${embedBase}/?autoplay=1&muted=${isMuted ? 1 : 0}&controls=${isDetailed ? 1 : 0}`;
+      return `${embedBase}/?autoplay=1&muted=${isMuted ? 1 : 0}&controls=0`;
     }
     const cleanId = getCleanId(cam);
     const currentHost = typeof window !== "undefined" ? (window.location.hostname || "localhost") : "localhost";
-    return `http://${currentHost}:8889/stream/${cleanId}/?autoplay=1&muted=${isMuted ? 1 : 0}&controls=${isDetailed ? 1 : 0}`;
-  }, [isMuted, isDetailed, resolveWhepApiUrl, getCleanId]);
+    return `http://${currentHost}:8889/stream/${cleanId}/?autoplay=1&muted=${isMuted ? 1 : 0}&controls=0`;
+  }, [isMuted, resolveWhepApiUrl, getCleanId]);
 
   const webRtcEmbedUrl = resolveWebRtcUrl(camera);
   const whepApiUrl = resolveWhepApiUrl(camera);
   const rawStreamUrl = camera ? (camera.stream_url || camera.rtsp_url || whepApiUrl) : "";
   const isRtspOnly = false;
 
+  useEffect(() => {
+    try {
+      localStorage.setItem("gujraksha_ai_vision_boxes", String(aiVisionEnabled));
+    } catch {}
+  }, [aiVisionEnabled]);
+
+  // Single Shared WebSocket Engine for Real-Time AI Bounding Boxes
+  useEffect(() => {
+    // Reset all detections immediately on camera switch
+    setLiveDetections([]);
+    setDetectionCounts({ total: 0, vehicles: 0, persons: 0, plates: 0 });
+
+    if (!showAiVision || !camera) {
+      return;
+    }
+    const camCode = camera.camera_code || camera.id || "GJ-GOV-001";
+    let isSubscribed = true;
+    let staleDetectionTimer = null;
+
+    const resetStaleTimer = () => {
+      if (staleDetectionTimer) clearTimeout(staleDetectionTimer);
+      staleDetectionTimer = setTimeout(() => {
+        if (isSubscribed) {
+          setLiveDetections([]);
+          setDetectionCounts({ total: 0, vehicles: 0, persons: 0, plates: 0 });
+        }
+      }, 2200);
+    };
+
+    const handleVisionFrame = (detections, counts) => {
+      if (!isSubscribed) return;
+      setLiveDetections(detections || []);
+      resetStaleTimer();
+      if (counts) {
+        setDetectionCounts(counts);
+      } else {
+        const list = detections || [];
+        setDetectionCounts({
+          total: list.length,
+          vehicles: list.filter(d => ['CAR', 'TRUCK', 'BUS', 'MOTORCYCLE', 'BICYCLE'].includes(String(d.label).toUpperCase())).length,
+          persons: list.filter(d => String(d.label).toUpperCase() === 'PERSON').length,
+          plates: list.filter(d => d.type === 'PLATE' || String(d.label).includes('PLATE')).length
+        });
+      }
+    };
+
+    // Subscribe via single shared WebSocket singleton
+    aiVisionSocket.subscribe(camCode, handleVisionFrame);
+
+    return () => {
+      isSubscribed = false;
+      setLiveDetections([]);
+      setDetectionCounts({ total: 0, vehicles: 0, persons: 0, plates: 0 });
+      if (staleDetectionTimer) clearTimeout(staleDetectionTimer);
+      aiVisionSocket.unsubscribe(camCode, handleVisionFrame);
+    };
+  }, [showAiVision, camera?.camera_code, camera?.id]);
+
+  // Dynamic Camera Stream Setup
   useEffect(() => {
     setStreamError(false);
     setIsLoading(true);
@@ -130,7 +203,6 @@ export const LiveCCTVFeed = ({
       setActiveProtocol("WHEP WebRTC");
       setIsLoading(false);
     } else if (isPhysicalLocalRtsp) {
-      // Physical IP camera (e.g. direct RTSP without WebRTC Gateway) -> Stream via RTSP Proxy
       setStreamMode("mjpeg");
       setActiveProtocol("Live RTSP Stream Gateway");
       setIsLoading(false);
@@ -191,19 +263,84 @@ export const LiveCCTVFeed = ({
     ? rtspProxyUrl
     : (camera.hls_url || rawStreamUrl);
 
+  // Helper to get color style for detected object classes
+  const getBoxStyle = (det) => {
+    const lbl = String(det.label || '').toUpperCase();
+    const isWatchlist = !!det.is_watchlist_hit || lbl.includes('WATCHLIST');
+    const isPlate = det.type === 'PLATE' || lbl.includes('PLATE');
+    const isPerson = lbl.includes('PERSON');
+    const isTwoWheeler = lbl.includes('MOTORCYCLE') || lbl.includes('BICYCLE') || lbl.includes('BIKE');
+
+    if (isWatchlist) {
+      return {
+        borderColor: '#ef4444',
+        badgeBg: '#dc2626',
+        textColor: '#ffffff',
+        shadow: '0 0 12px rgba(239, 68, 68, 0.6)',
+        bg: 'rgba(239, 68, 68, 0.12)',
+        icon: '🚨'
+      };
+    }
+    if (isPlate) {
+      return {
+        borderColor: '#10b981',
+        badgeBg: '#059669',
+        textColor: '#ffffff',
+        shadow: '0 0 10px rgba(16, 185, 129, 0.5)',
+        bg: 'rgba(16, 185, 129, 0.12)',
+        icon: '🎯'
+      };
+    }
+    if (isPerson) {
+      return {
+        borderColor: '#f59e0b',
+        badgeBg: '#d97706',
+        textColor: '#ffffff',
+        shadow: '0 0 10px rgba(245, 158, 11, 0.5)',
+        bg: 'rgba(245, 158, 11, 0.10)',
+        icon: '👤'
+      };
+    }
+    if (isTwoWheeler) {
+      return {
+        borderColor: '#a855f7',
+        badgeBg: '#9333ea',
+        textColor: '#ffffff',
+        shadow: '0 0 10px rgba(168, 85, 247, 0.5)',
+        bg: 'rgba(168, 85, 247, 0.10)',
+        icon: '🏍️'
+      };
+    }
+    // Default Vehicles (Car, Bus, Truck)
+    return {
+      borderColor: '#06b6d4',
+      badgeBg: '#0891b2',
+      textColor: '#ffffff',
+      shadow: '0 0 10px rgba(6, 182, 212, 0.5)',
+      bg: 'rgba(6, 182, 212, 0.10)',
+      icon: lbl.includes('TRUCK') ? '🚚' : (lbl.includes('BUS') ? '🚌' : '🚗')
+    };
+  };
+
+  // Only real detections from live AI models (No mock/random data!)
+  const displayDetections = liveDetections || [];
+
+  const totalVehicleCount = displayDetections.filter(d => ['CAR', 'TRUCK', 'BUS', 'MOTORCYCLE', 'BICYCLE', 'VEHICLE'].some(k => String(d.label).toUpperCase().includes(k))).length;
+  const totalPlateCount = displayDetections.filter(d => d.type === 'PLATE' || String(d.label).includes('PLATE')).length;
+  const totalPersonCount = displayDetections.filter(d => String(d.label).toUpperCase().includes('PERSON')).length;
 
   return (
     <div style={{ width: "100%", height: "100%", position: "relative", background: "#000", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      {/* 1. Sandbox HTTPS Video Stream Player */}
+      {/* 1. Direct MP4 / Static Sandbox Feeds */}
       {streamMode === "sandbox_video" && (
         <video
           ref={videoRef}
           src={sandboxVideoUrl}
           autoPlay
-          muted={isMuted}
+          muted={true}
           loop
           playsInline
-          controls={isDetailed}
+          controls={false}
           onLoadedData={handleVideoLoaded}
           onError={handleVideoError}
           style={{
@@ -232,7 +369,7 @@ export const LiveCCTVFeed = ({
             position: "relative",
             zIndex: 1,
             display: streamError ? "none" : "block",
-            pointerEvents: isDetailed ? "auto" : "none"
+            pointerEvents: "none"
           }}
           allow="autoplay; fullscreen"
         />
@@ -244,10 +381,10 @@ export const LiveCCTVFeed = ({
           ref={videoRef}
           src={effectiveFallbackUrl}
           autoPlay
-          muted={isMuted}
+          muted={true}
           loop
           playsInline
-          controls={isDetailed}
+          controls={false}
           onLoadedData={handleVideoLoaded}
           onCanPlay={handleVideoLoaded}
           onPlaying={handleVideoLoaded}
@@ -265,7 +402,7 @@ export const LiveCCTVFeed = ({
         />
       )}
 
-      {/* 3. MJPEG Image Stream */}
+      {/* 4. MJPEG Image Stream */}
       {streamMode === "mjpeg" && (
         <img
           ref={imgRef}
@@ -283,6 +420,121 @@ export const LiveCCTVFeed = ({
             display: streamError ? "none" : "block"
           }}
         />
+      )}
+
+      {/* 5. AI OBJECT DETECTION & BOUNDING BOX HUD OVERLAY (Only for Single Camera with showAiVision=true) */}
+      {showAiVision && aiVisionEnabled && (
+        <div
+          className="ai-hud-overlay"
+          style={{
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "none",
+            zIndex: 15,
+            overflow: "hidden"
+          }}
+        >
+          {/* Render Bounding Boxes */}
+          {displayDetections.map((det, idx) => {
+            const style = getBoxStyle(det);
+            const norm = det.normalized_box || [0.2, 0.2, 0.6, 0.6];
+            const ymin = Math.max(0.02, Math.min(0.95, norm[0]));
+            const xmin = Math.max(0.02, Math.min(0.95, norm[1]));
+            const ymax = Math.max(ymin + 0.05, Math.min(0.98, norm[2]));
+            const xmax = Math.max(xmin + 0.05, Math.min(0.98, norm[3]));
+
+            const topPct = `${(ymin * 100).toFixed(2)}%`;
+            const leftPct = `${(xmin * 100).toFixed(2)}%`;
+            const widthPct = `${((xmax - xmin) * 100).toFixed(2)}%`;
+            const heightPct = `${((ymax - ymin) * 100).toFixed(2)}%`;
+
+            return (
+              <div
+                key={`bbox-${idx}-${det.label || 'obj'}`}
+                className="ai-bbox-box"
+                style={{
+                  top: topPct,
+                  left: leftPct,
+                  width: widthPct,
+                  height: heightPct,
+                  border: `1.5px solid ${style.borderColor}`,
+                  background: style.bg,
+                  boxShadow: style.shadow,
+                  position: "absolute"
+                }}
+              >
+                {/* 4-Corner Reticle Brackets */}
+                <span className="ai-bbox-corner ai-bbox-tl" style={{ borderColor: style.borderColor }} />
+                <span className="ai-bbox-corner ai-bbox-tr" style={{ borderColor: style.borderColor }} />
+                <span className="ai-bbox-corner ai-bbox-bl" style={{ borderColor: style.borderColor }} />
+                <span className="ai-bbox-corner ai-bbox-br" style={{ borderColor: style.borderColor }} />
+
+                {/* Top Pill Badge Label */}
+                <div
+                  className="ai-bbox-badge"
+                  style={{
+                    background: style.badgeBg,
+                    color: style.textColor,
+                    border: `1px solid ${style.borderColor}`
+                  }}
+                >
+                  <span>{style.icon}</span>
+                  <span>{det.label || 'OBJECT'}</span>
+                  {det.confidence && (
+                    <span style={{ opacity: 0.9, fontSize: '9px', fontWeight: 600 }}>
+                      {Math.round(det.confidence)}%
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Top-Right AI Vision HUD Controls & Live Object Counters (Only when showAiVision=true) */}
+      {showAiVision && (
+        <div
+          className="ai-hud-toolbar"
+          style={{
+            position: "absolute",
+            top: "8px",
+            right: "8px",
+            zIndex: 25,
+            display: "flex",
+            alignItems: "center",
+            gap: "6px"
+          }}
+        >
+          {/* Live Object Counts Pill */}
+          {aiVisionEnabled && (
+            <div className="ai-hud-counts-badge">
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22d3ee", boxShadow: "0 0 6px #22d3ee" }} />
+              <span>{totalVehicleCount} Vehicles</span>
+              <span style={{ opacity: 0.4 }}>•</span>
+              <span>{totalPlateCount} Plates</span>
+              {totalPersonCount > 0 && (
+                <>
+                  <span style={{ opacity: 0.4 }}>•</span>
+                  <span>{totalPersonCount} Persons</span>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* AI Vision Toggle Button */}
+          <button
+            className={`ai-hud-toggle-btn ${aiVisionEnabled ? 'active' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setAiVisionEnabled(!aiVisionEnabled);
+            }}
+            title="Toggle AI Object & Plate Detection Bounding Boxes"
+          >
+            {aiVisionEnabled ? <Eye size={12} strokeWidth={2.4} /> : <EyeOff size={12} strokeWidth={2.4} />}
+            <span>AI Vision {aiVisionEnabled ? 'ON' : 'OFF'}</span>
+          </button>
+        </div>
       )}
 
       {/* Stream Protocol & Status Badge (Top-Left HUD - only in detailed modal) */}
@@ -366,4 +618,5 @@ export const LiveCCTVFeed = ({
     </div>
   );
 };
+
 

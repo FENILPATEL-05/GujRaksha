@@ -97,7 +97,7 @@ export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, depar
                 className={activeView === 'anpr' ? 'active' : ''}
                 onClick={() => onViewChange('anpr')}
               >
-                <Car size={15} strokeWidth={2} /> ANPR & Watchlist
+                <Car size={15} strokeWidth={2} /> AI Vision & ANPR
               </button>
             </>
           )}

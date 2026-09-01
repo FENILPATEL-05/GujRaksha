@@ -17,6 +17,17 @@
       "onnx": "plate_ocr.onnx",
       "task": "LICENSE_PLATE_OCR",
       "input_shape": [1, 64, 128, 3]
+    },
+    "object_detector": {
+      "tflite": "object_detection.tflite",
+      "onnx": "object_detection.onnx",
+      "task": "OBJECT_AND_VEHICLE_DETECTION",
+      "input_shape": [1, 320, 320, 3]
+    },
+    "face_detector": {
+      "onnx": "face_detection.onnx",
+      "task": "FACE_DETECTION",
+      "input_shape": [1, 3, 640, 640]
     }
   }
 }

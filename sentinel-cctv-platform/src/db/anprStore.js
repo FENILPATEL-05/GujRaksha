@@ -15,6 +15,40 @@ class AnprDataStore {
   constructor() {
     this.detections = this.loadFromFile();
     this.alertSubscribers = [];
+    this.liveCameraDetections = new Map();
+    this.activeVisionCameraCode = "GJ-GOV-001";
+  }
+
+  setActiveVisionCamera(camCode) {
+    if (camCode) {
+      this.activeVisionCameraCode = String(camCode);
+    }
+  }
+
+  getActiveVisionCamera() {
+    return this.activeVisionCameraCode || "GJ-GOV-001";
+  }
+
+  updateLiveDetections(payload) {
+    if (!payload || !payload.camera_code) return;
+    const camCode = payload.camera_code;
+    this.liveCameraDetections.set(camCode, {
+      camera_code: camCode,
+      camera_id: payload.camera_id,
+      timestamp: payload.timestamp || new Date().toISOString(),
+      detections: payload.detections || [],
+      counts: payload.counts || {
+        total: (payload.detections || []).length,
+        vehicles: (payload.detections || []).filter(d => ['CAR', 'TRUCK', 'BUS', 'MOTORCYCLE', 'BICYCLE'].includes(String(d.label).toUpperCase())).length,
+        persons: (payload.detections || []).filter(d => String(d.label).toUpperCase() === 'PERSON').length,
+        plates: (payload.detections || []).filter(d => d.type === 'PLATE' || String(d.label).includes('PLATE')).length
+      }
+    });
+  }
+
+  getLiveDetections(cameraCode) {
+    if (!cameraCode) return null;
+    return this.liveCameraDetections.get(cameraCode) || null;
   }
 
   loadFromFile() {
@@ -85,6 +119,71 @@ class AnprDataStore {
         console.error("Error sending SSE alert:", err.message);
       }
     });
+  }
+
+  // Ingest & Cache Real-Time Live Camera Detections (Object & Plate Bounding Boxes)
+  updateLiveDetections(payload) {
+    if (!payload || (!payload.camera_code && !payload.camera_id)) return null;
+    const cameraCode = payload.camera_code || payload.camera_id;
+    const items = Array.isArray(payload.detections) ? payload.detections : [];
+    
+    // Calculate category breakdown
+    const counts = {
+      total: items.length,
+      vehicles: items.filter(d => ['CAR', 'TRUCK', 'BUS', 'MOTORCYCLE', 'BICYCLE', 'VEHICLE'].includes(String(d.label).toUpperCase())).length,
+      persons: items.filter(d => String(d.label).toUpperCase() === 'PERSON').length,
+      plates: items.filter(d => d.type === 'PLATE' || d.plate || String(d.label).toUpperCase().includes('PLATE')).length
+    };
+
+    const record = {
+      camera_code: cameraCode,
+      camera_id: payload.camera_id || cameraCode,
+      timestamp: payload.timestamp || new Date().toISOString(),
+      updated_at: Date.now(),
+      frame_width: payload.frame_width || 1920,
+      frame_height: payload.frame_height || 1080,
+      detections: items,
+      counts: counts
+    };
+
+    this.liveCameraDetections.set(cameraCode, record);
+    if (payload.camera_id && payload.camera_id !== cameraCode) {
+      this.liveCameraDetections.set(payload.camera_id, record);
+    }
+
+    // Broadcast live detections to SSE subscribers
+    this.broadcastAlert({
+      type: "STREAM_AI_DETECTIONS",
+      ...record
+    });
+
+    return record;
+  }
+
+  getLiveDetections(cameraCode) {
+    if (!cameraCode) return { camera_code: "", detections: [], counts: { total: 0, vehicles: 0, persons: 0, plates: 0 } };
+    const clean = String(cameraCode).trim();
+    const data = this.liveCameraDetections.get(clean) || this.liveCameraDetections.get(`gov-feed-${clean}`) || this.liveCameraDetections.get(clean.replace('gov-feed-', ''));
+    if (!data) return { camera_code: cameraCode, detections: [], counts: { total: 0, vehicles: 0, persons: 0, plates: 0 } };
+    
+    // Check if stale (> 8 seconds)
+    if (Date.now() - data.updated_at > 8000) {
+      return { ...data, stale: true };
+    }
+    return data;
+  }
+
+  getAllLiveDetections() {
+    const list = [];
+    const now = Date.now();
+    const seen = new Set();
+    for (const [code, data] of this.liveCameraDetections.entries()) {
+      if (!seen.has(data.camera_code) && now - data.updated_at <= 8000) {
+        seen.add(data.camera_code);
+        list.push(data);
+      }
+    }
+    return list;
   }
 
   getAll(filters = {}) {

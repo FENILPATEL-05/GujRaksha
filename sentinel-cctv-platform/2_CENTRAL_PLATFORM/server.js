@@ -21,13 +21,14 @@ import watchlistRoutes from './src/routes/watchlistRoutes.js';
 import anprRoutes from './src/routes/anprRoutes.js';
 import edgeRoutes from './src/routes/edgeRoutes.js';
 import workerRoutes from './src/routes/workerRoutes.js';
-import authRoutes from './src/routes/authRoutes.js';
 import pgClient from './src/db/pgClient.js';
 import pool from './src/db/pool.js';
 import departmentStore from './src/db/departmentStore.js';
 import watchlistStore from './src/db/watchlistStore.js';
+import http from 'http';
 import compression from 'compression';
 import anprStore from './src/db/anprStore.js';
+import visionWsServer from './src/services/wsVisionServer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,7 +50,6 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Mount Routes Helper for both Root and /gujraksha Subpath
 const mountApiEndpoints = (prefix = '') => {
-  app.use(`${prefix}/api/v1/auth`, authRoutes);
   app.use(`${prefix}/api/v1/cameras`, cameraRoutes);
   app.use(`${prefix}/api/v1/departments`, departmentRoutes);
   app.use(`${prefix}/api/v1/watchlist`, watchlistRoutes);
@@ -159,11 +159,15 @@ async function startServer() {
   }
 
 
-  app.listen(PORT, () => {
+  const server = http.createServer(app);
+  visionWsServer.init(server);
+
+  server.listen(PORT, () => {
     console.log('=======================================================');
     console.log('🏢 GUJRAKSHA CENTRAL COMMAND & CONTROL PLATFORM');
     console.log(`💻 Central Dashboard running on http://localhost:${PORT}`);
     console.log('🗺️  GIS Control Center, Video Wall & Database Active');
+    console.log('⚡ Real-Time WebSocket AI Vision Streaming on ws://localhost:' + PORT + '/ws/ai-vision');
     console.log('📡 Distributed AI Ingestion API Active & Standing By');
     console.log('=======================================================');
   });

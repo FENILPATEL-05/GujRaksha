@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Camera, X, Check, FileSpreadsheet, CheckCircle2, Radio, Sliders, Layers, Lock } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import React, { useState } from 'react';
+import { Camera, X, Check, FileSpreadsheet, CheckCircle2, Radio, Sliders, Layers } from 'lucide-react';
 
 export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, departments = [] }) => {
-  const { isDeptAdmin, userDepartmentId, userDepartmentName } = useAuth();
   const [activeTab, setActiveTab] = useState('manual');
   const [bulkResult, setBulkResult] = useState(null);
   const [showAdvancedStream, setShowAdvancedStream] = useState(false);
@@ -11,7 +9,7 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
   const [form, setForm] = useState({
     name: '',
     camera_code: '',
-    department_id: (isDeptAdmin && userDepartmentId !== 'ALL') ? userDepartmentId : (departments.length > 0 ? departments[0].code : 'HOME'),
+    department_id: departments.length > 0 ? departments[0].code : 'HOME',
     district: '',
     taluka: '',
     latitude: '',
@@ -32,12 +30,6 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
     bitrate: '4Mbps',
     retention_days: 15
   });
-
-  useEffect(() => {
-    if (isOpen && isDeptAdmin && userDepartmentId !== 'ALL') {
-      setForm(prev => ({ ...prev, department_id: userDepartmentId }));
-    }
-  }, [isOpen, isDeptAdmin, userDepartmentId]);
 
   if (!isOpen) return null;
 
@@ -184,23 +176,16 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
 
                 <div className="form-field">
                   <label>Department Ownership *</label>
-                  {isDeptAdmin && userDepartmentId !== 'ALL' ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--panel-bg)', borderRadius: '8px', border: '1px solid var(--panel-border)', fontSize: '13px', color: 'var(--accent)' }}>
-                      <Lock size={14} />
-                      <span style={{ fontWeight: 600 }}>{userDepartmentName || userDepartmentId}</span>
-                    </div>
-                  ) : (
-                    <select
-                      value={form.department_id}
-                      onChange={(e) => setForm({ ...form, department_id: e.target.value })}
-                    >
-                      {departments.map((d) => (
-                        <option key={d.code} value={d.code}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                  <select
+                    value={form.department_id}
+                    onChange={(e) => setForm({ ...form, department_id: e.target.value })}
+                  >
+                    {departments.map((d) => (
+                      <option key={d.code} value={d.code}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="form-field">
@@ -276,12 +261,13 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                   <label>AI Detection & Analytics Mode *</label>
                   <select
                     value={form.detection_mode}
-                    onChange={(e) => setForm({ ...form, detection_mode: e.target.value })}
+                    onChange={(e) => setForm({ ...form, detection_mode: e.target.value, enable_object_detection: e.target.value === 'OBJECT_DETECTION' })}
                   >
-                    <option value="GENERAL_SURVEILLANCE">General Surveillance (Standard Feed / No AI)</option>
+                    <option value="OBJECT_DETECTION">AI Object Detection & Classification (YOLOv9 Live HUD)</option>
                     <option value="ANPR_DETECTION">ANPR Detection (Automatic License Plate Recognition)</option>
-                    <option value="VEHICLE_COUNTING">Vehicle Counting & Classification</option>
                     <option value="TRAFFIC_MONITORING">Traffic Flow & Speed Monitoring</option>
+                    <option value="VEHICLE_COUNTING">Vehicle Counting & Classification</option>
+                    <option value="GENERAL_SURVEILLANCE">General Surveillance (Standard Feed / No AI)</option>
                   </select>
                 </div>
 

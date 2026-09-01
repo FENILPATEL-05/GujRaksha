@@ -61,13 +61,28 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "../../"))
 DEFAULT_DET_MODEL = os.path.join(PROJECT_ROOT, "models/tflite/plate_detector.tflite")
 DEFAULT_OCR_MODEL = os.path.join(PROJECT_ROOT, "models/tflite/plate_ocr.tflite")
+DEFAULT_OBJ_MODEL = os.path.join(PROJECT_ROOT, "models/tflite/object_detection.tflite")
 DEFAULT_ONNX_DET_MODEL = os.path.join(PROJECT_ROOT, "models/onnx/plate_detector.onnx")
 DEFAULT_ONNX_OCR_MODEL = os.path.join(PROJECT_ROOT, "models/onnx/plate_ocr.onnx")
+DEFAULT_ONNX_OBJ_MODEL = os.path.join(PROJECT_ROOT, "models/onnx/object_detection.onnx")
 
 
 DET_SIZE = 384
 OCR_W, OCR_H = 128, 64
 OCR_CHARSET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+COCO_CLASSES = (
+    'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat',
+    'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat',
+    'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack',
+    'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
+    'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
+    'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
+    'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake',
+    'chair', 'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
+    'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink',
+    'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
+)
 
 INDIAN_STATE_CODES = (
     'GJ', 'MH', 'DL', 'KA', 'TN', 'UP', 'HR', 'RJ', 'MP', 'PB',
@@ -439,7 +454,181 @@ class PlateOCRONNX:
         return text, mean_conf
 
 
-def create_anpr_pipeline(backend: str = "auto", det_tflite: str = None, ocr_tflite: str = None, num_threads: int = None):
+class ObjectDetectorONNX:
+    """YOLO Object & Vehicle Detector using ONNX Runtime (CUDA / TensorRT GPU)."""
+    def __init__(self, model_path: str):
+        if not HAS_ONNXRUNTIME:
+            raise RuntimeError("onnxruntime is not installed.")
+        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        avail = ort.get_available_providers()
+        valid_providers = [p for p in providers if p in avail]
+        sess_opts = ort.SessionOptions()
+        sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        self.session = ort.InferenceSession(model_path, sess_options=sess_opts, providers=valid_providers)
+        self.input_name = self.session.get_inputs()[0].name
+        self.output_name = self.session.get_outputs()[0].name
+        self.input_shape = self.session.get_inputs()[0].shape
+        self.input_size = 640 if (len(self.input_shape) >= 3 and self.input_shape[2] in [640, '640']) else 320
+        self.accel_mode = "GPU"
+
+    def preprocess(self, img: np.ndarray):
+        h, w = img.shape[:2]
+        scale = self.input_size / max(h, w)
+        new_w, new_h = int(w * scale), int(h * scale)
+        resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+        pad_w = (self.input_size - new_w) // 2
+        pad_h = (self.input_size - new_h) // 2
+        canvas = np.full((self.input_size, self.input_size, 3), 114, dtype=np.uint8)
+        canvas[pad_h : pad_h + new_h, pad_w : pad_w + new_w] = resized
+        canvas_rgb = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
+        blob = (canvas_rgb.astype(np.float32) / 255.0)
+        blob = np.transpose(blob, (2, 0, 1))[np.newaxis, :]
+        return blob, scale, (pad_w, pad_h)
+
+    def detect(self, img: np.ndarray, conf_thresh: float = 0.25, iou_thresh: float = 0.45):
+        if img is None or img.size == 0:
+            return []
+        h, w = img.shape[:2]
+        blob, scale, (pad_w, pad_h) = self.preprocess(img)
+        outputs = self.session.run([self.output_name], {self.input_name: blob})
+        raw = outputs[0][0]
+        preds = raw.T if raw.shape[0] < raw.shape[1] else raw
+        if len(preds) == 0:
+            return []
+
+        if preds.shape[1] >= 84:
+            if preds.shape[1] == 84:
+                class_probs = preds[:, 4:]
+                class_ids = np.argmax(class_probs, axis=1)
+                scores = class_probs[np.arange(len(preds)), class_ids]
+            else:
+                obj_conf = preds[:, 4]
+                class_probs = preds[:, 5:]
+                class_ids = np.argmax(class_probs, axis=1)
+                scores = obj_conf * class_probs[np.arange(len(preds)), class_ids]
+
+            mask = scores >= conf_thresh
+            filtered = preds[mask]
+            filtered_scores = scores[mask]
+            filtered_classes = class_ids[mask]
+            if len(filtered) == 0:
+                return []
+
+            cx, cy, bw, bh = filtered[:, 0], filtered[:, 1], filtered[:, 2], filtered[:, 3]
+            if np.max(cx) <= 1.05:
+                cx = cx * self.input_size
+                cy = cy * self.input_size
+                bw = bw * self.input_size
+                bh = bh * self.input_size
+
+            x1 = np.clip((cx - bw / 2.0 - pad_w) / scale, 0, w)
+            y1 = np.clip((cy - bh / 2.0 - pad_h) / scale, 0, h)
+            x2 = np.clip((cx + bw / 2.0 - pad_w) / scale, 0, w)
+            y2 = np.clip((cy + bh / 2.0 - pad_h) / scale, 0, h)
+
+            boxes = np.stack([x1, y1, x2 - x1, y2 - y1], axis=1).tolist()
+            scores_list = filtered_scores.tolist()
+
+            indices = cv2.dnn.NMSBoxes(boxes, scores_list, conf_thresh, iou_thresh)
+            detections = []
+            if len(indices) > 0:
+                for idx in indices.flatten():
+                    bx, by, bw_b, bh_b = boxes[idx]
+                    cid = int(filtered_classes[idx])
+                    cname = COCO_CLASSES[cid] if cid < len(COCO_CLASSES) else f'object_{cid}'
+                    detections.append({
+                        'box': [int(bx), int(by), int(bx + bw_b), int(by + bh_b)],
+                        'class_id': cid,
+                        'label': cname,
+                        'confidence': float(scores_list[idx])
+                    })
+            return detections
+        return []
+
+
+class ObjectDetectorTFLite:
+    """TFLite / LiteRT Object & Vehicle Detector (YOLO COCO 80 classes)."""
+    def __init__(self, model_path: str, num_threads: int = None):
+        self.interpreter, self.accel_mode = create_accelerated_interpreter(model_path, num_threads)
+        self.input_details = self.interpreter.get_input_details()[0]
+        self.output_details = self.interpreter.get_output_details()[0]
+        self.input_shape = self.input_details['shape']
+        self.input_size = self.input_shape[1] if len(self.input_shape) >= 2 else 320
+
+    def preprocess(self, img: np.ndarray):
+        h, w = img.shape[:2]
+        scale = self.input_size / max(h, w)
+        new_w, new_h = int(w * scale), int(h * scale)
+
+        resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+        pad_w = (self.input_size - new_w) // 2
+        pad_h = (self.input_size - new_h) // 2
+
+        canvas = np.full((self.input_size, self.input_size, 3), 114, dtype=np.uint8)
+        canvas[pad_h : pad_h + new_h, pad_w : pad_w + new_w] = resized
+
+        canvas_rgb = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
+        blob = (canvas_rgb.astype(np.float32) / 255.0)[np.newaxis, :]
+        return blob, scale, (pad_w, pad_h)
+
+    def detect(self, img: np.ndarray, conf_thresh: float = 0.25, iou_thresh: float = 0.45):
+        if img is None or img.size == 0:
+            return []
+        h, w = img.shape[:2]
+        blob, scale, (pad_w, pad_h) = self.preprocess(img)
+        self.interpreter.set_tensor(self.input_details['index'], blob)
+        self.interpreter.invoke()
+
+        preds = self.interpreter.get_tensor(self.output_details['index'])[0]
+        if len(preds) == 0:
+            return []
+
+        obj_conf = preds[:, 4]
+        class_probs = preds[:, 5:]
+        class_ids = np.argmax(class_probs, axis=1)
+        class_scores = class_probs[np.arange(len(preds)), class_ids]
+        scores = obj_conf * class_scores
+
+        mask = scores >= conf_thresh
+        filtered = preds[mask]
+        filtered_scores = scores[mask]
+        filtered_classes = class_ids[mask]
+
+        if len(filtered) == 0:
+            return []
+
+        cx, cy, bw, bh = filtered[:, 0], filtered[:, 1], filtered[:, 2], filtered[:, 3]
+        if np.max(cx) <= 1.05:
+            cx = cx * self.input_size
+            cy = cy * self.input_size
+            bw = bw * self.input_size
+            bh = bh * self.input_size
+
+        x1 = np.clip((cx - bw / 2.0 - pad_w) / scale, 0, w)
+        y1 = np.clip((cy - bh / 2.0 - pad_h) / scale, 0, h)
+        x2 = np.clip((cx + bw / 2.0 - pad_w) / scale, 0, w)
+        y2 = np.clip((cy + bh / 2.0 - pad_h) / scale, 0, h)
+
+        boxes = np.stack([x1, y1, x2 - x1, y2 - y1], axis=1).tolist()
+        scores_list = filtered_scores.tolist()
+
+        indices = cv2.dnn.NMSBoxes(boxes, scores_list, conf_thresh, iou_thresh)
+        detections = []
+        if len(indices) > 0:
+            for idx in indices.flatten():
+                bx, by, bw_b, bh_b = boxes[idx]
+                cid = int(filtered_classes[idx])
+                cname = COCO_CLASSES[cid] if cid < len(COCO_CLASSES) else f'object_{cid}'
+                detections.append({
+                    'box': [int(bx), int(by), int(bx + bw_b), int(by + bh_b)],
+                    'class_id': cid,
+                    'label': cname,
+                    'confidence': float(scores_list[idx])
+                })
+        return detections
+
+
+def create_anpr_pipeline(backend: str = "auto", det_tflite: str = None, ocr_tflite: str = None, obj_tflite: str = None, num_threads: int = None):
     """
     Adaptive Dual-Engine Pipeline Factory:
     - Auto-probes NVIDIA CUDA / TensorRT ONNX acceleration.
@@ -448,8 +637,10 @@ def create_anpr_pipeline(backend: str = "auto", det_tflite: str = None, ocr_tfli
     """
     det_tflite_path = det_tflite or DEFAULT_DET_MODEL
     ocr_tflite_path = ocr_tflite or DEFAULT_OCR_MODEL
+    obj_tflite_path = obj_tflite or DEFAULT_OBJ_MODEL
     det_onnx_path = DEFAULT_ONNX_DET_MODEL
     ocr_onnx_path = DEFAULT_ONNX_OCR_MODEL
+    obj_onnx_path = DEFAULT_ONNX_OBJ_MODEL
 
     gpu_available = False
     if HAS_ONNXRUNTIME:
@@ -474,16 +665,20 @@ def create_anpr_pipeline(backend: str = "auto", det_tflite: str = None, ocr_tfli
             print("⚡ [AI Engine] Probing ONNX Runtime GPU Acceleration...", flush=True)
             detector = PlateDetectorONNX(det_onnx_path)
             ocr = PlateOCRONNX(ocr_onnx_path)
-            print(f"🚀 [AI Acceleration] ACTIVE: {detector.accel_mode} for YOLOv9 Detection & CCT OCR", flush=True)
-            return detector, ocr, detector.accel_mode
+            obj_det = ObjectDetectorONNX(obj_onnx_path) if os.path.exists(obj_onnx_path) else (
+                ObjectDetectorTFLite(obj_tflite_path, num_threads=num_threads) if os.path.exists(obj_tflite_path) else None
+            )
+            print(f"🚀 [AI Acceleration] ACTIVE: {detector.accel_mode} for YOLOv9 Detection, Object Detection & CCT OCR", flush=True)
+            return detector, ocr, obj_det, detector.accel_mode
         except Exception as e:
             print(f"⚠️ [ONNX Exception] GPU initialization failed ({e}). Falling back to TFLite CPU...", flush=True)
 
     # Fallback to TFLite CPU
     detector = PlateDetectorTFLite(det_tflite_path, num_threads=num_threads)
     ocr = PlateOCRTFLite(ocr_tflite_path, num_threads=num_threads)
+    obj_det = ObjectDetectorTFLite(obj_tflite_path, num_threads=num_threads) if os.path.exists(obj_tflite_path) else None
     print(f"💻 [AI Acceleration] ACTIVE: {detector.accel_mode} (TFLite Fallback)", flush=True)
-    return detector, ocr, detector.accel_mode
+    return detector, ocr, obj_det, detector.accel_mode
 
 
 def classify_vehicle_color(crop_bgr: np.ndarray) -> str:
@@ -693,7 +888,7 @@ INFERENCE_LOCK = threading.Lock()
 
 class CameraWorkerThread(threading.Thread):
     """Dedicated Real-Time RTSP Stream Processor for a single CCTV camera."""
-    def __init__(self, cam_info: dict, detector: PlateDetectorTFLite, ocr: PlateOCRTFLite, api_url: str, conf: float = 0.12, iou: float = 0.40, frame_stride: int = 3, motion_gate: bool = False):
+    def __init__(self, cam_info: dict, detector: PlateDetectorTFLite, ocr: PlateOCRTFLite, object_detector, api_url: str, conf: float = 0.12, iou: float = 0.40, frame_stride: int = 3, motion_gate: bool = False):
         super().__init__(daemon=True)
         self.cam_info = cam_info
         self.camera_id = cam_info.get("id") or "gov-feed-1"
@@ -702,6 +897,7 @@ class CameraWorkerThread(threading.Thread):
         self.stream_url = urls.get("rtsp") or cam_info.get("rtsp_url") or cam_info.get("stream_url") or f"rtsp://localhost:8554/stream/{str(self.camera_id).replace('gov-feed-', '')}"
         self.detector = detector
         self.ocr = ocr
+        self.object_detector = object_detector
         self.api_url = api_url
         self.conf = conf
         self.iou = iou
@@ -711,6 +907,7 @@ class CameraWorkerThread(threading.Thread):
         self.running = True
         self.recent_detections = {}
         self.connected_once = False
+        self.last_live_dispatch = 0
 
     def stop(self):
         self.running = False
@@ -774,14 +971,23 @@ class CameraWorkerThread(threading.Thread):
                     except Exception:
                         pass
 
+                h, w = frame.shape[:2]
+
                 # 3. Run Thread-Safe YOLOv9 Plate Detector on frame
                 with INFERENCE_LOCK:
                     raw_boxes = self.detector.detect(frame, self.conf, self.iou)
 
+                # 4. Run Thread-Safe Object & Vehicle Detector on frame
+                raw_objects = []
+                if self.object_detector is not None:
+                    with INFERENCE_LOCK:
+                        raw_objects = self.object_detector.detect(frame, conf_thresh=0.22, iou_thresh=0.45)
+
+                plate_detections_for_frame = []
                 for x1, y1, x2, y2, det_score in raw_boxes:
                     if (x2 - x1) < 20 or (y2 - y1) < 10:
                         continue
-                    # 4. Run Thread-Safe CCT Transformer OCR on detected plate box
+                    # Run Thread-Safe CCT Transformer OCR on detected plate box
                     with INFERENCE_LOCK:
                         raw_text, ocr_conf = self.ocr.recognize(frame, (x1, y1, x2, y2))
                     cleaned_text = normalize_ocr_text(raw_text)
@@ -791,7 +997,6 @@ class CameraWorkerThread(threading.Thread):
                         last_seen = self.recent_detections.get(cleaned_text, 0)
                         if now - last_seen > 3.0:  # 3s cooldown per plate
                             self.recent_detections[cleaned_text] = now
-                            h, w = frame.shape[:2]
                             x1_c, y1_c, x2_c, y2_c = max(0, x1), max(0, y1), min(w, x2), min(h, y2)
                             vehicle_crop = frame[y1_c:y2_c, x1_c:x2_c]
                             v_color = classify_vehicle_color(vehicle_crop)
@@ -806,9 +1011,25 @@ class CameraWorkerThread(threading.Thread):
                                 vehicle_color=v_color, vehicle_type=v_type, speed_kmh=speed_kmh, is_speeding=is_speeding
                             )
 
+                        plate_detections_for_frame.append({
+                            "box": [x1, y1, x2, y2],
+                            "normalized_box": [round(y1 / h, 4), round(x1 / w, 4), round(y2 / h, 4), round(x2 / w, 4)],
+                            "label": f"PLATE: {cleaned_text}" if cleaned_text else "LICENSE_PLATE",
+                            "plate": cleaned_text,
+                            "confidence": round(ocr_conf * 100.0, 1),
+                            "type": "PLATE"
+                        })
+                    else:
+                        plate_detections_for_frame.append({
+                            "box": [x1, y1, x2, y2],
+                            "normalized_box": [round(y1 / h, 4), round(x1 / w, 4), round(y2 / h, 4), round(x2 / w, 4)],
+                            "label": "LICENSE_PLATE",
+                            "confidence": round(det_score * 100.0, 1),
+                            "type": "PLATE"
+                        })
+
                 # 5. Periodic central crop scan (essential when testing plates directly in front of camera)
                 if frame_counter % (8 * self.frame_stride) == 0:
-                    h, w = frame.shape[:2]
                     crop_center = frame[int(h * 0.20):int(h * 0.80), int(w * 0.15):int(w * 0.85)]
                     with INFERENCE_LOCK:
                         center_text, center_conf = self.ocr.recognize(crop_center)
@@ -826,8 +1047,45 @@ class CameraWorkerThread(threading.Thread):
                                 vehicle_color=v_color, vehicle_type=v_type, speed_kmh=speed_kmh, is_speeding=is_speeding
                             )
 
-                time.sleep(0.01)  # Frame loop pacing
+                # 6. Stream Live AI Bounding Boxes (Objects + Plates) to Central Platform
+                if (now - self.last_live_dispatch >= 0.35) and (len(raw_objects) > 0 or len(plate_detections_for_frame) > 0 or frame_counter % 12 == 0):
+                    self.last_live_dispatch = now
+                    live_boxes = []
 
+                    for obj in raw_objects:
+                        bx = obj["box"]
+                        live_boxes.append({
+                            "box": bx,
+                            "normalized_box": [round(bx[1] / h, 4), round(bx[0] / w, 4), round(bx[3] / h, 4), round(bx[2] / w, 4)],
+                            "label": obj["label"].upper(),
+                            "class_id": obj["class_id"],
+                            "confidence": round(obj["confidence"] * 100.0, 1),
+                            "type": "OBJECT"
+                        })
+
+                    live_boxes.extend(plate_detections_for_frame)
+
+                    live_payload = {
+                        "camera_code": self.camera_code,
+                        "camera_id": self.camera_id,
+                        "frame_width": w,
+                        "frame_height": h,
+                        "timestamp": time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                        "detections": live_boxes
+                    }
+                    try:
+                        live_bytes = json.dumps(live_payload).encode('utf-8')
+                        req_live = urllib.request.Request(
+                            f"{self.api_url}/anpr/live-detections",
+                            data=live_bytes,
+                            headers={"Content-Type": "application/json"},
+                            method="POST"
+                        )
+                        urllib.request.urlopen(req_live, timeout=0.8)
+                    except Exception:
+                        pass
+
+                time.sleep(0.01)  # Frame loop pacing
 
             cap.release()
             time.sleep(2.0)
@@ -835,12 +1093,11 @@ class CameraWorkerThread(threading.Thread):
         print(f"🛑 [Camera Worker Stopped] {self.camera_code}", flush=True)
 
 
-
 class DynamicCameraManager:
     """Continuously monitors CCTV registry and auto-attaches workers to cameras with ANPR enabled."""
     def __init__(self, api_url: str, det_model: str, ocr_model: str, threads: int, conf: float, iou: float, backend: str = "auto", frame_stride: int = 3, motion_gate: bool = False, max_workers: int = 16, partition_index: int = 0, partition_total: int = 1, district: str = None, worker_id: str = None):
         self.api_url = api_url
-        self.detector, self.ocr, self.accel_mode = create_anpr_pipeline(backend, det_model, ocr_model, num_threads=threads)
+        self.detector, self.ocr, self.object_detector, self.accel_mode = create_anpr_pipeline(backend, det_model, ocr_model, num_threads=threads)
         self.conf = conf
         self.iou = iou
         self.frame_stride = frame_stride
@@ -861,6 +1118,7 @@ class DynamicCameraManager:
         """Registers this worker node with Central GujRaksha Orchestrator."""
         try:
             import socket
+            import requests
             hostname = socket.gethostname()
             reg_url = f"{self.api_url}/workers/register"
             payload = {
@@ -884,6 +1142,7 @@ class DynamicCameraManager:
         if not self.worker_id:
             return None
         try:
+            import requests
             hb_url = f"{self.api_url}/workers/heartbeat"
             payload = {
                 "worker_id": self.worker_id,
@@ -917,7 +1176,7 @@ class DynamicCameraManager:
             if self.district:
                 cameras = [c for c in cameras if str(c.get("district", "")).lower() == self.district.lower()]
 
-            # 1. Filter candidate cameras (Strictly ANPR-enabled cameras)
+            # 1. Filter candidate cameras
             candidate_cameras = []
             for cam in cameras:
                 mode = str(cam.get("detection_mode", "")).upper()
@@ -925,6 +1184,11 @@ class DynamicCameraManager:
                 is_anpr = ("ANPR" in mode) or ("ANPR" in features) or ("PLATE" in mode)
                 if is_anpr:
                     candidate_cameras.append(cam)
+
+            # If no explicit ANPR mode found, fall back to active cameras
+            if not candidate_cameras and cameras:
+                active_cams = [c for c in cameras if c.get("is_active")]
+                candidate_cameras = active_cams if active_cams else cameras
 
             # 2. Distributed Partition Sharding (Shard across worker nodes)
             if self.partition_total > 1:
@@ -946,7 +1210,7 @@ class DynamicCameraManager:
                 try:
                     worker = CameraWorkerThread(
                         {"id": cam.get("id"), "camera_code": code, "rtsp_url": rtsp},
-                        self.detector, self.ocr, self.api_url, self.conf, self.iou,
+                        self.detector, self.ocr, self.object_detector, self.api_url, self.conf, self.iou,
                         frame_stride=self.frame_stride, motion_gate=self.motion_gate
                     )
                     worker.start()
@@ -1013,7 +1277,7 @@ def main():
     args = parser.parse_args()
 
     print("=================================================================")
-    print(" 🚔 GujRaksha High-Scale Adaptive AI ANPR Engine (ONNX GPU / TFLite CPU)")
+    print(" 🚔 GujRaksha High-Scale Adaptive AI ANPR & Object Detection Engine")
     print("=================================================================")
 
     if args.all_cameras or args.worker_id:
@@ -1027,8 +1291,8 @@ def main():
         return
 
     # Single Camera / Image / Video mode
-    detector, ocr, accel_mode = create_anpr_pipeline(args.backend, args.det_model, args.ocr_model, num_threads=args.threads)
-    print(f"✓ YOLOv9 & CCT AI Models Loaded Successfully! [{accel_mode}]", flush=True)
+    detector, ocr, obj_det, accel_mode = create_anpr_pipeline(args.backend, args.det_model, args.ocr_model, num_threads=args.threads)
+    print(f"✓ YOLOv9, Object Detection & CCT AI Models Loaded Successfully! [{accel_mode}]", flush=True)
 
     # Check image file vs video stream
     ext = os.path.splitext(str(args.source))[-1].lower()
@@ -1052,7 +1316,7 @@ def main():
 
     worker = CameraWorkerThread(
         {"id": args.camera_id, "camera_code": args.camera_code, "rtsp_url": source_val},
-        detector, ocr, args.api_url, args.conf, args.iou,
+        detector, ocr, obj_det, args.api_url, args.conf, args.iou,
         frame_stride=args.frame_stride, motion_gate=args.motion_gate
     )
     worker.start()
@@ -1061,4 +1325,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

@@ -29,10 +29,13 @@ import {
   Eye,
   Video,
   ExternalLink,
-  Copy
+  Copy,
+  Maximize2,
+  Camera
 } from "lucide-react";
 import { Pagination } from "./Pagination";
 import { WatchlistManagerPage } from "./WatchlistManagerPage";
+import { LiveCCTVFeed } from "./LiveCCTVFeed";
 
 export const ANPRIntelligencePage = ({
   onTrackVehicleOnMap,
@@ -41,7 +44,8 @@ export const ANPRIntelligencePage = ({
   cameras = [],
   addToast
 }) => {
-  const [activeTab, setActiveTab] = useState(() => localStorage.getItem("gujraksha_anpr_tab") || "detections"); // "detections", "watchlist", or "edge_nodes"
+  const [activeTab, setActiveTab] = useState(() => localStorage.getItem("gujraksha_anpr_tab") || "ai_vision"); // "ai_vision", "detections", "watchlist", or "edge_nodes"
+  const [selectedVisionCamId, setSelectedVisionCamId] = useState(null);
   const [detections, setDetections] = useState([]);
   const [edgeNodes, setEdgeNodes] = useState([]);
   const [selectedWorkerModal, setSelectedWorkerModal] = useState(null);
@@ -166,6 +170,44 @@ export const ANPRIntelligencePage = ({
     return mode === 'ANPR_DETECTION' || mode === 'ANPR';
   }).length;
 
+  // STRICT Filter: ONLY cameras configured with detection_mode === "OBJECT_DETECTION"
+  const selectableCams = cameras.filter(c => 
+    c.detection_mode === "OBJECT_DETECTION" || 
+    c.detection_mode === "AI_OBJECT_DETECTION"
+  );
+
+  const activeVisionCam = selectableCams.find(c => String(c.id) === String(selectedVisionCamId)) || selectableCams[0] || null;
+
+  const handleSelectVisionCam = (camId) => {
+    setSelectedVisionCamId(camId);
+    const cam = selectableCams.find(c => String(c.id) === String(camId)) || cameras.find(c => String(c.id) === String(camId));
+    const camCode = cam ? (cam.camera_code || cam.id) : camId;
+    if (camCode) {
+      try {
+        fetch("/api/v1/anpr/active-vision-camera", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ camera_code: camCode })
+        }).catch(() => {});
+      } catch (_) {}
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "ai_vision" && activeVisionCam) {
+      const camCode = activeVisionCam.camera_code || activeVisionCam.id;
+      if (camCode) {
+        try {
+          fetch("/api/v1/anpr/active-vision-camera", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ camera_code: camCode })
+          }).catch(() => {});
+        } catch (_) {}
+      }
+    }
+  }, [activeTab, activeVisionCam?.camera_code, activeVisionCam?.id]);
+
   return (
     <div className="table-view">
       {/* Sub-Header Tabs - ALWAYS VISIBLE */}
@@ -173,11 +215,19 @@ export const ANPRIntelligencePage = ({
         <div>
           <h2 style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
             <Car size={20} strokeWidth={2.2} style={{ color: "var(--accent)" }} />
-            ANPR & Watchlist
+            AI Vision & ANPR Hub
           </h2>
         </div>
 
         <div className="view-switcher" style={{ background: "var(--input-bg)", padding: "4px", borderRadius: "10px" }}>
+          <button
+            className={activeTab === "ai_vision" ? "active" : ""}
+            onClick={() => setActiveTab("ai_vision")}
+            style={{ gap: "6px", fontWeight: 700 }}
+          >
+            <Eye size={14} strokeWidth={2.4} style={{ color: "var(--accent)" }} /> 🎯 Live AI Object Detection
+          </button>
+
           <button
             className={activeTab === "detections" ? "active" : ""}
             onClick={() => setActiveTab("detections")}
@@ -201,7 +251,103 @@ export const ANPRIntelligencePage = ({
         </div>
       </div>
 
-      {activeTab === "watchlist" ? (
+      {activeTab === "ai_vision" ? (
+        selectableCams.length === 0 ? (
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "14px",
+            background: "var(--panel-bg)",
+            padding: "48px 24px",
+            borderRadius: "10px",
+            border: "1px solid var(--panel-border)",
+            height: "calc(100vh - 150px)",
+            minHeight: "520px",
+            textAlign: "center"
+          }}>
+            <div style={{ width: "56px", height: "56px", borderRadius: "50%", background: "rgba(34, 211, 238, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Eye size={28} style={{ color: "var(--accent)" }} />
+            </div>
+            <h3 style={{ margin: 0, fontSize: "16px", color: "var(--text-primary)" }}>No Cameras Configured for Live AI Object Detection</h3>
+            <p style={{ margin: 0, fontSize: "13px", color: "var(--text-dim)", maxWidth: "480px", lineHeight: "1.6" }}>
+              Live Object Detection is currently not enabled on any camera. Go to <strong>Camera Registry</strong> or edit a camera and select <strong>"AI Object Detection & Classification"</strong> or check <strong>"🎯 Enable Live AI Object Detection"</strong>.
+            </p>
+          </div>
+        ) : (
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "10px",
+          background: "var(--panel-bg)",
+          padding: "14px",
+          borderRadius: "10px",
+          border: "1px solid var(--panel-border)",
+          height: "calc(100vh - 150px)",
+          minHeight: "520px"
+        }}>
+          {/* Simple Top Bar: Camera Selector */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", boxShadow: "0 0 8px #10b981" }} />
+              <h3 style={{ margin: 0, fontSize: "14.5px", color: "var(--text-primary)" }}>
+                Live Stream: {activeVisionCam?.name} ({activeVisionCam?.camera_code || activeVisionCam?.id})
+              </h3>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "12px", color: "var(--text-dim)", fontWeight: 600 }}>Select Camera ({selectableCams.length} Available):</span>
+              <select
+                className="input-select"
+                value={activeVisionCam?.id || ""}
+                onChange={(e) => handleSelectVisionCam(e.target.value)}
+                style={{
+                  minWidth: "280px",
+                  fontSize: "12px",
+                  padding: "5px 10px",
+                  background: "var(--input-bg)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--panel-border)",
+                  borderRadius: "6px",
+                  outline: "none"
+                }}
+              >
+                {selectableCams.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.camera_code || c.id}) - {c.district || "Gujarat"}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Clean Full-Height Live Video Player with Real-Time Bounding Boxes */}
+          <div style={{
+            flex: 1,
+            width: "100%",
+            height: "100%",
+            minHeight: "450px",
+            background: "#000",
+            borderRadius: "8px",
+            overflow: "hidden",
+            position: "relative",
+            border: "1px solid var(--panel-border)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}>
+            <LiveCCTVFeed
+              key={activeVisionCam?.id || activeVisionCam?.camera_code}
+              camera={activeVisionCam}
+              isMuted={true}
+              isDetailed={false}
+              showAiVision={true}
+            />
+          </div>
+        </div>
+        )
+      ) : activeTab === "watchlist" ? (
         <WatchlistManagerPage
           onOpenAddWatchlist={onOpenAddWatchlist}
           onTrackVehicleOnMap={onTrackVehicleOnMap}
