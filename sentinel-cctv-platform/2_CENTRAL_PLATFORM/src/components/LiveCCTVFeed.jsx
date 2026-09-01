@@ -6,7 +6,7 @@ export const LiveCCTVFeed = ({
   camera,
   isMuted = true,
   isDetailed = false,
-  showAiVision = false
+  showAiVision = true
 }) => {
   const videoRef = useRef(null);
   const imgRef = useRef(null);
@@ -437,11 +437,17 @@ export const LiveCCTVFeed = ({
           {/* Render Bounding Boxes */}
           {displayDetections.map((det, idx) => {
             const style = getBoxStyle(det);
-            const norm = det.normalized_box || [0.2, 0.2, 0.6, 0.6];
-            const ymin = Math.max(0.02, Math.min(0.95, norm[0]));
-            const xmin = Math.max(0.02, Math.min(0.95, norm[1]));
-            const ymax = Math.max(ymin + 0.05, Math.min(0.98, norm[2]));
-            const xmax = Math.max(xmin + 0.05, Math.min(0.98, norm[3]));
+            let norm = det.normalized_box;
+            if (!norm && det.box && Array.isArray(det.box) && det.box.length === 4) {
+              const fw = det.frame_width || 1280;
+              const fh = det.frame_height || 720;
+              norm = [det.box[1] / fh, det.box[0] / fw, det.box[3] / fh, det.box[2] / fw];
+            }
+            if (!norm) norm = [0.2, 0.2, 0.6, 0.6];
+            const ymin = Math.max(0.01, Math.min(0.96, norm[0]));
+            const xmin = Math.max(0.01, Math.min(0.96, norm[1]));
+            const ymax = Math.max(ymin + 0.03, Math.min(0.99, norm[2]));
+            const xmax = Math.max(xmin + 0.03, Math.min(0.99, norm[3]));
 
             const topPct = `${(ymin * 100).toFixed(2)}%`;
             const leftPct = `${(xmin * 100).toFixed(2)}%`;
@@ -460,7 +466,8 @@ export const LiveCCTVFeed = ({
                   border: `1.5px solid ${style.borderColor}`,
                   background: style.bg,
                   boxShadow: style.shadow,
-                  position: "absolute"
+                  position: "absolute",
+                  transition: "top 0.15s cubic-bezier(0.25, 0.1, 0.25, 1.0), left 0.15s cubic-bezier(0.25, 0.1, 0.25, 1.0), width 0.15s cubic-bezier(0.25, 0.1, 0.25, 1.0), height 0.15s cubic-bezier(0.25, 0.1, 0.25, 1.0)"
                 }}
               >
                 {/* 4-Corner Reticle Brackets */}

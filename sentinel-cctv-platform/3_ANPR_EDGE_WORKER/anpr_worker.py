@@ -235,7 +235,7 @@ class PlateDetectorONNX:
         if not HAS_ONNXRUNTIME:
             raise RuntimeError("onnxruntime is not installed.")
         
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        providers = ['CUDAExecutionProvider', 'TensorRTExecutionProvider', 'CPUExecutionProvider']
         avail = ort.get_available_providers()
         valid_providers = [p for p in providers if p in avail]
         
@@ -246,7 +246,9 @@ class PlateDetectorONNX:
         self.output_name = self.session.get_outputs()[0].name
         
         active_provider = self.session.get_providers()[0]
-        self.accel_mode = "GPU (NVIDIA CUDA)" if "CUDA" in active_provider else "GPU (TensorRT)" if "TensorRT" in active_provider else "CPU (ONNX)"
+        if "CUDA" not in active_provider and "TensorRT" not in active_provider:
+            raise RuntimeError(f"ONNX session loaded on CPU ({active_provider}). CPU execution requires TFLite engine.")
+        self.accel_mode = "GPU (NVIDIA CUDA)" if "CUDA" in active_provider else "GPU (TensorRT)"
 
     def preprocess(self, img: np.ndarray):
         h, w = img.shape[:2]
@@ -306,7 +308,7 @@ class PlateOCRONNX:
         if not HAS_ONNXRUNTIME:
             raise RuntimeError("onnxruntime is not installed.")
         
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        providers = ['CUDAExecutionProvider', 'TensorRTExecutionProvider', 'CPUExecutionProvider']
         avail = ort.get_available_providers()
         valid_providers = [p for p in providers if p in avail]
         
@@ -314,7 +316,11 @@ class PlateOCRONNX:
         sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         self.session = ort.InferenceSession(model_path, sess_options=sess_opts, providers=valid_providers)
         self.input_name = self.session.get_inputs()[0].name
-        self.accel_mode = "GPU"
+        
+        active_provider = self.session.get_providers()[0]
+        if "CUDA" not in active_provider and "TensorRT" not in active_provider:
+            raise RuntimeError(f"ONNX session loaded on CPU ({active_provider}). CPU execution requires TFLite engine.")
+        self.accel_mode = "GPU (NVIDIA CUDA)" if "CUDA" in active_provider else "GPU (TensorRT)"
 
     def recognize(self, img: np.ndarray, bbox: tuple = None):
         if bbox:
@@ -357,7 +363,7 @@ class ObjectDetectorONNX:
     def __init__(self, model_path: str):
         if not HAS_ONNXRUNTIME:
             raise RuntimeError("onnxruntime is not installed.")
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        providers = ['CUDAExecutionProvider', 'TensorRTExecutionProvider', 'CPUExecutionProvider']
         avail = ort.get_available_providers()
         valid_providers = [p for p in providers if p in avail]
         sess_opts = ort.SessionOptions()
@@ -367,7 +373,11 @@ class ObjectDetectorONNX:
         self.output_name = self.session.get_outputs()[0].name
         self.input_shape = self.session.get_inputs()[0].shape
         self.input_size = 640 if (len(self.input_shape) >= 3 and self.input_shape[2] in [640, '640']) else 320
-        self.accel_mode = "GPU"
+        
+        active_provider = self.session.get_providers()[0]
+        if "CUDA" not in active_provider and "TensorRT" not in active_provider:
+            raise RuntimeError(f"ONNX session loaded on CPU ({active_provider}). CPU execution requires TFLite engine.")
+        self.accel_mode = "GPU (NVIDIA CUDA)" if "CUDA" in active_provider else "GPU (TensorRT)"
 
     def preprocess(self, img: np.ndarray):
         h, w = img.shape[:2]
@@ -624,10 +634,13 @@ class ObjectDetectorTFLite:
             return []
 
         cx, cy, bw, bh = filtered[:, 0], filtered[:, 1], filtered[:, 2], filtered[:, 3]
-        cx_pix = cx * self.input_size
-        cy_pix = cy * self.input_size
-        bw_pix = bw * self.input_size
-        bh_pix = bh * self.input_size
+        if np.max(cx) <= 1.05:
+            cx_pix = cx * self.input_size
+            cy_pix = cy * self.input_size
+            bw_pix = bw * self.input_size
+            bh_pix = bh * self.input_size
+        else:
+            cx_pix, cy_pix, bw_pix, bh_pix = cx, cy, bw, bh
 
         x1 = np.clip((cx_pix - bw_pix / 2.0 - pad_w) / scale, 0, w)
         y1 = np.clip((cy_pix - bh_pix / 2.0 - pad_h) / scale, 0, h)
@@ -1072,7 +1085,7 @@ class CameraWorkerThread(threading.Thread):
                         })
 
                 # 6. Stream Live AI Bounding Boxes (Objects + Plates) to Central Platform for Live Surveillance Feed
-                if (now - self.last_live_dispatch >= 0.35) and (len(raw_objects) > 0 or len(plate_detections_for_frame) > 0 or frame_counter % 12 == 0):
+                if (now - self.last_live_dispatch >= 0.15) and (len(raw_objects) > 0 or len(plate_detections_for_frame) > 0 or frame_counter % 6 == 0):
                     self.last_live_dispatch = now
                     live_boxes = []
 

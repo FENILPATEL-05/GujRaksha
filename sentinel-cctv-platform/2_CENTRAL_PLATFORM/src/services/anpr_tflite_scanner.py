@@ -329,7 +329,7 @@ class PlateDetectorONNX:
         if 'TensorRTExecutionProvider' in active_providers or 'CUDAExecutionProvider' in active_providers:
             self.accel_mode = f"ONNX GPU ({active_providers[0]})"
         else:
-            self.accel_mode = "ONNX CPU"
+            raise RuntimeError(f"ONNX session loaded on CPU ({active_providers[0]}). CPU execution requires TFLite engine.")
 
         self.input_name = self.session.get_inputs()[0].name
         self.input_shape = self.session.get_inputs()[0].shape
@@ -412,7 +412,7 @@ class PlateOCRONNX:
         if 'TensorRTExecutionProvider' in active_providers or 'CUDAExecutionProvider' in active_providers:
             self.accel_mode = f"ONNX GPU ({active_providers[0]})"
         else:
-            self.accel_mode = "ONNX CPU"
+            raise RuntimeError(f"ONNX session loaded on CPU ({active_providers[0]}). CPU execution requires TFLite engine.")
 
         self.input_name = self.session.get_inputs()[0].name
 
@@ -459,7 +459,7 @@ class ObjectDetectorONNX:
     def __init__(self, model_path: str):
         if not HAS_ONNXRUNTIME:
             raise RuntimeError("onnxruntime is not installed.")
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        providers = ['CUDAExecutionProvider', 'TensorRTExecutionProvider', 'CPUExecutionProvider']
         avail = ort.get_available_providers()
         valid_providers = [p for p in providers if p in avail]
         sess_opts = ort.SessionOptions()
@@ -469,7 +469,11 @@ class ObjectDetectorONNX:
         self.output_name = self.session.get_outputs()[0].name
         self.input_shape = self.session.get_inputs()[0].shape
         self.input_size = 640 if (len(self.input_shape) >= 3 and self.input_shape[2] in [640, '640']) else 320
-        self.accel_mode = "GPU"
+        
+        active_provider = self.session.get_providers()[0]
+        if "CUDA" not in active_provider and "TensorRT" not in active_provider:
+            raise RuntimeError(f"ONNX session loaded on CPU ({active_provider}). CPU execution requires TFLite engine.")
+        self.accel_mode = "GPU (NVIDIA CUDA)" if "CUDA" in active_provider else "GPU (TensorRT)"
 
     def preprocess(self, img: np.ndarray):
         h, w = img.shape[:2]
