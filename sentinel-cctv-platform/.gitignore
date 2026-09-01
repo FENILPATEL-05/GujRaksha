@@ -1,5 +1,13 @@
 # Dependencies
 node_modules/
+venv/
+.venv/
+
+# Python compiled Bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
 # Production builds
 dist/
@@ -22,4 +30,5 @@ npm-debug.log*
 # Local database fallback storage
 data/
 
-public/
+# Public built assets
+public/assets/

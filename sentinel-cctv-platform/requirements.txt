@@ -1,7 +1,0 @@
-# GujRaksha TFLite & ONNX ANPR AI Engine Requirements
-opencv-python-headless>=4.8.0
-ai-edge-litert>=1.0.0
-onnxruntime>=1.16.0
-numpy>=1.24.0
-requests>=2.31.0
-

@@ -21,6 +21,7 @@ import watchlistRoutes from './src/routes/watchlistRoutes.js';
 import anprRoutes from './src/routes/anprRoutes.js';
 import edgeRoutes from './src/routes/edgeRoutes.js';
 import workerRoutes from './src/routes/workerRoutes.js';
+import authRoutes from './src/routes/authRoutes.js';
 import pgClient from './src/db/pgClient.js';
 import pool from './src/db/pool.js';
 import departmentStore from './src/db/departmentStore.js';
@@ -58,6 +59,7 @@ const mountApiEndpoints = (prefix = '') => {
   app.use(`${prefix}/api/v1/edge`, edgeRoutes);
   app.use(`${prefix}/api/v1/onboarding`, onboardingRoutes);
   app.use(`${prefix}/api/v1/analytics`, analyticsRoutes);
+  app.use(`${prefix}/api/v1/auth`, authRoutes);
   app.use(`${prefix}/api/v1`, proxyRoutes);
   app.use(`${prefix}/api/v1/proxy-stream`, proxyRoutes);
 

@@ -1,19 +1,16 @@
 {
   "name": "gujraksha-cctv-platform",
-  "version": "1.0.0",
-  "description": "GujRaksha - Gujarat Industrial CCTV Asset Registry & Spatial GIS Platform",
+  "version": "2.0.0",
+  "description": "GujRaksha - Gujarat CCTV Platform Top-Level Workspace",
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "prestart": "node scripts/verify_and_fulfill_requirements.js",
-    "start": "NODE_ENV=production node server.js",
-    "dev": "node --watch-path=server.js --watch-path=src/routes --watch-path=src/services --watch-path=src/middleware --watch-path=src/config --watch-path=src/db server.js",
-    "db:init": "node scripts/init_postgres_db.js",
-    "db:migrate": "node scripts/init_postgres_db.js --migrate",
-    "db:seed": "node scripts/init_postgres_db.js --seed",
-    "db:reset": "node scripts/init_postgres_db.js --reset",
-    "prebuild": "node scripts/verify_and_fulfill_requirements.js",
-    "build": "vite build"
+    "start": "cd 2_CENTRAL_PLATFORM && npm start",
+    "dev": "cd 2_CENTRAL_PLATFORM && npm run dev",
+    "build": "cd 2_CENTRAL_PLATFORM && npm run build",
+    "central": "cd 2_CENTRAL_PLATFORM && ./start_central.sh",
+    "worker": "cd 3_ANPR_EDGE_WORKER && ./start_worker.sh",
+    "gateway": "cd 1_STREAM_GATEWAY && ./start_gateway.sh"
   },
   "keywords": [
     "gujarat-police",
@@ -22,24 +19,5 @@
     "spatial-registry"
   ],
   "author": "Fenil Patel (GujRaksha)",
-  "license": "UNLICENSED",
-  "dependencies": {
-    "compression": "^1.8.1",
-    "cors": "^2.8.5",
-    "csv-parser": "^3.0.0",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "leaflet": "^1.9.4",
-    "lucide-react": "^0.428.0",
-    "multer": "^1.4.5-lts.1",
-    "pg": "^8.23.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "tesseract.js": "^7.0.0",
-    "ws": "^8.21.3"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.4.1"
-  }
+  "license": "UNLICENSED"
 }

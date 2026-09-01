@@ -1,5 +1,13 @@
 # Dependencies
 node_modules/
+venv/
+.venv/
+
+# Python compiled Bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
 # Production builds
 dist/
