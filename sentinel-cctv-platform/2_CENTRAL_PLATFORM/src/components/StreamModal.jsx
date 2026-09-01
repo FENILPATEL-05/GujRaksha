@@ -25,18 +25,27 @@ export const StreamModal = ({ camera, onClose, onEditCamera }) => {
 
   const resolveWhepUrl = (cam) => {
     if (!cam) return '';
-    if (cam.whep_url && cam.whep_url.trim()) return cam.whep_url.trim();
-    if (cam.urls && cam.urls.whep && cam.urls.whep.trim()) return cam.urls.whep.trim();
+    const currentHost = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+    const sanitizeUrl = (u) => {
+      if (!u) return u;
+      if (currentHost && currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+        return u.replace('localhost', currentHost).replace('127.0.0.1', currentHost);
+      }
+      return u;
+    };
+
+    if (cam.whep_url && cam.whep_url.trim()) return sanitizeUrl(cam.whep_url.trim());
+    if (cam.urls && cam.urls.whep && cam.urls.whep.trim()) return sanitizeUrl(cam.urls.whep.trim());
     if (cam.stream_url && (cam.stream_url.endsWith('/whep') || cam.stream_url.includes(':8889/'))) {
-      return cam.stream_url.trim();
+      return sanitizeUrl(cam.stream_url.trim());
     }
     if (cam.rtsp_url && (cam.rtsp_url.includes(':8554/') || cam.rtsp_url.includes('/stream/'))) {
       const match = cam.rtsp_url.match(/rtsp:\/\/(?:[^@]+@)?([^:/]+):?(\d*)\/(.+)/);
       if (match) {
-        return `http://${match[1]}:8889/${match[3]}/whep`;
+        const hostPart = (match[1] === 'localhost' || match[1] === '127.0.0.1') ? currentHost : match[1];
+        return `http://${hostPart}:8889/${match[3]}/whep`;
       }
     }
-    const currentHost = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
     const cleanId = String(cam.number || (cam.id || '').replace('gov-feed-', '').replace('cam-', '') || '1');
     return `http://${currentHost}:8889/stream/${cleanId}/whep`;
   };
