@@ -498,7 +498,14 @@ export const CameraRegistryPage = ({
                                 </button>
                               </div>
                                 <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginTop: '4px', wordBreak: 'break-all' }}>
-                                  {cam.whep_url || (cam.urls && cam.urls.whep) || (cam.stream_url && cam.stream_url.includes(':8889/') ? cam.stream_url : `http://${typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost'}:8889/stream/${String(cam.number || (cam.id || '').replace('gov-feed-', '').replace('cam-', '') || '1')}/whep`)}
+                                  {(() => {
+                                    const currentHost = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+                                    let raw = cam.whep_url || (cam.urls && cam.urls.whep) || (cam.stream_url && cam.stream_url.includes(':8889/') ? cam.stream_url : `http://${currentHost}:8889/stream/${String(cam.number || (cam.id || '').replace('gov-feed-', '').replace('cam-', '') || '1')}/whep`);
+                                    if (currentHost && currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+                                      raw = raw.replace('localhost', currentHost).replace('127.0.0.1', currentHost);
+                                    }
+                                    return raw;
+                                  })()}
                                 </div>
                             </div>
 

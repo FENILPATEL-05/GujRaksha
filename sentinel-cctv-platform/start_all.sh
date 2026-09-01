@@ -98,13 +98,20 @@ if [ -d "3_ANPR_EDGE_WORKER" ]; then
     cd "$PROJECT_ROOT"
 fi
 
+# Auto-detect primary LAN IP address
+LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+if [ -z "$LAN_IP" ]; then
+    LAN_IP="127.0.0.1"
+fi
+
 echo -e "\n${GREEN}======================================================================${NC}"
 echo -e "${GREEN} 🚀 ALL GUJRAKSHA SERVICES RUNNING IN FULL HARMONY! ${NC}"
 echo -e "${GREEN}======================================================================${NC}"
-echo -e " 🌐 Central Control Room UI : ${CYAN}http://localhost:3000/${CYAN}"
-echo -e " 🔴 RTSP Video Gateway    : ${CYAN}rtsp://localhost:8554/stream/1${CYAN}"
-echo -e " ⚡ Triton gRPC API       : ${CYAN}localhost:8001${CYAN}"
-echo -e " 📊 Triton GPU Metrics    : ${CYAN}http://localhost:8002/metrics${CYAN}"
+echo -e " 💻 Local Access (This PC)       : ${CYAN}http://localhost:3000/${NC}"
+echo -e " 🌐 Remote Access (Other PC/LAN) : ${GREEN}http://${LAN_IP}:3000/${NC}"
+echo -e " 🔴 RTSP Video Gateway           : ${CYAN}rtsp://${LAN_IP}:8554/stream/1${NC}"
+echo -e " ⚡ Triton gRPC API              : ${CYAN}${LAN_IP}:8001${NC}"
+echo -e " 📊 Triton GPU Metrics           : ${CYAN}http://${LAN_IP}:8002/metrics${NC}"
 echo -e "======================================================================"
 echo -e "Press [Ctrl+C] anytime to stop all processes.\n"
 
