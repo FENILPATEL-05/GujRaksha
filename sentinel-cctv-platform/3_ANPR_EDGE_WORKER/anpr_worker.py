@@ -20,7 +20,7 @@ import socket
 # Suppress noisy OpenCV / FFMPEG probing logs and force zero-latency RTSP over TCP
 os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"
-os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|fflags;nobuffer|flags;low_delay|max_delay;500000"
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|fflags;nobuffer|flags;low_delay|max_delay;50000|reorder_queue_size;0|buffer_size;102400"
 
 import cv2
 try:
@@ -1062,16 +1062,22 @@ class CameraWorkerThread(threading.Thread):
                 # 3. License Plate Detection (Runs strictly on ANPR cameras)
                 raw_boxes = []
                 if is_anpr_cam and self.detector is not None:
-                    with INFERENCE_LOCK:
+                    if hasattr(self.detector, "triton_client") or getattr(self.detector, "accel_mode", "").startswith("GPU"):
                         raw_boxes = self.detector.detect(frame, self.conf, self.iou)
+                    else:
+                        with INFERENCE_LOCK:
+                            raw_boxes = self.detector.detect(frame, self.conf, self.iou)
 
                 # 4. Target-Specific Object & Vehicle Detection (Runs strictly on OBJECT_DETECTION cameras & active UI target)
                 raw_objects = []
                 is_selected_vision_cam = self.ws_client.is_camera_active_target(self.camera_code, self.camera_id) if self.ws_client else True
 
                 if (is_obj_cam or is_selected_vision_cam) and self.object_detector is not None:
-                    with INFERENCE_LOCK:
+                    if hasattr(self.object_detector, "triton_client") or getattr(self.object_detector, "accel_mode", "").startswith("GPU"):
                         raw_objects = self.object_detector.detect(frame, conf_thresh=0.10, iou_thresh=0.40)
+                    else:
+                        with INFERENCE_LOCK:
+                            raw_objects = self.object_detector.detect(frame, conf_thresh=0.10, iou_thresh=0.40)
 
                 # 4.5. Terminal Log for Detected Objects (Only for active vision camera)
                 if (is_selected_vision_cam or is_obj_cam) and len(raw_objects) > 0 and (now - self.last_obj_log >= 1.5):
@@ -1090,8 +1096,11 @@ class CameraWorkerThread(threading.Thread):
                     if (x2 - x1) < 20 or (y2 - y1) < 10:
                         continue
 
-                    with INFERENCE_LOCK:
+                    if getattr(self.ocr, "accel_mode", "").startswith("GPU"):
                         raw_text, ocr_conf = self.ocr.recognize(frame, (x1, y1, x2, y2))
+                    else:
+                        with INFERENCE_LOCK:
+                            raw_text, ocr_conf = self.ocr.recognize(frame, (x1, y1, x2, y2))
                     cleaned_text = normalize_ocr_text(raw_text)
 
                     if cleaned_text and len(cleaned_text) >= 4:
