@@ -1214,12 +1214,13 @@ class CameraWorkerThread(threading.Thread):
 
 class DistributedWorkerManager:
     """Manages full lifecycle with Central CCC (Registration, 100-Camera Dispatch & Standby)."""
-    def __init__(self, central_url: str, worker_id: str, max_capacity: int = 100, threads: int = 4, backend: str = "auto"):
+    def __init__(self, central_url: str, worker_id: str, max_capacity: int = 100, threads: int = 4, backend: str = "auto", triton_url: str = "localhost:8001"):
         self.central_url = central_url.rstrip("/")
         self.worker_id = worker_id or f"node-{socket.gethostname()[:8]}"
         self.max_capacity = max_capacity
         self.threads = threads
-        self.detector, self.ocr, self.object_detector, self.accel_mode = create_anpr_pipeline(backend, num_threads=threads)
+        self.triton_url = triton_url
+        self.detector, self.ocr, self.object_detector, self.accel_mode = create_anpr_pipeline(backend, num_threads=threads, triton_url=triton_url)
         self.watchlist_mgr = CentralWatchlistManager(central_url)
         self.workers = {} # camera_code -> CameraWorkerThread
         self.running = True
