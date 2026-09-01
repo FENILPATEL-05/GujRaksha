@@ -407,9 +407,9 @@ export const CameraRegistryPage = ({
                                   <Play size={11} /> Play WHEP Feed
                                 </button>
                               </div>
-                              <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginTop: '4px', wordBreak: 'break-all' }}>
-                                {cam.whep_url || (cam.urls && cam.urls.whep) || `http://localhost:8889/stream/${(cam.id || '').replace('gov-feed-', '')}/whep`}
-                              </div>
+                                <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginTop: '4px', wordBreak: 'break-all' }}>
+                                  {cam.whep_url || (cam.urls && cam.urls.whep) || (cam.stream_url && cam.stream_url.includes(':8889/') ? cam.stream_url : `http://${typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost'}:8889/stream/${String(cam.number || (cam.id || '').replace('gov-feed-', '').replace('cam-', '') || '1')}/whep`)}
+                                </div>
                             </div>
 
                             {/* RTSP / Ingest URL */}

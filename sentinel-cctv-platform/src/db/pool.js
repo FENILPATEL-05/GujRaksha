@@ -389,7 +389,8 @@ class CameraDataStore {
   }
 
   normalizeStreamData(cameraData, fallbackId) {
-    const cleanId = String(cameraData.id || fallbackId || '').replace('gov-feed-', '') || Date.now().toString().slice(-4);
+    const rawId = String(cameraData.id || fallbackId || '').trim();
+    const cleanId = rawId.replace('gov-feed-', '') || Date.now().toString().slice(-4);
     
     let streamUrl = cameraData.stream_url || '';
     let rtspUrl = cameraData.rtsp_url || (cameraData.urls && cameraData.urls.rtsp) || '';
@@ -407,7 +408,10 @@ class CameraDataStore {
     }
 
     if (rtspUrl && !whepUrl) {
-      if (rtspUrl.includes('live.corp8.cloud')) {
+      if (rtspUrl.includes('103.250.160.189')) {
+        whepUrl = `http://103.250.160.189:8889/stream/${cleanId}/whep`;
+        if (!hlsUrl) hlsUrl = `https://cctv.corp8.cloud/${cleanId}/index.m3u8`;
+      } else if (rtspUrl.includes('live.corp8.cloud')) {
         whepUrl = `http://live.corp8.cloud:8889/stream/${cleanId}/whep`;
         if (!hlsUrl) hlsUrl = `https://live.corp8.cloud/live/stream/${cleanId}/index.m3u8`;
       } else {
@@ -417,7 +421,10 @@ class CameraDataStore {
     }
 
     if (whepUrl && !rtspUrl) {
-      if (whepUrl.includes('live.corp8.cloud')) {
+      if (whepUrl.includes('103.250.160.189')) {
+        rtspUrl = `rtsp://103.250.160.189:8554/stream/${cleanId}`;
+        if (!hlsUrl) hlsUrl = `https://cctv.corp8.cloud/${cleanId}/index.m3u8`;
+      } else if (whepUrl.includes('live.corp8.cloud')) {
         rtspUrl = `rtsp://live.corp8.cloud:8554/stream/${cleanId}`;
         if (!hlsUrl) hlsUrl = `https://live.corp8.cloud/live/stream/${cleanId}/index.m3u8`;
       } else {
@@ -427,19 +434,19 @@ class CameraDataStore {
     }
 
     if (!rtspUrl && !whepUrl && !streamUrl) {
-      rtspUrl = `rtsp://localhost:8554/stream/${cleanId}`;
-      whepUrl = `http://localhost:8889/stream/${cleanId}/whep`;
-      hlsUrl = `http://localhost:8888/stream/${cleanId}/index.m3u8`;
+      rtspUrl = `rtsp://103.250.160.189:8554/stream/${cleanId}`;
+      whepUrl = `http://103.250.160.189:8889/stream/${cleanId}/whep`;
+      hlsUrl = `https://cctv.corp8.cloud/${cleanId}/index.m3u8`;
       streamUrl = rtspUrl;
     } else if (!streamUrl) {
       streamUrl = rtspUrl || whepUrl;
     }
 
     if (!whepUrl && cleanId) {
-      whepUrl = `http://localhost:8889/stream/${cleanId}/whep`;
+      whepUrl = `http://103.250.160.189:8889/stream/${cleanId}/whep`;
     }
     if (!hlsUrl && cleanId) {
-      hlsUrl = `http://localhost/live/stream/${cleanId}/index.m3u8`;
+      hlsUrl = `https://cctv.corp8.cloud/${cleanId}/index.m3u8`;
     }
 
     const codec = cameraData.codec || (cameraData.stream_properties && cameraData.stream_properties.codec) || 'H.264';

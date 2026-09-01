@@ -10,6 +10,7 @@
 
 import cameraService from "./cameraService.js";
 import anprStore from "../db/anprStore.js";
+import watchlistStore from "../db/watchlistStore.js";
 
 class WorkerOrchestratorService {
   constructor() {
@@ -19,7 +20,21 @@ class WorkerOrchestratorService {
   }
 
   /**
-   * Register worker in STANDBY mode (No cameras assigned until Central assigns them).
+   * Helper to get target plates for workers.
+   */
+  getTargetWatchlist() {
+    return watchlistStore.getAll().map(w => ({
+      id: w.id,
+      vehicle_plate: w.vehicle_plate,
+      category: w.category,
+      fir_number: w.fir_number,
+      police_station: w.police_station,
+      priority: w.priority
+    }));
+  }
+
+  /**
+   * Register worker and AUTO-ASSIGN up to 100 ANPR cameras immediately.
    */
   registerWorker({ worker_id, hostname = "worker-node", district = "All", max_capacity = 100, hardware = "CPU" }) {
     if (!worker_id) {
@@ -27,14 +42,43 @@ class WorkerOrchestratorService {
     }
 
     const existing = this.workers.get(worker_id);
-    const assigned = existing?.assigned_cameras || [];
+    let assigned = existing?.assigned_cameras || [];
     const isReconnecting = existing && existing.status === "OFFLINE";
+    const capacity = Math.max(1, parseInt(max_capacity) || 100);
+
+    // Auto-allocate max 100 ANPR cameras immediately upon connect
+    if (assigned.length === 0) {
+      const allCamsResult = cameraService.getCameras({ limit: 100000 });
+      let allCams = allCamsResult.cameras || [];
+
+      if (district && district.toLowerCase() !== "all") {
+        allCams = allCams.filter(c => String(c.district || "").toLowerCase() === district.toLowerCase());
+      }
+
+      const anprCams = allCams.filter(c => {
+        const mode = String(c.detection_mode || "").toUpperCase();
+        return mode.includes("ANPR") || mode.includes("PLATE") || mode.includes("TRAFFIC") || mode.includes("SPEED");
+      });
+      const candidates = anprCams.length > 0 ? anprCams : allCams;
+      const maxToTake = Math.min(capacity, candidates.length);
+
+      assigned = candidates.slice(0, maxToTake).map(c => ({
+        id: c.id,
+        camera_code: c.camera_code || c.code || `CAM-${c.id}`,
+        name: c.name || `Camera ${c.id}`,
+        district: c.district || district || "All",
+        detection_mode: c.detection_mode || "ANPR_INTELLIGENCE",
+        rtsp_url: c.rtsp_url || c.stream_url || c.url || "0",
+        latitude: c.latitude,
+        longitude: c.longitude
+      }));
+    }
 
     const workerRecord = {
       worker_id,
       hostname,
       district: district || "All",
-      max_capacity: Math.max(1, parseInt(max_capacity) || 100),
+      max_capacity: capacity,
       hardware,
       status: "ONLINE",
       state: assigned.length > 0 ? "SCANNING" : "STANDBY",
@@ -53,10 +97,15 @@ class WorkerOrchestratorService {
     this.workers.set(worker_id, workerRecord);
 
     const logMsg = isReconnecting
-      ? `🟢 [Worker Orchestrator] Worker \x1b[32m${worker_id}\x1b[0m RECONNECTED and is now ONLINE!`
-      : `📡 [Worker Orchestrator] Worker \x1b[36m${worker_id}\x1b[0m (${hostname}) connected. Status: \x1b[33m${workerRecord.state}\x1b[0m`;
+      ? `🟢 [Worker Orchestrator] Worker \x1b[32m${worker_id}\x1b[0m RECONNECTED (Auto-Assigned: ${assigned.length} cameras)!`
+      : `📡 [Worker Orchestrator] Worker \x1b[36m${worker_id}\x1b[0m (${hostname}) connected ➔ Auto-Assigned \x1b[32m${assigned.length} ANPR Cameras\x1b[0m (Status: \x1b[32m${workerRecord.state}\x1b[0m)`;
     
     console.log(logMsg);
+    if (assigned.length > 0) {
+      const sampleCodes = assigned.slice(0, 8).map(c => `${c.camera_code} (${c.district})`).join(', ');
+      const moreMsg = assigned.length > 8 ? ` ... and ${assigned.length - 8} more` : '';
+      console.log(`   📹 \x1b[33m[Assigned Cams]:\x1b[0m ${sampleCodes}${moreMsg}`);
+    }
 
     // Broadcast live SSE update to CCC Dashboard
     try {
@@ -70,7 +119,10 @@ class WorkerOrchestratorService {
       });
     } catch (_) {}
 
-    return workerRecord;
+    return {
+      ...workerRecord,
+      watchlist: this.getTargetWatchlist()
+    };
   }
 
   /**
@@ -118,14 +170,16 @@ class WorkerOrchestratorService {
       status: worker.status,
       state: worker.state,
       assigned_count: worker.assigned_cameras.length,
-      assigned_cameras: worker.assigned_cameras
+      assigned_cameras: worker.assigned_cameras,
+      watchlist: this.getTargetWatchlist()
     };
   }
 
   /**
    * Central Admin explicitly assigns cameras to a specific worker node.
+   * Prioritizes ANPR-enabled and traffic surveillance cameras.
    */
-  assignCamerasToWorker(worker_id, { camera_ids = [], count = null, district = null }) {
+  assignCamerasToWorker(worker_id, { camera_ids = [], count = null, district = null, anpr_only = true }) {
     const worker = this.workers.get(worker_id);
     if (!worker) {
       return { success: false, message: `Worker ${worker_id} not found.` };
@@ -135,11 +189,23 @@ class WorkerOrchestratorService {
       return { success: false, message: `Worker ${worker_id} is currently OFFLINE. Cannot assign cameras.` };
     }
 
-    const allCamsResult = cameraService.getCameras({ limit: 10000 });
+    const allCamsResult = cameraService.getCameras({ limit: 100000 });
     let allCams = allCamsResult.cameras || [];
 
     if (district && district.toLowerCase() !== "all") {
       allCams = allCams.filter(c => String(c.district || "").toLowerCase() === district.toLowerCase());
+    }
+
+    // Filter & prioritize ANPR and Traffic Intelligence cameras for AI Workers
+    let candidateCams = allCams;
+    if (anpr_only !== false) {
+      const anprCams = allCams.filter(c => {
+        const mode = String(c.detection_mode || "").toUpperCase();
+        return mode.includes("ANPR") || mode.includes("PLATE") || mode.includes("TRAFFIC") || mode.includes("SPEED");
+      });
+      if (anprCams.length > 0) {
+        candidateCams = anprCams;
+      }
     }
 
     let selectedCams = [];
@@ -147,10 +213,10 @@ class WorkerOrchestratorService {
       const idSet = new Set(camera_ids.map(String));
       selectedCams = allCams.filter(c => idSet.has(String(c.id)) || idSet.has(String(c.camera_code)));
     } else if (count) {
-      const maxToTake = Math.min(parseInt(count) || 50, worker.max_capacity);
-      selectedCams = allCams.slice(0, maxToTake);
+      const maxToTake = Math.min(parseInt(count) || 100, worker.max_capacity);
+      selectedCams = candidateCams.slice(0, maxToTake);
     } else {
-      selectedCams = allCams.slice(0, worker.max_capacity);
+      selectedCams = candidateCams.slice(0, worker.max_capacity);
     }
 
     worker.assigned_cameras = selectedCams.map(c => ({
@@ -158,6 +224,7 @@ class WorkerOrchestratorService {
       camera_code: c.camera_code || c.code || `CAM-${c.id}`,
       name: c.name || `Camera ${c.id}`,
       district: c.district || worker.district,
+      detection_mode: c.detection_mode || "ANPR_INTELLIGENCE",
       rtsp_url: c.rtsp_url || c.stream_url || c.url || "0",
       latitude: c.latitude,
       longitude: c.longitude
@@ -166,7 +233,7 @@ class WorkerOrchestratorService {
     worker.state = worker.assigned_cameras.length > 0 ? "SCANNING" : "STANDBY";
     worker.stats.active_streams = worker.assigned_cameras.length;
 
-    console.log(`🎯 [Worker Orchestrator] Central Admin assigned ${worker.assigned_cameras.length} cameras to \x1b[36m${worker_id}\x1b[0m!`);
+    console.log(`🎯 [Worker Orchestrator] Central Admin assigned ${worker.assigned_cameras.length} ANPR cameras to \x1b[36m${worker_id}\x1b[0m!`);
 
     return {
       success: true,
@@ -193,19 +260,30 @@ class WorkerOrchestratorService {
   }
 
   /**
-   * Distribute all cameras evenly across all currently ONLINE workers.
+   * Distribute all ANPR cameras evenly across all currently ONLINE workers.
    */
-  autoDistributeAllWorkers(district = null) {
+  autoDistributeAllWorkers(district = null, anpr_only = true) {
     const onlineWorkers = Array.from(this.workers.values()).filter(w => w.status === "ONLINE");
 
     if (onlineWorkers.length === 0) {
       return { success: false, message: "No online workers connected to Central CCC." };
     }
 
-    const allCamsResult = cameraService.getCameras({ limit: 10000 });
+    const allCamsResult = cameraService.getCameras({ limit: 100000 });
     let allCams = allCamsResult.cameras || [];
     if (district && district.toLowerCase() !== "all") {
       allCams = allCams.filter(c => String(c.district || "").toLowerCase() === district.toLowerCase());
+    }
+
+    // Filter for ANPR & Traffic cameras specifically
+    if (anpr_only !== false) {
+      const anprCams = allCams.filter(c => {
+        const mode = String(c.detection_mode || "").toUpperCase();
+        return mode.includes("ANPR") || mode.includes("PLATE") || mode.includes("TRAFFIC") || mode.includes("SPEED");
+      });
+      if (anprCams.length > 0) {
+        allCams = anprCams;
+      }
     }
 
     onlineWorkers.forEach(w => { w.assigned_cameras = []; });
@@ -218,6 +296,7 @@ class WorkerOrchestratorService {
           camera_code: c.camera_code || c.code || `CAM-${c.id}`,
           name: c.name || `Camera ${c.id}`,
           district: c.district || targetWorker.district,
+          detection_mode: c.detection_mode || "ANPR_INTELLIGENCE",
           rtsp_url: c.rtsp_url || c.stream_url || c.url || "0",
           latitude: c.latitude,
           longitude: c.longitude
@@ -230,7 +309,7 @@ class WorkerOrchestratorService {
       w.stats.active_streams = w.assigned_cameras.length;
     });
 
-    console.log(`⚖️ [Worker Orchestrator] Central auto-distributed ${allCams.length} cameras across ${onlineWorkers.length} workers.`);
+    console.log(`⚖️ [Worker Orchestrator] Central auto-distributed ${allCams.length} ANPR cameras across ${onlineWorkers.length} workers.`);
 
     return {
       success: true,

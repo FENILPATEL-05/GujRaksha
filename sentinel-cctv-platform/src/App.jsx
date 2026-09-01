@@ -293,14 +293,14 @@ export function AppContent() {
         <VideoWallPage
           cameras={cameras}
           departments={departments}
-          onCameraSelect={(cam) => setSelectedCameraForStream(cam)}
+          onCameraSelect={handleOpenStreamModal}
           addToast={addToast}
         />
       ) : activeView === 'anpr' && isAdmin ? (
         <ANPRIntelligencePage
           onTrackVehicleOnMap={handleTrackVehicleOnMap}
           onOpenAddWatchlist={() => setIsAddWatchlistOpen(true)}
-          onCameraSelect={(cam) => setSelectedCameraForStream(cam)}
+          onCameraSelect={handleOpenStreamModal}
           cameras={cameras}
           addToast={addToast}
         />
