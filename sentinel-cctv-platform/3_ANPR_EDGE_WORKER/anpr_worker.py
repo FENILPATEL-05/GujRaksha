@@ -89,7 +89,10 @@ class VisionWebSocketClient:
             return
         self.last_attempt = now
         try:
-            self.ws = websocket.create_connection(self.ws_url, timeout=1.5)
+            ws = websocket.create_connection(self.ws_url, timeout=2.0)
+            ws.settimeout(0.3)
+            self.ws = ws
+            print(f"⚡ \x1b[32m[AI Vision WebSocket]\x1b[0m Connected to Central CCC at {self.ws_url}", flush=True)
             # Background listener to receive active camera target updates from UI
             threading.Thread(target=self._read_loop, daemon=True).start()
         except Exception:
@@ -105,6 +108,8 @@ class VisionWebSocketClient:
                         target = data.get("active_camera_code")
                         if target:
                             self.active_camera_target = str(target).strip()
+            except (websocket.WebSocketTimeoutException, socket.timeout):
+                continue
             except Exception:
                 break
 
@@ -126,7 +131,8 @@ class VisionWebSocketClient:
             if self.ws is not None:
                 try:
                     payload["type"] = "DETECTIONS_FRAME"
-                    self.ws.send(json.dumps(payload))
+                    data_str = json.dumps(payload)
+                    self.ws.send(data_str)
                     return True
                 except Exception:
                     try:
@@ -135,6 +141,7 @@ class VisionWebSocketClient:
                         pass
                     self.ws = None
             return False
+
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DET_TFLITE = os.path.join(SCRIPT_DIR, "models/tflite/plate_detector.tflite")
@@ -974,9 +981,24 @@ def get_shared_vision_ws(central_url: str):
     global GLOBAL_VISION_WS
     with GLOBAL_VISION_WS_LOCK:
         if GLOBAL_VISION_WS is None:
-            ws_host = central_url.replace("http://", "ws://").replace("https://", "wss://").replace("/api/v1", "").replace("/api", "").rstrip("/")
-            GLOBAL_VISION_WS = VisionWebSocketClient(f"{ws_host}/ws/ai-vision")
+            u = (central_url or "http://localhost:3000/api/v1").rstrip("/")
+            if u.endswith("/api/v1"):
+                base = u[:-7]
+            elif u.endswith("/api"):
+                base = u[:-4]
+            else:
+                base = u
+
+            if base.startswith("https://"):
+                ws_url = "wss://" + base[8:] + "/ws/ai-vision"
+            elif base.startswith("http://"):
+                ws_url = "ws://" + base[7:] + "/ws/ai-vision"
+            else:
+                ws_url = f"ws://{base}/ws/ai-vision"
+
+            GLOBAL_VISION_WS = VisionWebSocketClient(ws_url)
         return GLOBAL_VISION_WS
+
 
 
 class CameraWorkerThread(threading.Thread):

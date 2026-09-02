@@ -1,8 +1,10 @@
 import express from "express";
 import anprStore from "../db/anprStore.js";
 import { authenticateToken } from "../middleware/auth.js";
+import visionWsServer from "../services/wsVisionServer.js";
 
 const router = express.Router();
+
 
 // GET all detection events
 router.get("/detections", authenticateToken, (req, res, next) => {
@@ -186,8 +188,19 @@ router.post("/scanner-config", async (req, res, next) => {
 router.post("/live-detections", (req, res, next) => {
   try {
     const result = anprStore.updateLiveDetections(req.body);
-    const camCode = req.body.camera_code || 'GJ-GOV-001';
+    const camCode = req.body.camera_code || req.body.camera_id || 'GJ-GOV-001';
     const detections = req.body.detections || [];
+    
+    // Broadcast directly to active WebSocket subscribers
+    if (visionWsServer) {
+      visionWsServer.broadcastFrame(camCode, {
+        camera_code: camCode,
+        camera_id: req.body.camera_id || camCode,
+        detections: detections,
+        counts: result?.counts
+      });
+    }
+
     if (detections.length > 0) {
       const counts = {};
       for (const d of detections) {
@@ -207,6 +220,7 @@ router.post("/live-detections", (req, res, next) => {
     next(err);
   }
 });
+
 
 // GET Live stream detections & bounding boxes for a specific camera
 router.get("/live-detections/:cameraCode", (req, res, next) => {
