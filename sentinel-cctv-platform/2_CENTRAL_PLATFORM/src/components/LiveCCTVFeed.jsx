@@ -150,8 +150,16 @@ export const LiveCCTVFeed = ({
   const rawStreamUrl = camera ? (camera.stream_url || camera.rtsp_url || whepApiUrl) : "";
   const isRtspOnly = false;
 
-  // Determine if AI Vision overlay should be drawn
-  const isAiActive = showAiVision || (!camera?.detection_mode || camera.detection_mode !== 'GENERAL_SURVEILLANCE' || !!camera.enable_object_detection);
+  // Determine if AI Vision overlay should be drawn (Supports ANPR, Object Detection, Traffic Monitoring)
+  const isAiActive = showAiVision || (
+    !camera?.detection_mode ||
+    (camera.detection_mode !== 'NO_AI' && camera.detection_mode !== 'GENERAL_SURVEILLANCE') ||
+    !!camera.enable_object_detection ||
+    camera.detection_mode === 'ANPR_DETECTION' ||
+    camera.detection_mode === 'OBJECT_DETECTION' ||
+    camera.detection_mode === 'ANPR'
+  );
+
 
   // Single Shared WebSocket Engine for Real-Time AI Bounding Boxes
   useEffect(() => {
@@ -636,12 +644,13 @@ export const LiveCCTVFeed = ({
                     }}
                   >
                     <span>{style.icon}</span>
-                    <span>{det.label || 'OBJECT'}</span>
+                    <span>{det.plate ? `🚘 ${det.plate}` : (det.label || 'OBJECT')}</span>
                     {det.confidence && (
                       <span style={{ opacity: 0.9, fontSize: '9px', fontWeight: 600 }}>
                         {Math.round(det.confidence)}%
                       </span>
                     )}
+
                   </div>
                 </div>
               );

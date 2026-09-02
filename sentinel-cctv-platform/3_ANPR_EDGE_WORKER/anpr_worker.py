@@ -1019,7 +1019,22 @@ class CameraWorkerThread(threading.Thread):
     def stop(self):
         self.running = False
 
+    def update_config(self, new_cam_info: dict):
+        """Hot-updates camera settings without restarting stream or thread."""
+        old_mode = str(self.cam_info.get("detection_mode") or "").upper()
+        new_mode = str(new_cam_info.get("detection_mode") or "").upper()
+        if old_mode != new_mode:
+            print(f"\x1b[33m🔄 [{self.camera_code}] Camera config edited (Mode: {old_mode or 'DEFAULT'}➔{new_mode}) — Updating AI pipelines...\x1b[0m", flush=True)
+            self.cam_info = new_cam_info
+        else:
+            self.cam_info = new_cam_info
+
+        new_stream = new_cam_info.get("rtsp_url") or new_cam_info.get("stream_url")
+        if new_stream and str(new_stream) != str(self.stream_url):
+            self.stream_url = new_stream
+
     def get_candidate_urls(self):
+
         urls = []
         if self.stream_url and str(self.stream_url) != "0":
             urls.append(str(self.stream_url))
@@ -1139,29 +1154,28 @@ class CameraWorkerThread(threading.Thread):
                 h, w = frame.shape[:2]
 
                 cam_mode = str(self.cam_info.get("detection_mode") or "").upper()
+                is_no_ai = (cam_mode in ["NO_AI", "GENERAL_SURVEILLANCE", "DISABLED"])
                 is_obj_cam = (cam_mode in ["OBJECT_DETECTION", "AI_OBJECT_DETECTION", "TRAFFIC_MONITORING", "VEHICLE_COUNTING"] or bool(self.cam_info.get("enable_object_detection")))
                 is_anpr_cam = (cam_mode in ["ANPR_DETECTION", "ANPR", "TRAFFIC_MONITORING"] or not cam_mode)
 
-
-                # 3. License Plate Detection (Runs strictly on ANPR cameras)
+                # 3. License Plate Detection (Runs when ANPR or OBJECT_DETECTION is active)
                 raw_boxes = []
-                if is_anpr_cam and self.detector is not None:
+                if not is_no_ai and self.detector is not None:
                     if hasattr(self.detector, "triton_client") or getattr(self.detector, "accel_mode", "").startswith("GPU"):
                         raw_boxes = self.detector.detect(frame, self.conf, self.iou)
                     else:
                         with INFERENCE_LOCK:
                             raw_boxes = self.detector.detect(frame, self.conf, self.iou)
 
-                # 4. Target-Specific Object & Vehicle Detection (Runs on OBJECT_DETECTION cameras & active UI target)
+                # 4. Target-Specific Object & Vehicle Detection (Runs on both OBJECT_DETECTION and ANPR feeds)
                 raw_objects = []
-                is_selected_vision_cam = self.ws_client.is_camera_active_target(self.camera_code, self.camera_id) if self.ws_client else True
-
-                if (is_obj_cam or is_selected_vision_cam) and self.object_detector is not None:
+                if not is_no_ai and self.object_detector is not None:
                     if hasattr(self.object_detector, "triton_client") or getattr(self.object_detector, "accel_mode", "").startswith("GPU"):
                         raw_objects = self.object_detector.detect(frame, conf_thresh=0.25, iou_thresh=0.45)
                     else:
                         with INFERENCE_LOCK:
                             raw_objects = self.object_detector.detect(frame, conf_thresh=0.25, iou_thresh=0.45)
+
 
 
                 # Initialize default virtual intrusion security perimeter zone if not present
@@ -1447,6 +1461,9 @@ class DistributedWorkerManager:
                 worker.start()
                 self.workers[code] = worker
                 newly_attached += 1
+            else:
+                self.workers[code].update_config(cam)
+
 
         if newly_attached > 0:
             obj_cams = [c for c in assigned_cameras if c.get("detection_mode") == "OBJECT_DETECTION"]

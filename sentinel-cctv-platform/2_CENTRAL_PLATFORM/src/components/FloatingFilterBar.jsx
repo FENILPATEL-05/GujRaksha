@@ -104,7 +104,9 @@ export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv, depart
         <option value="GENERAL_SURVEILLANCE">No AI</option>
         <option value="ANPR_DETECTION">ANPR</option>
         <option value="OBJECT_DETECTION">Object Detection</option>
+        <option value="HYBRID_AI">ANPR + Object</option>
       </select>
+
 
       <select
         className="filter-select"

@@ -55,14 +55,17 @@ class WorkerOrchestratorService {
         allCams = allCams.filter(c => String(c.district || "").toLowerCase() === district.toLowerCase());
       }
 
-      // ONLY assign cameras that are explicitly configured for AI detection (OBJECT_DETECTION or ANPR_DETECTION)
+      // ONLY assign cameras that are explicitly configured for AI detection (OBJECT_DETECTION, ANPR_DETECTION, HYBRID_AI)
       const aiCams = allCams.filter(c => {
         const mode = String(c.detection_mode || "").toUpperCase();
         return mode === "OBJECT_DETECTION" || 
                mode === "AI_OBJECT_DETECTION" ||
                mode === "ANPR_DETECTION" || 
-               mode === "ANPR";
+               mode === "ANPR" ||
+               mode === "HYBRID_AI" ||
+               mode === "ANPR_AND_OBJECT";
       });
+
       const candidates = aiCams;
       const maxToTake = Math.min(capacity, candidates.length);
 
@@ -158,8 +161,11 @@ class WorkerOrchestratorService {
         return mode === "OBJECT_DETECTION" || 
                mode === "AI_OBJECT_DETECTION" ||
                mode === "ANPR_DETECTION" || 
-               mode === "ANPR";
+               mode === "ANPR" ||
+               mode === "HYBRID_AI" ||
+               mode === "ANPR_AND_OBJECT";
       });
+
 
       const maxToTake = Math.min(worker.max_capacity, aiCams.length);
       worker.assigned_cameras = aiCams.slice(0, maxToTake).map(c => ({
@@ -236,8 +242,11 @@ class WorkerOrchestratorService {
         return mode === "OBJECT_DETECTION" || 
                mode === "AI_OBJECT_DETECTION" ||
                mode === "ANPR_DETECTION" || 
-               mode === "ANPR";
+               mode === "ANPR" ||
+               mode === "HYBRID_AI" ||
+               mode === "ANPR_AND_OBJECT";
       });
+
       candidateCams = aiCams;
     }
 
@@ -317,8 +326,11 @@ class WorkerOrchestratorService {
         return mode === "OBJECT_DETECTION" || 
                mode === "AI_OBJECT_DETECTION" ||
                mode === "ANPR_DETECTION" || 
-               mode === "ANPR";
+               mode === "ANPR" ||
+               mode === "HYBRID_AI" ||
+               mode === "ANPR_AND_OBJECT";
       });
+
       allCams = aiCams;
     }
 

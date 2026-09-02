@@ -387,10 +387,12 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                   onChange={(e) => updateField('detection_mode', e.target.value)}
                 >
                   <option value="GENERAL_SURVEILLANCE">No AI (Standard Feed)</option>
-                  <option value="ANPR_DETECTION">ANPR (Automatic License Plate Recognition)</option>
+                  <option value="ANPR_DETECTION">ANPR (License Plate Recognition)</option>
                   <option value="OBJECT_DETECTION">Object Detection (Vehicle & Person)</option>
+                  <option value="HYBRID_AI">ANPR + Object Detection (Dual Pipeline)</option>
                 </select>
               </div>
+
 
               <div className="form-field span-2">
                 <label>Status SLA</label>

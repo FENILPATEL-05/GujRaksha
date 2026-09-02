@@ -26,7 +26,14 @@ import { Pagination } from './Pagination';
 
 const renderDetectionModeBadge = (mode) => {
   const normalized = String(mode || '').toUpperCase();
-  if (normalized.includes('OBJECT')) {
+  if (normalized.includes('HYBRID') || (normalized.includes('ANPR') && normalized.includes('OBJECT'))) {
+    return (
+      <span className="badge-ai-mode" style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.4)', gap: '4px', fontSize: '11px', padding: '2px 8px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', fontWeight: 700 }} title="AI Mode: ANPR + Object Detection Dual Pipeline">
+        <Zap size={11} strokeWidth={2.4} style={{ color: '#c084fc' }} />
+        <span>ANPR + Object</span>
+      </span>
+    );
+  } else if (normalized.includes('OBJECT')) {
     return (
       <span className="badge-ai-mode traffic" title="AI Mode: Object Detection (Vehicle & Person Detection)">
         <Activity size={11} strokeWidth={2.2} />
@@ -49,6 +56,7 @@ const renderDetectionModeBadge = (mode) => {
     );
   }
 };
+
 
 export const CameraRegistryPage = ({
   cameras,
@@ -315,7 +323,9 @@ export const CameraRegistryPage = ({
                     <option value="GENERAL_SURVEILLANCE">No AI</option>
                     <option value="ANPR_DETECTION">ANPR</option>
                     <option value="OBJECT_DETECTION">Object Detection</option>
+                    <option value="HYBRID_AI">ANPR + Object</option>
                   </select>
+
                 </div>
 
                 <div className="filter-popover-field">
@@ -599,14 +609,16 @@ export const CameraRegistryPage = ({
                               </div>
                             </div>
 
-                            <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: cam.detection_mode === 'ANPR_DETECTION' ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid var(--panel-border)' }}>
+                            <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: cam.detection_mode === 'HYBRID_AI' ? '1px solid rgba(168, 85, 247, 0.4)' : (cam.detection_mode === 'ANPR_DETECTION' ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid var(--panel-border)') }}>
                               <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>AI Analytics Mode</div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: cam.detection_mode === 'ANPR_DETECTION' ? '#4ade80' : (cam.detection_mode === 'OBJECT_DETECTION' ? 'var(--accent)' : 'var(--text-primary)'), marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: cam.detection_mode === 'HYBRID_AI' ? '#c084fc' : (cam.detection_mode === 'ANPR_DETECTION' ? '#4ade80' : (cam.detection_mode === 'OBJECT_DETECTION' ? 'var(--accent)' : 'var(--text-primary)')), marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {cam.detection_mode === 'HYBRID_AI' && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#c084fc', display: 'inline-block' }}></span>}
                                 {cam.detection_mode === 'ANPR_DETECTION' && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#4ade80', display: 'inline-block' }}></span>}
                                 {cam.detection_mode === 'OBJECT_DETECTION' && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }}></span>}
-                                {cam.detection_mode === 'OBJECT_DETECTION' ? 'Object Detection' : (cam.detection_mode === 'ANPR_DETECTION' ? 'ANPR Plate Detection' : 'No AI (Standard Feed)')}
+                                {cam.detection_mode === 'HYBRID_AI' ? 'ANPR + Object Detection' : (cam.detection_mode === 'OBJECT_DETECTION' ? 'Object Detection' : (cam.detection_mode === 'ANPR_DETECTION' ? 'ANPR Plate Detection' : 'No AI (Standard Feed)'))}
                               </div>
                             </div>
+
 
                             {/* WHEP Stream URL */}
                             <div style={{ gridColumn: 'span 2', background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(34, 211, 238, 0.25)' }}>
