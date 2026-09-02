@@ -307,8 +307,9 @@ export const ANPRIntelligencePage = ({
             onClick={() => setActiveTab("ai_vision")}
             style={{ gap: "6px", fontWeight: 700 }}
           >
-            <Eye size={14} strokeWidth={2.4} style={{ color: "var(--accent)" }} /> 🎯 Live AI Object Detection
+            <Eye size={14} strokeWidth={2.4} style={{ color: "var(--accent)" }} /> 🎯 Live AI Detection
           </button>
+
 
           <button
             className={activeTab === "detections" ? "active" : ""}
