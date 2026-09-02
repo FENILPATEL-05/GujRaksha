@@ -112,12 +112,13 @@ export const DetectionCanvasOverlay = ({ camera, isPlaying = true }) => {
       const isBus = cls.includes("bus");
       const isTruck = cls.includes("truck");
 
-      // Strictly allow ONLY the 5 target classes + license plate
-      if (!isPerson && !isCar && !isMotorcycle && !isBus && !isTruck && !isPlate) {
+      // Strictly allow ONLY license plate detections in raw stream canvas overlay
+      if (!isPlate && box.type !== "PLATE" && !box.plate && !box.plate_text) {
         return;
       }
 
       const isHit = box.is_watchlist || box.is_loitering || box.is_intrusion;
+
 
       let color = "#22c55e"; // Default Green for Vehicles
       if (isHit) color = "#ef4444"; // Red for Watchlist / Loitering / Intrusion

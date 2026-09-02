@@ -390,23 +390,21 @@ export const LiveCCTVFeed = ({
     setStreamError(false);
   };
 
-  // Strictly filter to the 5 allowed surveillance classes (+ license plates)
+  // Strictly filter to license plates only for raw video overlay
   const displayDetections = useMemo(() => {
     if (!liveDetections || !Array.isArray(liveDetections)) return [];
     return liveDetections.filter((det) => {
       const cls = String(det.class_name || det.class || det.label || det.type || '').toLowerCase();
       return (
-        cls.includes('person') ||
-        cls.includes('car') ||
-        cls.includes('motorcycle') ||
-        cls.includes('bike') ||
-        cls.includes('bus') ||
-        cls.includes('truck') ||
+        det.type === 'PLATE' ||
         cls.includes('plate') ||
-        cls.includes('anpr')
+        cls.includes('anpr') ||
+        !!det.plate ||
+        !!det.plate_text
       );
     });
   }, [liveDetections]);
+
 
 
   return (

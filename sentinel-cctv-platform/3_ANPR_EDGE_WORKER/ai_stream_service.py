@@ -165,11 +165,34 @@ class OpenCVONNXDetector:
         return detections
 
 
-# Initialize Global Detector
+# Initialize Global Object Detector
 detector = OpenCVONNXDetector()
+
+# Initialize Global Plate Detector and OCR
+plate_detector = None
+plate_ocr = None
+
+try:
+    from anpr_worker import PlateDetectorONNX, PlateOCRONNX, normalize_ocr_text, HAS_ONNXRUNTIME
+    p_det_path = os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/onnx/plate_detector.onnx")
+    p_ocr_path = os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/onnx/plate_ocr.onnx")
+    if not os.path.exists(p_det_path):
+        p_det_path = "/home/dell-i5/nxon-projects/GujRaksha/sentinel-cctv-platform/2_CENTRAL_PLATFORM/models/onnx/plate_detector.onnx"
+    if not os.path.exists(p_ocr_path):
+        p_ocr_path = "/home/dell-i5/nxon-projects/GujRaksha/sentinel-cctv-platform/2_CENTRAL_PLATFORM/models/onnx/plate_ocr.onnx"
+
+    if HAS_ONNXRUNTIME and os.path.exists(p_det_path):
+        plate_detector = PlateDetectorONNX(p_det_path)
+        logger.info("✅ AI Stream: Plate Detector Loaded")
+    if HAS_ONNXRUNTIME and os.path.exists(p_ocr_path):
+        plate_ocr = PlateOCRONNX(p_ocr_path)
+        logger.info("✅ AI Stream: Plate OCR Model Loaded")
+except Exception as e:
+    logger.warning(f"Plate models not loaded in AI stream: {e}")
 
 
 def create_placeholder_frame(text: str) -> np.ndarray:
+
     """Creates a placeholder frame for connection/error states."""
     frame = np.zeros((480, 640, 3), dtype=np.uint8)
     y0, dy = 180, 35
@@ -332,7 +355,31 @@ def generate_frames(
             cv2.putText(annotated_frame, label, (x1 + 3, max(y1 - 5, 15)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 1)
 
+        # 3.5. License Plate Detection & High-Contrast ANPR Tag Drawing
+        if plate_detector is not None:
+            try:
+                raw_plates = plate_detector.detect(frame, conf_thresh=0.20, iou_thresh=0.45)
+                if raw_plates:
+                    frame_counts["plates"] = len(raw_plates)
+                for px1, py1, px2, py2, pconf in raw_plates:
+                    p_text = ""
+                    if plate_ocr is not None:
+                        p_text, _ = plate_ocr.recognize(frame, (px1, py1, px2, py2))
+                    cleaned_p = normalize_ocr_text(p_text) if p_text else ""
+
+                    # Draw Bright Yellow Box on Plate
+                    cv2.rectangle(annotated_frame, (px1, py1), (px2, py2), (0, 230, 255), 2)
+
+                    p_label = f"PLATE: {cleaned_p}" if cleaned_p else "LICENSE_PLATE"
+                    (pw, ph), _ = cv2.getTextSize(p_label, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)
+                    cv2.rectangle(annotated_frame, (px1, max(py1 - 20, 0)), (px1 + pw + 8, max(py1, 20)), (0, 230, 255), -1)
+                    cv2.putText(annotated_frame, p_label, (px1 + 4, max(py1 - 5, 15)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.48, (0, 0, 0), 2)
+            except Exception:
+                pass
+
         # 4. Draw Intrusion Zone (Virtual Security Fence)
+
         if intrusion_zone:
             intrusion_zone.draw(annotated_frame, active=intrusion_active)
             zone_label = "RESTRICTED PERIMETER ZONE" if not intrusion_active else "!!! PERIMETER BREACH DETECTED !!!"
