@@ -248,34 +248,55 @@ class OpenCVPlateDetector:
         return detections
 
 
-# Real Deep Learning ANPR Detector and OCR (YOLOv9 Plate Detector + CCT Transformer OCR)
+# Real Deep Learning ANPR Pipeline (GPU CUDA / TensorRT Priority -> CPU TFLite Fallback)
 real_plate_detector = None
 real_plate_ocr = None
 normalize_ocr_text = lambda x: x
+active_backend_mode = "CPU (TFLite)"
 
 try:
-    from ai_edge_litert.interpreter import Interpreter
-    tflite_det_path = os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/tflite/plate_detector.tflite")
-    tflite_ocr_path = os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/tflite/plate_ocr.tflite")
-    if not os.path.exists(tflite_det_path):
-        tflite_det_path = "/home/dell-i5/nxon-projects/GujRaksha/sentinel-cctv-platform/2_CENTRAL_PLATFORM/models/tflite/plate_detector.tflite"
-    if not os.path.exists(tflite_ocr_path):
-        tflite_ocr_path = "/home/dell-i5/nxon-projects/GujRaksha/sentinel-cctv-platform/2_CENTRAL_PLATFORM/models/tflite/plate_ocr.tflite"
-
     central_services_dir = os.path.abspath(os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/src/services"))
     if central_services_dir not in sys.path:
         sys.path.insert(0, central_services_dir)
 
-    from anpr_tflite_scanner import PlateDetectorTFLite, PlateOCRTFLite, normalize_ocr_text
+    det_onnx_path = os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/onnx/plate_detector.onnx")
+    ocr_onnx_path = os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/onnx/plate_ocr.onnx")
+    tflite_det_path = os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/tflite/plate_detector.tflite")
+    tflite_ocr_path = os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/tflite/plate_ocr.tflite")
 
-    if os.path.exists(tflite_det_path):
-        real_plate_detector = PlateDetectorTFLite(tflite_det_path)
-        logger.info(f"✅ Real YOLOv9 Plate Detector loaded from {tflite_det_path}")
-    if os.path.exists(tflite_ocr_path):
-        real_plate_ocr = PlateOCRTFLite(tflite_ocr_path)
-        logger.info(f"✅ Real CCT Transformer OCR loaded from {tflite_ocr_path}")
+    from anpr_tflite_scanner import normalize_ocr_text
+
+    # STEP 1: Attempt NVIDIA GPU (CUDA / TensorRT) via ONNX Runtime
+    gpu_success = False
+    try:
+        import onnxruntime as ort
+        providers = ort.get_available_providers()
+        cuda_available = any("CUDA" in p or "TensorRT" in p for p in providers)
+
+        if cuda_available and os.path.exists(det_onnx_path) and os.path.exists(ocr_onnx_path):
+            from anpr_worker import PlateDetectorONNX, PlateOCRONNX
+            real_plate_detector = PlateDetectorONNX(det_onnx_path)
+            real_plate_ocr = PlateOCRONNX(ocr_onnx_path)
+            active_backend_mode = real_plate_detector.accel_mode
+            current_ai_stats["backend_engine"] = f"GPU ({active_backend_mode})"
+            logger.info(f"🚀 [AI Engine] Priority 1 GPU Activated: {active_backend_mode}")
+            gpu_success = True
+    except Exception as gpu_err:
+        logger.info(f"ℹ️ [AI Engine] GPU ONNX not available ({gpu_err}), falling back to CPU...")
+
+    # STEP 2: Fallback to High-Performance Multi-threaded CPU (LiteRT / TFLite XNNPACK)
+    if not gpu_success:
+        from anpr_tflite_scanner import PlateDetectorTFLite, PlateOCRTFLite
+        if os.path.exists(tflite_det_path):
+            real_plate_detector = PlateDetectorTFLite(tflite_det_path)
+        if os.path.exists(tflite_ocr_path):
+            real_plate_ocr = PlateOCRTFLite(tflite_ocr_path)
+        active_backend_mode = "CPU XNNPACK (LiteRT)"
+        current_ai_stats["backend_engine"] = active_backend_mode
+        logger.info(f"✅ [AI Engine] Priority 2 CPU Activated: {active_backend_mode}")
 except Exception as e:
-    logger.error(f"Failed to load real ANPR TFLite models: {e}")
+    logger.error(f"Failed to initialize ANPR deep learning pipeline: {e}")
+
 
 
 STREAM_DYNAMIC_CONTROLS: Dict[str, Dict[str, bool]] = {}
