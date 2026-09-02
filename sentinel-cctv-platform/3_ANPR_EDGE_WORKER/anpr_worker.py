@@ -1056,8 +1056,8 @@ class CameraWorkerThread(threading.Thread):
                 h, w = frame.shape[:2]
 
                 cam_mode = str(self.cam_info.get("detection_mode") or "").upper()
-                is_obj_cam = (cam_mode == "OBJECT_DETECTION" or cam_mode == "AI_OBJECT_DETECTION")
-                is_anpr_cam = (cam_mode == "ANPR_DETECTION" or cam_mode == "ANPR")
+                is_obj_cam = (cam_mode in ["OBJECT_DETECTION", "AI_OBJECT_DETECTION", "TRAFFIC_MONITORING", "VEHICLE_COUNTING"] or bool(self.cam_info.get("enable_object_detection")))
+                is_anpr_cam = (cam_mode in ["ANPR_DETECTION", "ANPR", "TRAFFIC_MONITORING"] or not cam_mode)
 
                 # 3. License Plate Detection (Runs strictly on ANPR cameras)
                 raw_boxes = []
@@ -1072,7 +1072,7 @@ class CameraWorkerThread(threading.Thread):
                 raw_objects = []
                 is_selected_vision_cam = self.ws_client.is_camera_active_target(self.camera_code, self.camera_id) if self.ws_client else True
 
-                if (is_obj_cam or is_selected_vision_cam) and self.object_detector is not None:
+                if (is_obj_cam or (is_selected_vision_cam and cam_mode != "GENERAL_SURVEILLANCE")) and self.object_detector is not None:
                     if hasattr(self.object_detector, "triton_client") or getattr(self.object_detector, "accel_mode", "").startswith("GPU"):
                         raw_objects = self.object_detector.detect(frame, conf_thresh=0.10, iou_thresh=0.40)
                     else:

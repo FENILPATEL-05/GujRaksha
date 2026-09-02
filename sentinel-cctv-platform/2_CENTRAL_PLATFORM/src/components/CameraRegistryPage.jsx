@@ -26,32 +26,25 @@ import { Pagination } from './Pagination';
 
 const renderDetectionModeBadge = (mode) => {
   const normalized = String(mode || '').toUpperCase();
-  if (normalized.includes('ANPR')) {
+  if (normalized.includes('OBJECT')) {
+    return (
+      <span className="badge-ai-mode traffic" title="AI Mode: Object Detection (Vehicle & Person Detection)">
+        <Activity size={11} strokeWidth={2.2} />
+        <span>Object Detect</span>
+      </span>
+    );
+  } else if (normalized.includes('ANPR')) {
     return (
       <span className="badge-ai-mode anpr" title="AI Mode: ANPR Plate Detection (Automatic License Plate Recognition)">
         <Zap size={11} strokeWidth={2.4} />
-        <span>ANPR Plate</span>
-      </span>
-    );
-  } else if (normalized.includes('COUNT')) {
-    return (
-      <span className="badge-ai-mode counting" title="AI Mode: Vehicle Counting & Classification">
-        <Layers size={11} strokeWidth={2.2} />
-        <span>Vehicle Counting</span>
-      </span>
-    );
-  } else if (normalized.includes('TRAFFIC')) {
-    return (
-      <span className="badge-ai-mode traffic" title="AI Mode: Traffic Flow & Speed Monitoring">
-        <Activity size={11} strokeWidth={2.2} />
-        <span>Traffic Flow</span>
+        <span>ANPR</span>
       </span>
     );
   } else {
     return (
-      <span className="badge-ai-mode surveillance" title="AI Mode: General Surveillance (Standard Video)">
+      <span className="badge-ai-mode surveillance" title="AI Mode: No AI (Standard Video Surveillance)">
         <Eye size={11} strokeWidth={2.2} />
-        <span>Surveillance</span>
+        <span>No AI</span>
       </span>
     );
   }
@@ -275,10 +268,9 @@ export const CameraRegistryPage = ({
                     }}
                   >
                     <option value="ALL">All AI Modes</option>
-                    <option value="ANPR_DETECTION">ANPR Detection (Plate Recognition)</option>
-                    <option value="VEHICLE_COUNTING">Vehicle Counting & Classification</option>
-                    <option value="TRAFFIC_MONITORING">Traffic Flow & Speed Monitoring</option>
-                    <option value="GENERAL_SURVEILLANCE">General Surveillance</option>
+                    <option value="GENERAL_SURVEILLANCE">No AI</option>
+                    <option value="ANPR_DETECTION">ANPR</option>
+                    <option value="OBJECT_DETECTION">Object Detection</option>
                   </select>
                 </div>
 
@@ -474,9 +466,10 @@ export const CameraRegistryPage = ({
 
                             <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: cam.detection_mode === 'ANPR_DETECTION' ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid var(--panel-border)' }}>
                               <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>AI Analytics Mode</div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: cam.detection_mode === 'ANPR_DETECTION' ? '#4ade80' : 'var(--text-primary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: cam.detection_mode === 'ANPR_DETECTION' ? '#4ade80' : (cam.detection_mode === 'OBJECT_DETECTION' ? 'var(--accent)' : 'var(--text-primary)'), marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {cam.detection_mode === 'ANPR_DETECTION' && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#4ade80', display: 'inline-block' }}></span>}
-                                {cam.detection_mode === 'ANPR_DETECTION' ? 'ANPR Plate Detection' : (cam.detection_mode === 'VEHICLE_COUNTING' ? 'Vehicle Counting' : (cam.detection_mode === 'TRAFFIC_MONITORING' ? 'Traffic Monitoring' : 'General Surveillance'))}
+                                {cam.detection_mode === 'OBJECT_DETECTION' && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }}></span>}
+                                {cam.detection_mode === 'OBJECT_DETECTION' ? 'Object Detection' : (cam.detection_mode === 'ANPR_DETECTION' ? 'ANPR Plate Detection' : 'No AI (Standard Feed)')}
                               </div>
                             </div>
 

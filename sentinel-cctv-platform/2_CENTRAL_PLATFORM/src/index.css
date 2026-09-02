@@ -2039,6 +2039,24 @@ form input:focus, form select:focus, form textarea:focus,
   box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.15);
 }
 
+.input-error,
+form input.input-error, form select.input-error,
+.form-field input.input-error, .form-field select.input-error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 1.5px rgba(239, 68, 68, 0.3) !important;
+}
+
+.field-error-msg {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #f87171;
+  font-size: 11px;
+  font-weight: 500;
+  margin-top: 3px;
+  animation: modalFadeIn 0.15s ease;
+}
+
 .field-hint {
   font-size: 10px;
   color: var(--text-dim);
@@ -2327,7 +2345,7 @@ form input:focus, form select:focus, form textarea:focus,
   position: fixed;
   top: 78px;
   right: 18px;
-  z-index: 3000;
+  z-index: 100000;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -4143,6 +4161,98 @@ body.theme-light .map-controls button:hover {
   font-family: var(--font-mono, monospace);
   color: var(--text-primary, #e2e8f0);
 }
+
+/* ==========================================================================
+   STEP-WISE CAMERA ONBOARDING WIZARD
+   ========================================================================== */
+.wizard-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 12px 18px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  gap: 8px;
+}
+
+.wizard-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.wizard-step.active {
+  opacity: 1;
+}
+
+.wizard-step.completed {
+  opacity: 0.85;
+}
+
+.wizard-step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  font-family: var(--font-mono, monospace);
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--panel-border);
+  transition: all 0.2s ease;
+}
+
+.wizard-step.active .wizard-step-circle {
+  background: var(--accent);
+  color: #04101e;
+  border-color: var(--accent);
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.4);
+}
+
+.wizard-step.completed .wizard-step-circle {
+  background: #10b981;
+  color: #fff;
+  border-color: #10b981;
+}
+
+.wizard-step-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.wizard-step-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.wizard-step-subtitle {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.wizard-step-divider {
+  flex: 1;
+  height: 2px;
+  background: var(--panel-border);
+  margin: 0 8px;
+  border-radius: 1px;
+}
+
+.wizard-step-divider.active {
+  background: var(--accent);
+}
+
 
 
 

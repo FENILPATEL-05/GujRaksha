@@ -1,62 +1,62 @@
 import React, { useState, useEffect } from 'react';
-import { SquarePen, X, Trash2, Save, Radio, Sliders, RefreshCw } from 'lucide-react';
+import { SquarePen, X, Trash2, Save, RefreshCw, AlertCircle, Sliders, Radio } from 'lucide-react';
+
+const GUJARAT_DISTRICTS = [
+  'Ahmedabad', 'Amreli', 'Anand', 'Aravalli', 'Banaskantha', 'Bharuch',
+  'Bhavnagar', 'Botad', 'Chhota Udaipur', 'Dahod', 'Dang', 'Devbhoomi Dwarka',
+  'Gandhinagar', 'Gir Somnath', 'Jamnagar', 'Junagadh', 'Kheda', 'Kutch',
+  'Mahisagar', 'Mehsana', 'Morbi', 'Narmada', 'Navsari', 'Panchmahal',
+  'Patan', 'Porbandar', 'Rajkot', 'Sabarkantha', 'Surat', 'Surendranagar',
+  'Tapi', 'Vadodara', 'Valsad'
+];
 
 export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, departments = [] }) => {
-  const [showAdvancedStream, setShowAdvancedStream] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showAdvancedStream, setShowAdvancedStream] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const [form, setForm] = useState({
     name: '',
     camera_code: '',
     department_id: 'HOME',
-    district: '',
+    camera_type: 'PTZ',
+    district: 'Ahmedabad',
     taluka: '',
+    address: '',
     latitude: '',
     longitude: '',
-    address: '',
-    ownership_type: 'GOVERNMENT',
-    camera_type: 'PTZ',
     detection_mode: 'GENERAL_SURVEILLANCE',
-    vms_vendor: '',
     status: 'ACTIVE',
     stream_url: '',
     rtsp_url: '',
     whep_url: '',
-    hls_url: '',
-    codec: 'H.264',
-    resolution: '1920x1080',
-    fps: 30,
-    bitrate: '4Mbps',
-    retention_days: 15
+    hls_url: ''
   });
 
   useEffect(() => {
     if (camera) {
+      const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+      const cleanId = (camera.id || '').replace('gov-feed-', '').replace('cam-', '').trim() || '1';
+      const streamUrl = camera.stream_url || (camera.urls && (camera.urls.rtsp || camera.urls.whep)) || '';
+
       setForm({
         name: camera.name || '',
         camera_code: camera.camera_code || '',
         department_id: camera.department_id || 'HOME',
-        district: camera.district || '',
+        camera_type: camera.camera_type || 'PTZ',
+        district: camera.district || 'Ahmedabad',
         taluka: camera.taluka || '',
+        address: camera.address || '',
         latitude: camera.latitude !== undefined && camera.latitude !== null ? String(camera.latitude) : '',
         longitude: camera.longitude !== undefined && camera.longitude !== null ? String(camera.longitude) : '',
-        address: camera.address || '',
-        ownership_type: camera.ownership_type || 'GOVERNMENT',
-        camera_type: camera.camera_type || 'PTZ',
         detection_mode: camera.detection_mode || 'GENERAL_SURVEILLANCE',
-        enable_object_detection: camera.enable_object_detection !== undefined ? !!camera.enable_object_detection : (camera.detection_mode === 'OBJECT_DETECTION' || camera.detection_mode === 'TRAFFIC_MONITORING' || camera.detection_mode === 'ANPR_DETECTION'),
-        vms_vendor: camera.vms_vendor || 'Live Sentinel Feeder',
         status: camera.status || 'ACTIVE',
-        stream_url: camera.stream_url || '',
-        rtsp_url: camera.rtsp_url || (camera.urls && camera.urls.rtsp) || '',
-        whep_url: camera.whep_url || (camera.urls && camera.urls.whep) || '',
-        hls_url: camera.hls_url || (camera.urls && camera.urls.hls) || '',
-        codec: camera.codec || (camera.stream_properties && camera.stream_properties.codec) || 'H.264',
-        resolution: (camera.stream_properties && camera.stream_properties.resolution) || camera.resolution || '1920x1080',
-        fps: (camera.stream_properties && camera.stream_properties.fps) || camera.fps || 30,
-        bitrate: (camera.stream_properties && camera.stream_properties.bitrate) || camera.bitrate || '4Mbps',
-        retention_days: camera.retention_days || 15
+        stream_url: streamUrl,
+        rtsp_url: camera.rtsp_url || (camera.urls && camera.urls.rtsp) || (streamUrl.startsWith('rtsp://') ? streamUrl : `rtsp://${host}:8554/stream/${cleanId}`),
+        whep_url: camera.whep_url || (camera.urls && camera.urls.whep) || `http://${host}:8889/stream/${cleanId}/whep`,
+        hls_url: camera.hls_url || (camera.urls && camera.urls.hls) || `http://${host}:8888/stream/${cleanId}/index.m3u8`
       });
+      setErrors({});
     }
   }, [camera]);
 
@@ -64,8 +64,13 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
 
   const handleStreamUrlChange = (val) => {
     const nextForm = { ...form, stream_url: val };
+    if (errors.stream_url) {
+      setErrors((prev) => ({ ...prev, stream_url: undefined }));
+    }
+
     const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
-    const cleanId = (camera.id || '').replace('gov-feed-', '') || '1';
+    const cleanId = (camera.id || '').replace('gov-feed-', '').replace('cam-', '').trim() || '1';
+
     if (val.startsWith('rtsp://')) {
       nextForm.rtsp_url = val;
       nextForm.whep_url = `http://${host}:8889/stream/${cleanId}/whep`;
@@ -74,25 +79,65 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
       nextForm.whep_url = val;
       nextForm.rtsp_url = `rtsp://${host}:8554/stream/${cleanId}`;
       nextForm.hls_url = `http://${host}:8888/stream/${cleanId}/index.m3u8`;
+    } else if (val.trim()) {
+      nextForm.rtsp_url = val;
+      nextForm.whep_url = `http://${host}:8889/stream/${cleanId}/whep`;
+      nextForm.hls_url = `http://${host}:8888/stream/${cleanId}/index.m3u8`;
     }
     setForm(nextForm);
+  };
+
+  const updateField = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!form.name || !form.name.trim()) {
+      newErrors.name = 'Camera Name / Location is required';
+    }
+    if (!form.department_id) {
+      newErrors.department_id = 'Department ownership is required';
+    }
+    if (!form.district || !form.district.trim()) {
+      newErrors.district = 'District is required';
+    }
+
+    if (!form.latitude || !String(form.latitude).trim()) {
+      newErrors.latitude = 'Latitude (GPS) is required';
+    } else {
+      const lat = parseFloat(form.latitude);
+      if (isNaN(lat) || lat < -90 || lat > 90) {
+        newErrors.latitude = 'Latitude must be between -90 and 90';
+      }
+    }
+
+    if (!form.longitude || !String(form.longitude).trim()) {
+      newErrors.longitude = 'Longitude (GPS) is required';
+    } else {
+      const lng = parseFloat(form.longitude);
+      if (isNaN(lng) || lng < -180 || lng > 180) {
+        newErrors.longitude = 'Longitude must be between -180 and 180';
+      }
+    }
+
+    if (!form.stream_url || !form.stream_url.trim()) {
+      newErrors.stream_url = 'Live Stream Feed URL is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (isSubmitting) return;
 
-    if (!form.name || !form.name.trim()) {
-      if (addToast) addToast('Camera Name is mandatory.', 'error', 'Validation Error');
-      return;
-    }
-
-    const lat = parseFloat(form.latitude);
-    const lng = parseFloat(form.longitude);
-    if (isNaN(lat) || isNaN(lng)) {
-      if (addToast) addToast('Valid numerical Latitude and Longitude are mandatory.', 'error', 'Validation Error');
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsSubmitting(true);
 
@@ -100,23 +145,44 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
       const depts = departments || [];
       const selectedDeptObj = depts.find(d => d.code === form.department_id);
       const targetId = camera.id || camera.camera_code;
+      const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+      const cleanId = (camera.id || '').replace('gov-feed-', '').replace('cam-', '').trim() || '1';
+
+      const rtspUrl = form.rtsp_url.trim() || form.stream_url.trim();
+      const whepUrl = form.whep_url.trim() || `http://${host}:8889/stream/${cleanId}/whep`;
+      const hlsUrl = form.hls_url.trim() || `http://${host}:8888/stream/${cleanId}/index.m3u8`;
 
       const payload = {
-        ...form,
         name: form.name.trim(),
-        latitude: lat,
-        longitude: lng,
+        camera_code: form.camera_code.trim() || undefined,
+        department_id: form.department_id,
         department_name: selectedDeptObj ? selectedDeptObj.name : `${form.department_id} Department`,
-        urls: {
-          rtsp: form.rtsp_url || form.stream_url || '',
-          whep: form.whep_url || '',
-          hls: form.hls_url || ''
+        camera_type: form.camera_type,
+        district: form.district.trim(),
+        taluka: form.taluka.trim(),
+        address: form.address.trim(),
+        latitude: parseFloat(form.latitude),
+        longitude: parseFloat(form.longitude),
+        detection_mode: form.detection_mode || 'GENERAL_SURVEILLANCE',
+        enable_object_detection: form.detection_mode === 'OBJECT_DETECTION',
+        status: form.status,
+        stream_url: form.stream_url.trim(),
+        rtsp_url: rtspUrl,
+        whep_url: whepUrl,
+        hls_url: hlsUrl,
+        ownership_type: camera.ownership_type || 'GOVERNMENT',
+        vms_vendor: camera.vms_vendor || 'Live Sentinel Feeder',
+        retention_days: camera.retention_days || 15,
+        stream_properties: camera.stream_properties || {
+          resolution: '1920x1080',
+          fps: 30,
+          codec: 'H.264',
+          bitrate: '4Mbps'
         },
-        stream_properties: {
-          resolution: form.resolution || '1920x1080',
-          fps: parseInt(form.fps || 30, 10),
-          codec: form.codec || 'H.264',
-          bitrate: form.bitrate || '4Mbps'
+        urls: {
+          rtsp: rtspUrl,
+          whep: whepUrl,
+          hls: hlsUrl
         }
       };
 
@@ -143,7 +209,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
   };
 
   const handleDelete = async () => {
-    if (!window.confirm(`Are you sure you want to remove camera '${camera.name}' [${camera.camera_code}] from the registry?`)) return;
+    if (!window.confirm(`Are you sure you want to remove camera '${camera.name}' [${camera.camera_code || camera.id}] from the registry?`)) return;
 
     setIsSubmitting(true);
     try {
@@ -167,38 +233,50 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
 
   return (
     <div className="modal-overlay" style={{ zIndex: 9999 }}>
-      <div className="modal modal-lg" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="modal modal-md" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         <div className="modal-head">
-          <h3><SquarePen size={16} strokeWidth={2.2} style={{ color: 'var(--accent)' }} /> Edit Camera Asset Details</h3>
+          <h3>
+            <SquarePen size={16} strokeWidth={2.2} style={{ color: 'var(--accent)' }} /> Edit Camera Asset Details
+          </h3>
           <button className="modal-close" onClick={onClose}><X size={16} strokeWidth={2.2} /></button>
         </div>
-        <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
+        <div className="modal-body" style={{ overflowY: 'auto', flex: 1, padding: '18px 24px' }}>
           <form onSubmit={handleSubmit} noValidate>
             <div className="form-grid">
+              {/* Section 1: Basic Information */}
+              <div className="form-field span-2">
+                <label>Camera Name / Location *</label>
+                <input
+                  type="text"
+                  required
+                  className={errors.name ? 'input-error' : ''}
+                  value={form.name}
+                  onChange={(e) => updateField('name', e.target.value)}
+                  placeholder="e.g. SG Highway Junction PTZ"
+                />
+                {errors.name && (
+                  <span className="field-error-msg">
+                    <AlertCircle size={11} strokeWidth={2.4} /> {errors.name}
+                  </span>
+                )}
+              </div>
+
               <div className="form-field">
                 <label>Camera Asset Code</label>
                 <input
                   type="text"
                   value={form.camera_code}
-                  onChange={(e) => setForm({ ...form, camera_code: e.target.value })}
-                />
-              </div>
-
-              <div className="form-field span-2">
-                <label>Camera Name / Location *</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="e.g. SG Highway Junction PTZ"
+                  onChange={(e) => updateField('camera_code', e.target.value)}
+                  placeholder="e.g. GJ-GOV-045"
                 />
               </div>
 
               <div className="form-field">
-                <label>Department Ownership</label>
+                <label>Department Ownership *</label>
                 <select
+                  className={errors.department_id ? 'input-error' : ''}
                   value={form.department_id}
-                  onChange={(e) => setForm({ ...form, department_id: e.target.value })}
+                  onChange={(e) => updateField('department_id', e.target.value)}
                 >
                   {(departments || []).map((d) => (
                     <option key={d.code} value={d.code}>
@@ -206,66 +284,18 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                     </option>
                   ))}
                 </select>
+                {errors.department_id && (
+                  <span className="field-error-msg">
+                    <AlertCircle size={11} strokeWidth={2.4} /> {errors.department_id}
+                  </span>
+                )}
               </div>
 
-              <div className="form-field">
-                <label>District *</label>
-                <input
-                  type="text"
-                  value={form.district}
-                  onChange={(e) => setForm({ ...form, district: e.target.value })}
-                  placeholder="e.g. Ahmedabad"
-                />
-              </div>
-
-              <div className="form-field">
-                <label>Taluka / Area</label>
-                <input
-                  type="text"
-                  value={form.taluka}
-                  onChange={(e) => setForm({ ...form, taluka: e.target.value })}
-                  placeholder="e.g. Daskroi"
-                />
-              </div>
-
-              <div className="form-field">
-                <label>Ownership Type</label>
-                <select
-                  value={form.ownership_type}
-                  onChange={(e) => setForm({ ...form, ownership_type: e.target.value })}
-                >
-                  <option value="GOVERNMENT">Government Owned</option>
-                  <option value="PRIVATE_PARTNER">Private Partner</option>
-                  <option value="MUNICIPAL">Municipal Corporation</option>
-                  <option value="PRIVATE">Private / Commercial</option>
-                </select>
-              </div>
-
-              <div className="form-field">
-                <label>Latitude *</label>
-                <input
-                  type="text"
-                  value={form.latitude}
-                  onChange={(e) => setForm({ ...form, latitude: e.target.value })}
-                  placeholder="e.g. 23.0225"
-                />
-              </div>
-
-              <div className="form-field">
-                <label>Longitude *</label>
-                <input
-                  type="text"
-                  value={form.longitude}
-                  onChange={(e) => setForm({ ...form, longitude: e.target.value })}
-                  placeholder="e.g. 72.5714"
-                />
-              </div>
-
-              <div className="form-field">
-                <label>Camera Type</label>
+              <div className="form-field span-2">
+                <label>Camera Hardware Type</label>
                 <select
                   value={form.camera_type}
-                  onChange={(e) => setForm({ ...form, camera_type: e.target.value })}
+                  onChange={(e) => updateField('camera_type', e.target.value)}
                 >
                   <option value="PTZ">PTZ Dome Speed Camera</option>
                   <option value="FIXED_BULLET">Fixed Bullet HD Camera</option>
@@ -274,38 +304,34 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                 </select>
               </div>
 
+              {/* Section 2: Location & Coordinates */}
               <div className="form-field">
-                <label>AI Detection & Analytics Mode *</label>
+                <label>District *</label>
                 <select
-                  value={form.detection_mode}
-                  onChange={(e) => setForm({ ...form, detection_mode: e.target.value, enable_object_detection: e.target.value === 'OBJECT_DETECTION' })}
+                  className={errors.district ? 'input-error' : ''}
+                  value={form.district}
+                  onChange={(e) => updateField('district', e.target.value)}
                 >
-                  <option value="OBJECT_DETECTION">AI Object Detection & Classification (YOLOv9 Live HUD)</option>
-                  <option value="ANPR_DETECTION">ANPR Detection (Automatic License Plate Recognition)</option>
-                  <option value="TRAFFIC_MONITORING">Traffic Flow & Speed Monitoring</option>
-                  <option value="VEHICLE_COUNTING">Vehicle Counting & Classification</option>
-                  <option value="GENERAL_SURVEILLANCE">General Surveillance (Standard Feed / No AI)</option>
+                  {GUJARAT_DISTRICTS.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
                 </select>
+                {errors.district && (
+                  <span className="field-error-msg">
+                    <AlertCircle size={11} strokeWidth={2.4} /> {errors.district}
+                  </span>
+                )}
               </div>
 
               <div className="form-field">
-                <label>Status SLA</label>
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value })}
-                >
-                  <option value="ACTIVE">ACTIVE / Online</option>
-                  <option value="MAINTENANCE">MAINTENANCE</option>
-                  <option value="OFFLINE">OFFLINE</option>
-                </select>
-              </div>
-
-              <div className="form-field">
-                <label>VMS Vendor / Feeder</label>
+                <label>Taluka / Area</label>
                 <input
                   type="text"
-                  value={form.vms_vendor}
-                  onChange={(e) => setForm({ ...form, vms_vendor: e.target.value })}
+                  value={form.taluka}
+                  onChange={(e) => updateField('taluka', e.target.value)}
+                  placeholder="e.g. Bodakdev / Daskroi"
                 />
               </div>
 
@@ -314,135 +340,172 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                 <input
                   type="text"
                   value={form.address}
-                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  onChange={(e) => updateField('address', e.target.value)}
+                  placeholder="e.g. Near Pakwan Cross Road, SG Highway"
                 />
               </div>
 
-              {/* Stream Endpoints & WHEP Section */}
-              <div className="form-field span-2" style={{ borderTop: '1px solid var(--panel-border)', paddingTop: '12px', marginTop: '4px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <label style={{ margin: 0, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent)' }}>
-                    <Radio size={14} /> Stream Endpoints & WHEP Configuration
-                  </label>
+              <div className="form-field">
+                <label>Latitude (GPS) *</label>
+                <input
+                  type="text"
+                  required
+                  className={errors.latitude ? 'input-error' : ''}
+                  value={form.latitude}
+                  onChange={(e) => updateField('latitude', e.target.value)}
+                  placeholder="e.g. 23.0338"
+                />
+                {errors.latitude && (
+                  <span className="field-error-msg">
+                    <AlertCircle size={11} strokeWidth={2.4} /> {errors.latitude}
+                  </span>
+                )}
+              </div>
+
+              <div className="form-field">
+                <label>Longitude (GPS) *</label>
+                <input
+                  type="text"
+                  required
+                  className={errors.longitude ? 'input-error' : ''}
+                  value={form.longitude}
+                  onChange={(e) => updateField('longitude', e.target.value)}
+                  placeholder="e.g. 72.5850"
+                />
+                {errors.longitude && (
+                  <span className="field-error-msg">
+                    <AlertCircle size={11} strokeWidth={2.4} /> {errors.longitude}
+                  </span>
+                )}
+              </div>
+
+              {/* Section 3: AI Mode & Stream URL */}
+              <div className="form-field span-2">
+                <label>AI Detection & Analytics Mode *</label>
+                <select
+                  value={form.detection_mode || 'GENERAL_SURVEILLANCE'}
+                  onChange={(e) => updateField('detection_mode', e.target.value)}
+                >
+                  <option value="GENERAL_SURVEILLANCE">No AI (Standard Feed)</option>
+                  <option value="ANPR_DETECTION">ANPR (Automatic License Plate Recognition)</option>
+                  <option value="OBJECT_DETECTION">Object Detection (Vehicle & Person)</option>
+                </select>
+              </div>
+
+              <div className="form-field span-2">
+                <label>Status SLA</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => updateField('status', e.target.value)}
+                >
+                  <option value="ACTIVE">ACTIVE / Online</option>
+                  <option value="MAINTENANCE">MAINTENANCE</option>
+                  <option value="OFFLINE">OFFLINE</option>
+                </select>
+              </div>
+
+              <div className="form-field span-2">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <label style={{ margin: 0 }}>Live Stream Feed URL (RTSP / WHEP / HTTP) *</label>
                   <button
                     type="button"
                     className="btn btn-sm"
-                    style={{ fontSize: '11px', padding: '2px 8px' }}
+                    style={{ fontSize: '11px', padding: '2px 8px', gap: '4px' }}
                     onClick={() => setShowAdvancedStream(!showAdvancedStream)}
                   >
-                    <Sliders size={11} /> {showAdvancedStream ? 'Hide Advanced Options' : 'Show Advanced Options'}
+                    <Sliders size={11} /> {showAdvancedStream ? 'Hide Advanced Endpoints' : 'Show Advanced Endpoints (RTSP, WHEP, HLS)'}
                   </button>
                 </div>
-
-                <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  Primary Stream URL (RTSP / HTTP / WHEP)
-                </label>
                 <input
                   type="text"
+                  required
+                  className={errors.stream_url ? 'input-error' : ''}
                   value={form.stream_url}
                   onChange={(e) => handleStreamUrlChange(e.target.value)}
+                  placeholder="e.g. rtsp://127.0.0.1:8554/stream/1 or http://localhost:8889/stream/1/whep"
                 />
+                {errors.stream_url && (
+                  <span className="field-error-msg">
+                    <AlertCircle size={11} strokeWidth={2.4} /> {errors.stream_url}
+                  </span>
+                )}
+                <small style={{ color: 'var(--text-dim)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  MediaMTX WebRTC & HLS playback endpoints will be automatically linked with this feed.
+                </small>
               </div>
 
+              {/* Advanced Stream Endpoints (RTSP, WHEP, HLS) */}
               {showAdvancedStream && (
                 <>
+                  <div className="form-field span-2" style={{ borderTop: '1px dashed var(--panel-border)', paddingTop: '10px', marginTop: '4px' }}>
+                    <label style={{ color: 'var(--accent)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Radio size={13} /> RTSP Stream Ingestion URL
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="rtsp://localhost:8554/stream/1"
+                      value={form.rtsp_url}
+                      onChange={(e) => updateField('rtsp_url', e.target.value)}
+                    />
+                  </div>
+
                   <div className="form-field span-2">
-                    <label style={{ color: 'var(--success)', fontWeight: 600 }}>
-                      WHEP WebRTC Playback URL (Ultra Low Latency HTTP POST)
+                    <label style={{ color: 'var(--success)', fontWeight: 700 }}>
+                      WHEP WebRTC Playback URL (Low Latency HTTP POST)
                     </label>
                     <input
                       type="text"
                       placeholder="http://localhost:8889/stream/1/whep"
                       value={form.whep_url}
-                      onChange={(e) => setForm({ ...form, whep_url: e.target.value })}
+                      onChange={(e) => updateField('whep_url', e.target.value)}
                     />
                   </div>
 
                   <div className="form-field span-2">
-                    <label>HLS Direct Playback URL (.m3u8)</label>
+                    <label style={{ fontWeight: 700 }}>
+                      HLS Stream URL (.m3u8)
+                    </label>
                     <input
                       type="text"
-                      placeholder="http://localhost/live/stream/1/index.m3u8"
+                      placeholder="http://localhost:8888/stream/1/index.m3u8"
                       value={form.hls_url}
-                      onChange={(e) => setForm({ ...form, hls_url: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="form-field">
-                    <label>Video Codec</label>
-                    <select
-                      value={form.codec}
-                      onChange={(e) => setForm({ ...form, codec: e.target.value })}
-                    >
-                      <option value="H.264">H.264 (AVC)</option>
-                      <option value="H.265">H.265 (HEVC)</option>
-                    </select>
-                  </div>
-
-                  <div className="form-field">
-                    <label>Stream Resolution</label>
-                    <select
-                      value={form.resolution}
-                      onChange={(e) => setForm({ ...form, resolution: e.target.value })}
-                    >
-                      <option value="1920x1080">1920x1080 (1080p FHD)</option>
-                      <option value="1280x720">1280x720 (720p HD)</option>
-                      <option value="3840x2160">3840x2160 (4K UHD)</option>
-                      <option value="640x480">640x480 (VGA)</option>
-                    </select>
-                  </div>
-
-                  <div className="form-field">
-                    <label>Frame Rate (FPS)</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="60"
-                      value={form.fps}
-                      onChange={(e) => setForm({ ...form, fps: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="form-field">
-                    <label>Target Bitrate</label>
-                    <input
-                      type="text"
-                      placeholder="4Mbps"
-                      value={form.bitrate}
-                      onChange={(e) => setForm({ ...form, bitrate: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="form-field">
-                    <label>Retention Days</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="365"
-                      value={form.retention_days}
-                      onChange={(e) => setForm({ ...form, retention_days: e.target.value })}
+                      onChange={(e) => updateField('hls_url', e.target.value)}
                     />
                   </div>
                 </>
               )}
             </div>
 
-            <div className="modal-foot" style={{ padding: '14px 0 0 0', marginTop: '14px', borderTop: '1px solid var(--panel-border)', display: 'flex', justifyContent: 'space-between' }}>
+            <div
+              className="modal-foot"
+              style={{
+                padding: '16px 0 0 0',
+                marginTop: '16px',
+                borderTop: '1px solid var(--panel-border)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
               <button
                 type="button"
                 className="btn btn-danger-outline"
                 onClick={handleDelete}
                 disabled={isSubmitting}
+                style={{ gap: '6px' }}
               >
-                <Trash2 size={14} strokeWidth={2} /> Delete Asset
+                <Trash2 size={14} strokeWidth={2} /> Delete Camera
               </button>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="button" className="btn" onClick={onClose} disabled={isSubmitting}>Cancel</button>
+                <button type="button" className="btn" onClick={onClose} disabled={isSubmitting}>
+                  Cancel
+                </button>
                 <button
                   type="button"
                   className="btn btn-primary"
                   onClick={handleSubmit}
                   disabled={isSubmitting}
+                  style={{ gap: '6px' }}
                 >
                   {isSubmitting ? (
                     <>
@@ -462,3 +525,5 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
     </div>
   );
 };
+
+
