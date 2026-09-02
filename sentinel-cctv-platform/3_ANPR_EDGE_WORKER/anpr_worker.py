@@ -1405,13 +1405,27 @@ class DistributedWorkerManager:
             code = cam.get("camera_code") or cam.get("code") or f"CAM-{cam.get('id')}"
             current_codes.add(code)
 
+            new_url = str(cam.get("rtsp_url") or cam.get("stream_url") or cam.get("url") or "0")
+            new_mode = str(cam.get("detection_mode") or "ANPR_DETECTION").upper()
+
             if code in self.workers and self.workers[code].is_alive():
-                # Dynamically update cam_info in running worker thread
-                old_mode = str(self.workers[code].cam_info.get("detection_mode") or "").upper()
-                new_mode = str(cam.get("detection_mode") or "ANPR_DETECTION").upper()
-                if old_mode != new_mode:
-                    self.workers[code].cam_info["detection_mode"] = new_mode
-                    print(f"🔄 \x1b[33m[{code}]\x1b[0m AI Mode Switched: \x1b[31m{old_mode}\x1b[0m ➔ \x1b[32m{new_mode}\x1b[0m (Instant Hot-Reload)", flush=True)
+                existing_worker = self.workers[code]
+                old_url = str(existing_worker.stream_url)
+                old_mode = str(existing_worker.cam_info.get("detection_mode") or "").upper()
+
+                # If camera RTSP URL or detection mode was modified in UI, restart stream completely!
+                if old_url != new_url or old_mode != new_mode:
+                    print(f"🔄 \x1b[33m[{code}]\x1b[0m Camera config edited (Mode: {old_mode}➔{new_mode}) — Stopping & restarting RTSP stream...", flush=True)
+                    existing_worker.stop()
+                    existing_worker.join(timeout=1.0)
+
+                    worker = CameraWorkerThread(
+                        cam, self.detector, self.ocr, self.object_detector, self.central_url, self.watchlist_mgr,
+                        conf=0.20, iou=0.45, frame_stride=3
+                    )
+                    worker.start()
+                    self.workers[code] = worker
+                    newly_attached += 1
             else:
                 worker = CameraWorkerThread(
                     cam, self.detector, self.ocr, self.object_detector, self.central_url, self.watchlist_mgr,
@@ -1420,6 +1434,7 @@ class DistributedWorkerManager:
                 worker.start()
                 self.workers[code] = worker
                 newly_attached += 1
+
 
 
         if newly_attached > 0:

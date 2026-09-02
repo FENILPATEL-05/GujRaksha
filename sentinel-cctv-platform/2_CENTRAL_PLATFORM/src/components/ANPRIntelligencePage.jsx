@@ -345,43 +345,9 @@ export const ANPRIntelligencePage = ({
               showAiVision={true}
             />
           </div>
-
-          {/* Live AI Telemetry & Multi-Object Tracking Engine Indicators */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px", marginTop: "4px" }}>
-            <div style={{ background: "var(--input-bg)", border: "1px solid var(--panel-border)", borderRadius: "8px", padding: "8px 12px" }}>
-              <div style={{ fontSize: "10.5px", color: "var(--text-dim)", textTransform: "uppercase", fontWeight: 700 }}>Tracker Engine</div>
-              <div style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--accent)", marginTop: "2px", display: "flex", alignItems: "center", gap: "5px" }}>
-                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--accent)" }} />
-                ByteTrack (Persistent IDs)
-              </div>
-            </div>
-
-            <div style={{ background: "var(--input-bg)", border: "1px solid var(--panel-border)", borderRadius: "8px", padding: "8px 12px" }}>
-              <div style={{ fontSize: "10.5px", color: "var(--text-dim)", textTransform: "uppercase", fontWeight: 700 }}>Trajectory Trails</div>
-              <div style={{ fontSize: "12.5px", fontWeight: 700, color: "#00f0ff", marginTop: "2px", display: "flex", alignItems: "center", gap: "5px" }}>
-                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#00f0ff" }} />
-                TrailTracker (Neon Paths)
-              </div>
-            </div>
-
-            <div style={{ background: "var(--input-bg)", border: "1px solid var(--panel-border)", borderRadius: "8px", padding: "8px 12px" }}>
-              <div style={{ fontSize: "10.5px", color: "var(--text-dim)", textTransform: "uppercase", fontWeight: 700 }}>Loitering Dwell</div>
-              <div style={{ fontSize: "12.5px", fontWeight: 700, color: "#4ade80", marginTop: "2px", display: "flex", alignItems: "center", gap: "5px" }}>
-                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#4ade80" }} />
-                DwellTracker (&gt;8.0s Alert)
-              </div>
-            </div>
-
-            <div style={{ background: "var(--input-bg)", border: "1px solid var(--panel-border)", borderRadius: "8px", padding: "8px 12px" }}>
-              <div style={{ fontSize: "10.5px", color: "var(--text-dim)", textTransform: "uppercase", fontWeight: 700 }}>Perimeter Security</div>
-              <div style={{ fontSize: "12.5px", fontWeight: 700, color: "#facc15", marginTop: "2px", display: "flex", alignItems: "center", gap: "5px" }}>
-                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#facc15" }} />
-                IntrusionZone (Virtual Fence)
-              </div>
-            </div>
-          </div>
         </div>
         )
+
 
       ) : activeTab === "watchlist" ? (
         <WatchlistManagerPage
