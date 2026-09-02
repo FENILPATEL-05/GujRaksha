@@ -22,7 +22,12 @@ else
   exit 1
 fi
 
+# Clean up any leftover worker instances before starting
+pkill -f "anpr_worker.py" 2>/dev/null || true
+pkill -f "ai_stream_service.py" 2>/dev/null || true
+
 if [ "$1" == "--source" ]; then
+
   # Direct single source mode
   SOURCE="$2"
   CENTRAL_URL="${3:-http://localhost:3000/api/v1}"

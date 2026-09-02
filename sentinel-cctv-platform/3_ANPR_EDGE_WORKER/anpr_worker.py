@@ -1012,15 +1012,29 @@ class CameraWorkerThread(threading.Thread):
         self.is_connected = False
         self.last_live_dispatch = 0
         self.last_obj_log = 0
+        self.cap = None
         
         # Single shared WebSocket connection for the entire edge worker process
         self.ws_client = get_shared_vision_ws(self.central_url)
 
     def stop(self):
         self.running = False
+        if self.cap is not None:
+            try:
+                self.cap.release()
+            except Exception:
+                pass
+            self.cap = None
 
     def open_capture(self):
         try:
+            if self.cap is not None:
+                try:
+                    self.cap.release()
+                except Exception:
+                    pass
+                self.cap = None
+
             if str(self.stream_url).isdigit():
                 cap = cv2.VideoCapture(int(self.stream_url), cv2.CAP_V4L2)
             else:
@@ -1031,18 +1045,23 @@ class CameraWorkerThread(threading.Thread):
                     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                 except Exception:
                     pass
-                return cap
+                self.cap = cap
+                return self.cap
         except Exception:
             pass
         return None
 
     def run(self):
         frame_counter = 0
-        cap = None
 
         while self.running:
+            cam_mode = str(self.cam_info.get("detection_mode") or "ANPR_DETECTION").upper()
+            if cam_mode == "GENERAL_SURVEILLANCE":
+                GLOBAL_STATS.set_status(self.camera_code, "REMOVED")
+                break
+
             # 1. Connect or Reconnect loop (Quiet background retry)
-            if cap is None or not cap.isOpened():
+            if self.cap is None or not self.cap.isOpened():
                 GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
                 self.is_connected = False
                 cap = self.open_capture()
@@ -1061,21 +1080,25 @@ class CameraWorkerThread(threading.Thread):
                     print(f"\x1b[32m[CAMERA ONLINE]\x1b[0m 🎥 \x1b[33m[{self.camera_code}]\x1b[0m Connected to {self.stream_url} — Mode: {mode_label}", flush=True)
 
             # 2. Frame Processing Loop (Synchronized Real-Time Capture)
-
-
             try:
                 # Flush buffer for live network streams so inference is always on the latest frame
                 if str(self.stream_url).startswith("rtsp://") or str(self.stream_url).startswith("rtsps://") or "stream" in str(self.stream_url):
                     for _ in range(4):
-                        cap.grab()
+                        if self.cap:
+                            self.cap.grab()
 
-                ret, frame = cap.read()
+                if not self.cap or not self.running:
+                    break
+
+                ret, frame = self.cap.read()
                 if not ret or frame is None or frame.shape[0] < 50:
-                    cap.release()
-                    cap = None
+                    if self.cap:
+                        self.cap.release()
+                    self.cap = None
                     GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
                     time.sleep(0.5)
                     continue
+
 
                 frame_counter += 1
                 now = time.time()
@@ -1406,10 +1429,16 @@ class DistributedWorkerManager:
         if assigned_cameras is None:
             return
 
+        # Strictly filter assigned cameras to active AI modes (ANPR_DETECTION or OBJECT_DETECTION)
+        active_ai_cameras = [
+            c for c in assigned_cameras
+            if str(c.get("detection_mode") or "").upper() in ["ANPR_DETECTION", "OBJECT_DETECTION"]
+        ]
+
         current_codes = set()
         newly_attached = 0
 
-        for cam in assigned_cameras:
+        for cam in active_ai_cameras:
             code = cam.get("camera_code") or cam.get("code") or f"CAM-{cam.get('id')}"
             current_codes.add(code)
 
@@ -1443,22 +1472,19 @@ class DistributedWorkerManager:
                 self.workers[code] = worker
                 newly_attached += 1
 
-
-
         if newly_attached > 0:
-            obj_cams = [c for c in assigned_cameras if c.get("detection_mode") == "OBJECT_DETECTION"]
-            anpr_cams = [c for c in assigned_cameras if c.get("detection_mode") == "ANPR_DETECTION"]
+            obj_cams = [c for c in active_ai_cameras if c.get("detection_mode") == "OBJECT_DETECTION"]
+            anpr_cams = [c for c in active_ai_cameras if c.get("detection_mode") == "ANPR_DETECTION"]
 
-
-            print(f"\n⚡ \x1b[1m\x1b[32m[Cluster Dispatch] {len(assigned_cameras)} Cameras Auto-Assigned by Central CCC\x1b[0m", flush=True)
+            print(f"\n⚡ \x1b[1m\x1b[32m[Cluster Dispatch] {len(active_ai_cameras)} AI Cameras Auto-Assigned by Central CCC\x1b[0m", flush=True)
             if len(obj_cams) > 0:
                 obj_codes = ", ".join([c.get("camera_code") or c.get("id") for c in obj_cams[:4]])
                 print(f"   🎯 \x1b[35m[AI OBJECT DETECTION]\x1b[0m {len(obj_cams)} Feeds Active ({obj_codes})", flush=True)
             if len(anpr_cams) > 0:
                 print(f"   🚗 \x1b[36m[ANPR SCANNER]\x1b[0m {len(anpr_cams)} Feeds Active (License Plate Recognition & Watchlist)", flush=True)
-            print(f"   🚀 Live multi-threaded AI vision scanning running across all {len(assigned_cameras)} cameras...\n", flush=True)
+            print(f"   🚀 Live multi-threaded AI vision scanning running across all {len(active_ai_cameras)} cameras...\n", flush=True)
 
-        # Detach unassigned cameras
+        # Detach unassigned or No AI (GENERAL_SURVEILLANCE) cameras
         detached = 0
         for code in list(self.workers.keys()):
             if code not in current_codes:
@@ -1468,7 +1494,8 @@ class DistributedWorkerManager:
                 detached += 1
 
         if detached > 0:
-            print(f"⏹️ [Cluster Dispatch] Revoked {detached} cameras (Active feeds: {len(assigned_cameras)}).", flush=True)
+            print(f"⏹️ \x1b[33m[Cluster Dispatch]\x1b[0m Detached {detached} cameras (No AI / Removed). Active AI feeds: {len(self.workers)}", flush=True)
+
 
     def start(self):
         print("======================================================================")

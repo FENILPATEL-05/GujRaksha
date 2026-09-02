@@ -20,6 +20,10 @@ echo -e "${CYAN}================================================================
 echo -e "${CYAN} 🛡️ GUJRAKSHA CCTV PLATFORM — MASTER 1-CLICK SYSTEM LAUNCH ${NC}"
 echo -e "${CYAN}======================================================================${NC}\n"
 
+# Clean up any leftover worker instances before startup
+pkill -f "anpr_worker.py" 2>/dev/null || true
+pkill -f "ai_stream_service.py" 2>/dev/null || true
+
 # Clean shutdown trap for all background sub-processes
 PIDS=()
 cleanup() {
@@ -29,10 +33,13 @@ cleanup() {
             kill "$pid" 2>/dev/null || true
         fi
     done
+    pkill -f "anpr_worker.py" 2>/dev/null || true
+    pkill -f "ai_stream_service.py" 2>/dev/null || true
     echo -e "${GREEN}✅ All services stopped safely.${NC}"
     exit 0
 }
 trap cleanup SIGINT SIGTERM EXIT
+
 
 ## ------------------------------------------------------------------------------
 # 1. Launch Central Command & Control Room Platform
