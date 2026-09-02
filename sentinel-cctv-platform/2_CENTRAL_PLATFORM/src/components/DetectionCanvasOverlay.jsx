@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import aiVisionSocket from "../services/aiVisionSocket.js";
 
 export const DetectionCanvasOverlay = ({ camera, isPlaying = true }) => {
   const canvasRef = useRef(null);
@@ -11,45 +12,30 @@ export const DetectionCanvasOverlay = ({ camera, isPlaying = true }) => {
 
   const cameraCode = getCleanCode(camera);
 
-  // Subscribe to real-time bounding box telemetry stream
+  // Subscribe to real-time bounding box telemetry stream via WebSocket singleton
   useEffect(() => {
     if (!cameraCode || !isPlaying) return;
 
-    let eventSource;
-    let pollInterval;
+    setBboxes([]);
+    let isSubscribed = true;
+    let staleTimer = null;
 
-    try {
-      eventSource = new EventSource("/api/v1/anpr/bbox-stream");
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data && (data.camera_code === cameraCode || data.camera_id === cameraCode || data.camera_code === camera?.id)) {
-            setBboxes(data.bboxes || data.detections || []);
-          }
-        } catch (e) {}
-      };
+    const handleVisionFrame = (detections) => {
+      if (!isSubscribed) return;
+      setBboxes(detections || []);
 
-      eventSource.onerror = () => {
-        // Fallback polling if SSE drops
-        if (!pollInterval) {
-          pollInterval = setInterval(async () => {
-            try {
-              const res = await fetch(`/api/v1/anpr/bbox/${cameraCode}`);
-              const json = await res.json();
-              if (json.success && json.data) {
-                setBboxes(json.data.bboxes || json.data.detections || []);
-              }
-            } catch (_) {}
-          }, 300);
-        }
-      };
-    } catch (err) {
-      console.warn("SSE init error in DetectionCanvasOverlay:", err);
-    }
+      if (staleTimer) clearTimeout(staleTimer);
+      staleTimer = setTimeout(() => {
+        if (isSubscribed) setBboxes([]);
+      }, 400);
+    };
+
+    aiVisionSocket.subscribe(cameraCode, handleVisionFrame);
 
     return () => {
-      if (eventSource) eventSource.close();
-      if (pollInterval) clearInterval(pollInterval);
+      isSubscribed = false;
+      if (staleTimer) clearTimeout(staleTimer);
+      aiVisionSocket.unsubscribe(cameraCode, handleVisionFrame);
     };
   }, [cameraCode, isPlaying, camera?.id]);
 
@@ -73,16 +59,35 @@ export const DetectionCanvasOverlay = ({ camera, isPlaying = true }) => {
     if (!bboxes || bboxes.length === 0) return;
 
     bboxes.forEach((box) => {
-      let [xmin, ymin, xmax, ymax] = box.norm_box || box.normalized_box || box.bbox || [0, 0, 0, 0];
-      
-      // If coordinates are in pixel resolution instead of 0..1 scale
-      if (xmax > 1.0 || ymax > 1.0) {
-        const frameW = box.frame_w || 1920;
-        const frameH = box.frame_h || 1080;
-        xmin /= frameW;
-        ymin /= frameH;
-        xmax /= frameW;
-        ymax /= frameH;
+      let ymin = 0, xmin = 0, ymax = 0, xmax = 0;
+      if (Array.isArray(box.normalized_box) && box.normalized_box.length === 4) {
+        const [b0, b1, b2, b3] = box.normalized_box;
+        ymin = Math.min(b0, b2);
+        ymax = Math.max(b0, b2);
+        xmin = Math.min(b1, b3);
+        xmax = Math.max(b1, b3);
+      } else if (Array.isArray(box.norm_box) && box.norm_box.length === 4) {
+        const [b0, b1, b2, b3] = box.norm_box;
+        ymin = Math.min(b0, b2);
+        ymax = Math.max(b0, b2);
+        xmin = Math.min(b1, b3);
+        xmax = Math.max(b1, b3);
+      } else if (Array.isArray(box.box) && box.box.length === 4) {
+        const frameW = box.frame_width || box.frame_w || 1920;
+        const frameH = box.frame_height || box.frame_h || 1080;
+        const [c0, c1, c2, c3] = box.box;
+        if (c0 <= 1.05 && c1 <= 1.05 && c2 <= 1.05 && c3 <= 1.05) {
+          xmin = Math.min(c0, c2); xmax = Math.max(c0, c2);
+          ymin = Math.min(c1, c3); ymax = Math.max(c1, c3);
+        } else {
+          let x1 = c0, y1 = c1, x2 = c2, y2 = c3;
+          if (x2 < x1) x2 = x1 + c2;
+          if (y2 < y1) y2 = y1 + c3;
+          xmin = Math.min(x1, x2) / frameW;
+          xmax = Math.max(x1, x2) / frameW;
+          ymin = Math.min(y1, y2) / frameH;
+          ymax = Math.max(y1, y2) / frameH;
+        }
       }
 
       const x = xmin * width;

@@ -1060,8 +1060,8 @@ class CameraWorkerThread(threading.Thread):
             # 2. Frame Processing Loop (Synchronized Real-Time Capture)
             try:
                 # Flush buffer for live network streams so inference is always on the latest frame
-                if str(self.stream_url).startswith("rtsp://") or str(self.stream_url).startswith("rtsps://"):
-                    for _ in range(1):
+                if str(self.stream_url).startswith("rtsp://") or str(self.stream_url).startswith("rtsps://") or "stream" in str(self.stream_url):
+                    for _ in range(4):
                         cap.grab()
 
                 ret, frame = cap.read()
