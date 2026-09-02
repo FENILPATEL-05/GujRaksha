@@ -22,6 +22,9 @@ export const LiveCCTVFeed = ({
   const [isPlaying, setIsPlaying] = useState(true);
   const [activeProtocol, setActiveProtocol] = useState("WHEP WebRTC");
   const [preferAiStream, setPreferAiStream] = useState(false);
+  const [enableObjDetection, setEnableObjDetection] = useState(true);
+  const [enablePlateDetection, setEnablePlateDetection] = useState(true);
+
 
 
   // Real-time detections from AI Vision Engine (Drawn directly according to camera configuration)
@@ -302,7 +305,8 @@ export const LiveCCTVFeed = ({
   const rtspProxyUrl = `${apiPrefix}/api/v1/proxy-stream?url=${encodeURIComponent(camera?.stream_url || camera?.rtsp_url || '')}`;
 
   const aiSourceUrl = camera?.rtsp_url || camera?.stream_url || (camera?.urls && (camera.urls.rtsp || camera.urls.hls || camera.urls.whep)) || rawStreamUrl || "0";
-  const aiStreamUrl = `${apiPrefix}/api/v1/ai/video_feed?source=${encodeURIComponent(aiSourceUrl)}&trails=true&dwell=false&zone=false`;
+  const aiStreamUrl = `${apiPrefix}/api/v1/ai/video_feed?source=${encodeURIComponent(aiSourceUrl)}&detect_objects=${enableObjDetection}&detect_plates=${enablePlateDetection}&trails=${enableObjDetection}&dwell=false&zone=false`;
+
 
 
   const effectiveFallbackUrl = (rawStreamUrl.startsWith('rtsp://') || isRtspOnly)
@@ -682,7 +686,7 @@ export const LiveCCTVFeed = ({
         </div>
       )}
 
-      {/* Stream Switcher Toggle (Raw Feed vs Real-time Baked-in AI Stream) */}
+      {/* Stream Switcher Toggle & Dynamic Detection Filters */}
       {!streamError && (
         <div style={{
           position: "absolute",
@@ -693,6 +697,67 @@ export const LiveCCTVFeed = ({
           alignItems: "center",
           gap: "4px"
         }}>
+          {preferAiStream && (
+            <>
+              {/* Toggle 1: Object Detection (Cars, Persons, Trails) */}
+              <button
+                type="button"
+                className="btn btn-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEnableObjDetection(!enableObjDetection);
+                }}
+                title={enableObjDetection ? "Disable Object Detection (Hide Cars & Persons)" : "Enable Object Detection"}
+                style={{
+                  fontSize: "9.5px",
+                  padding: "2px 7px",
+                  background: enableObjDetection ? "rgba(59, 130, 246, 0.85)" : "rgba(15, 23, 42, 0.75)",
+                  border: enableObjDetection ? "1px solid #3b82f6" : "1px solid rgba(255, 255, 255, 0.2)",
+                  color: "#fff",
+                  borderRadius: "5px",
+                  backdropFilter: "blur(6px)",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "3px"
+                }}
+              >
+                <span>{enableObjDetection ? "✓" : "✗"}</span>
+                <span>🎯 Objects</span>
+              </button>
+
+              {/* Toggle 2: Number Plate Recognition (ANPR + OCR) */}
+              <button
+                type="button"
+                className="btn btn-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEnablePlateDetection(!enablePlateDetection);
+                }}
+                title={enablePlateDetection ? "Disable Number Plate Recognition" : "Enable Number Plate Recognition"}
+                style={{
+                  fontSize: "9.5px",
+                  padding: "2px 7px",
+                  background: enablePlateDetection ? "rgba(234, 179, 8, 0.85)" : "rgba(15, 23, 42, 0.75)",
+                  border: enablePlateDetection ? "1px solid #eab308" : "1px solid rgba(255, 255, 255, 0.2)",
+                  color: "#fff",
+                  borderRadius: "5px",
+                  backdropFilter: "blur(6px)",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "3px"
+                }}
+              >
+                <span>{enablePlateDetection ? "✓" : "✗"}</span>
+                <span>🚘 Plates</span>
+              </button>
+            </>
+          )}
+
+          {/* Main Stream Mode Toggle */}
           <button
             type="button"
             className="btn btn-xs"
@@ -720,6 +785,7 @@ export const LiveCCTVFeed = ({
           </button>
         </div>
       )}
+
 
 
       {/* Loading Indicator */}

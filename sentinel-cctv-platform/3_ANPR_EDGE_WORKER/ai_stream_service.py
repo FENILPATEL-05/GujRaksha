@@ -204,15 +204,16 @@ def create_placeholder_frame(text: str) -> np.ndarray:
 
 def generate_frames(
     source: str,
+    enable_objects: bool = True,
+    enable_plates: bool = True,
     enable_trails: bool = True,
     enable_dwell: bool = False,
     enable_zone: bool = False,
     zone_polygon: Optional[List[List[int]]] = None
 ):
-
     """
     Generator yielding multipart MJPEG frames with full OpenCV HUD annotations.
-    Replicates exact reference logic from sentinel-cctv-registry.
+    Supports dynamic toggles for Object Detection and License Plate Recognition.
     """
     global current_ai_stats
 
@@ -278,98 +279,126 @@ def generate_frames(
         elif not enable_zone or not zone_polygon:
             intrusion_zone = None
 
-
         annotated_frame = frame.copy()
         dwell_alerts_list = []
         intrusion_active = False
         intrusion_events = []
         tracked_objects = []
 
-        # 2. Run Object Detection & ByteTrack
+        # 2. Run Object Detection & ByteTrack (Only when enable_objects is True)
         t_start = time.time()
-        raw_dets = detector.detect(frame)
+        if enable_objects:
+            raw_dets = detector.detect(frame)
+            if raw_dets:
+                tracked_objects = byte_tracker.update(raw_dets)
         infer_time_ms = (time.time() - t_start) * 1000.0
-
-        if raw_dets:
-            tracked_objects = byte_tracker.update(raw_dets)
 
         frame_counts = {}
 
         # 3. Process Tracked Detections (Trails, Zone Breaches, Loitering, Bounding Boxes)
-        for obj in tracked_objects:
-            x1, y1, x2, y2 = map(int, obj["box"])
-            cx, cy = int((x1 + x2) / 2), int((y1 + y2) / 2)
-            cls_name = obj["label"]
-            track_id = obj.get("track_id")
+        if enable_objects:
+            for obj in tracked_objects:
+                x1, y1, x2, y2 = map(int, obj["box"])
+                cx, cy = int((x1 + x2) / 2), int((y1 + y2) / 2)
+                cls_name = obj["label"]
+                track_id = obj.get("track_id")
 
-            frame_counts[cls_name] = frame_counts.get(cls_name, 0) + 1
+                frame_counts[cls_name] = frame_counts.get(cls_name, 0) + 1
 
-            # 3.1. Movement Trajectory Trails
-            if enable_trails and track_id is not None:
-                stream_trail_tracker.update(cls_name, track_id, cx, cy, epoch=current_epoch)
-                trail_pts = stream_trail_tracker.get_points(cls_name, track_id)
-                if len(trail_pts) > 1:
-                    for i in range(1, len(trail_pts)):
-                        cv2.line(annotated_frame, trail_pts[i - 1], trail_pts[i], (0, 215, 255), 2)
-                    cv2.circle(annotated_frame, (cx, cy), 4, (0, 255, 255), -1)
+                # 3.1. Movement Trajectory Trails
+                if enable_trails and track_id is not None:
+                    stream_trail_tracker.update(cls_name, track_id, cx, cy, epoch=current_epoch)
+                    trail_pts = stream_trail_tracker.get_points(cls_name, track_id)
+                    if len(trail_pts) > 1:
+                        for i in range(1, len(trail_pts)):
+                            cv2.line(annotated_frame, trail_pts[i - 1], trail_pts[i], (0, 215, 255), 2)
+                        cv2.circle(annotated_frame, (cx, cy), 4, (0, 255, 255), -1)
 
-            # 3.2. Intrusion Zone Perimeter Breach Check
-            is_inside_zone = False
-            if intrusion_zone and track_id is not None:
-                inside, entered, center_pt = intrusion_zone.check(cls_name, track_id, (x1, y1, x2, y2))
-                if inside:
-                    intrusion_active = True
-                    is_inside_zone = True
-                    intrusion_events.append(f"{cls_name} #{track_id}")
-                    cv2.circle(annotated_frame, center_pt, 7, (0, 0, 255), -1)
+                # 3.2. Intrusion Zone Perimeter Breach Check
+                is_inside_zone = False
+                if intrusion_zone and track_id is not None:
+                    inside, entered, center_pt = intrusion_zone.check(cls_name, track_id, (x1, y1, x2, y2))
+                    if inside:
+                        intrusion_active = True
+                        is_inside_zone = True
+                        intrusion_events.append(f"{cls_name} #{track_id}")
+                        cv2.circle(annotated_frame, center_pt, 7, (0, 0, 255), -1)
 
-            # 3.3. Dwell Loitering Anomaly Check
-            is_loitering = False
-            dwell_time = 0.0
-            if enable_dwell and track_id is not None:
-                is_loitering, dwell_time = stream_dwell_tracker.update(cls_name, track_id, inside=True)
-                if is_loitering or dwell_time > 8.0:
-                    is_loitering = True
-                    dwell_alerts_list.append(f"{cls_name} #{track_id} ({dwell_time:.1f}s)")
+                # 3.3. Dwell Loitering Anomaly Check
+                is_loitering = False
+                dwell_time = 0.0
+                if enable_dwell and track_id is not None:
+                    is_loitering, dwell_time = stream_dwell_tracker.update(cls_name, track_id, inside=True)
+                    if is_loitering or dwell_time > 8.0:
+                        is_loitering = True
+                        dwell_alerts_list.append(f"{cls_name} #{track_id} ({dwell_time:.1f}s)")
 
-            # 3.4. Draw Crisp Bounding Box & Label Badge
-            if is_loitering or is_inside_zone:
-                box_color = (0, 0, 255)  # Red for Alert
-            elif cls_name == "person":
-                box_color = (255, 128, 0)  # Orange/Blue for Person
-            elif cls_name == "motorcycle":
-                box_color = (255, 0, 200)  # Magenta for 2-Wheeler
-            else:
-                box_color = (0, 255, 0)  # Green for Vehicles
+                # 3.4. Draw Crisp Bounding Box & Label Badge
+                if is_loitering or is_inside_zone:
+                    box_color = (0, 0, 255)  # Red for Alert
+                elif cls_name == "person":
+                    box_color = (255, 128, 0)  # Orange for Person
+                elif cls_name == "motorcycle":
+                    box_color = (255, 0, 200)  # Magenta for 2-Wheeler
+                else:
+                    box_color = (0, 255, 0)  # Green for Vehicles
 
-            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), box_color, 2)
+                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), box_color, 2)
 
-            label = f"{cls_name.upper()}" + (f" #{track_id}" if track_id is not None else "")
-            if is_loitering:
-                label += f" [LOITERING {dwell_time:.0f}s]"
-            elif is_inside_zone:
-                label += " [INTRUSION]"
+                label = f"{cls_name.upper()}" + (f" #{track_id}" if track_id is not None else "")
+                if is_loitering:
+                    label += f" [LOITERING {dwell_time:.0f}s]"
+                elif is_inside_zone:
+                    label += " [INTRUSION]"
 
-            (w_txt, h_txt), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.52, 2)
-            # Draw Dark Solid Background Badge with Colored Border
-            cv2.rectangle(annotated_frame, (x1, max(y1 - 24, 0)), (x1 + w_txt + 10, max(y1, 24)), (15, 23, 42), -1)
-            cv2.rectangle(annotated_frame, (x1, max(y1 - 24, 0)), (x1 + w_txt + 10, max(y1, 24)), box_color, 1)
-            # Draw Ultra-Clear Pure White Bold Text
-            cv2.putText(annotated_frame, label, (x1 + 5, max(y1 - 7, 18)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 2)
+                (w_txt, h_txt), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.52, 2)
+                # Draw Dark Solid Background Badge with Colored Border
+                cv2.rectangle(annotated_frame, (x1, max(y1 - 24, 0)), (x1 + w_txt + 10, max(y1, 24)), (15, 23, 42), -1)
+                cv2.rectangle(annotated_frame, (x1, max(y1 - 24, 0)), (x1 + w_txt + 10, max(y1, 24)), box_color, 1)
+                # Draw Ultra-Clear Pure White Bold Text
+                cv2.putText(annotated_frame, label, (x1 + 5, max(y1 - 7, 18)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 2)
 
-        # 3.5. License Plate Detection & High-Contrast ANPR Tag Drawing
-        if plate_detector is not None:
-            try:
-                raw_plates = plate_detector.detect(frame, conf_thresh=0.20, iou_thresh=0.45)
-                if raw_plates:
-                    frame_counts["plates"] = len(raw_plates)
-                for px1, py1, px2, py2, pconf in raw_plates:
-                    p_text = ""
-                    if plate_ocr is not None:
-                        p_text, _ = plate_ocr.recognize(frame, (px1, py1, px2, py2))
-                    cleaned_p = normalize_ocr_text(p_text) if p_text else ""
+        # 3.5. License Plate Detection & High-Contrast ANPR Tag Drawing (Only when enable_plates is True)
+        if enable_plates:
+            plate_boxes = []
+            if plate_detector is not None:
+                try:
+                    raw_plates = plate_detector.detect(frame, conf_thresh=0.18, iou_thresh=0.45)
+                    for px1, py1, px2, py2, pconf in raw_plates:
+                        p_text = ""
+                        if plate_ocr is not None:
+                            p_text, _ = plate_ocr.recognize(frame, (px1, py1, px2, py2))
+                        cleaned_p = normalize_ocr_text(p_text) if p_text else ""
+                        plate_boxes.append((px1, py1, px2, py2, cleaned_p))
+                except Exception:
+                    pass
 
+            # If vehicle objects are detected and no plate was found on full frame, scan vehicle crops
+            if len(plate_boxes) == 0 and plate_detector is not None and len(tracked_objects) > 0:
+                for obj in tracked_objects:
+                    if obj["label"] in ["car", "bus", "truck", "motorcycle"]:
+                        vx1, vy1, vx2, vy2 = map(int, obj["box"])
+                        v_crop = frame[max(0, vy1):min(h, vy2), max(0, vx1):min(w, vx2)]
+                        if v_crop.size > 0 and v_crop.shape[0] > 30 and v_crop.shape[1] > 40:
+                            try:
+                                v_plates = plate_detector.detect(v_crop, conf_thresh=0.15, iou_thresh=0.45)
+                                for cpx1, cpy1, cpx2, cpy2, _ in v_plates:
+                                    g_px1 = vx1 + cpx1
+                                    g_py1 = vy1 + cpy1
+                                    g_px2 = vx1 + cpx2
+                                    g_py2 = vy1 + cpy2
+                                    p_text = ""
+                                    if plate_ocr is not None:
+                                        p_text, _ = plate_ocr.recognize(frame, (g_px1, g_py1, g_px2, g_py2))
+                                    cleaned_p = normalize_ocr_text(p_text) if p_text else ""
+                                    plate_boxes.append((g_px1, g_py1, g_px2, g_py2, cleaned_p))
+                            except Exception:
+                                pass
+
+            if plate_boxes:
+                frame_counts["plates"] = len(plate_boxes)
+                for px1, py1, px2, py2, cleaned_p in plate_boxes:
                     # Draw Bright Yellow Box on Plate
                     cv2.rectangle(annotated_frame, (px1, py1), (px2, py2), (0, 230, 255), 2)
 
@@ -381,11 +410,15 @@ def generate_frames(
                     # Draw Crisp Pure White Bold Text
                     cv2.putText(annotated_frame, p_label, (px1 + 5, max(py1 - 7, 18)),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 2)
-            except Exception:
-                pass
-
 
         # 4. Draw Intrusion Zone (Virtual Security Fence)
+        if intrusion_zone:
+            intrusion_zone.draw(annotated_frame, active=intrusion_active)
+            zone_label = "RESTRICTED PERIMETER ZONE" if not intrusion_active else "!!! PERIMETER BREACH DETECTED !!!"
+            z_color = (0, 0, 255) if intrusion_active else (0, 255, 0)
+            cv2.putText(annotated_frame, zone_label, (int(w * 0.18), int(h * 0.43)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.52, z_color, 2)
+
 
         if intrusion_zone:
             intrusion_zone.draw(annotated_frame, active=intrusion_active)
@@ -452,11 +485,12 @@ class AIStreamRequestHandler(BaseHTTPRequestHandler):
 
         if path in ["/api/v1/ai/video_feed", "/ai/video_feed"]:
             source = params.get("source", ["0"])[0]
+            objects = params.get("detect_objects", params.get("objects", ["true"]))[0].lower() == "true"
+            plates = params.get("detect_plates", params.get("plates", ["true"]))[0].lower() == "true"
             trails = params.get("trails", ["true"])[0].lower() == "true"
             dwell = params.get("dwell", ["false"])[0].lower() == "true"
             zone = params.get("zone", ["false"])[0].lower() == "true"
             zone_pts_raw = params.get("zone_pts", [None])[0]
-
 
             zone_pts = None
             if zone_pts_raw:
@@ -472,12 +506,13 @@ class AIStreamRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
             try:
-                for frame_bytes in generate_frames(source, trails, dwell, zone, zone_pts):
+                for frame_bytes in generate_frames(source, objects, plates, trails, dwell, zone, zone_pts):
                     self.wfile.write(frame_bytes)
             except (BrokenPipeError, ConnectionResetError):
                 pass
             except Exception as e:
                 logger.error(f"Stream client disconnected: {e}")
+
 
         elif path in ["/api/v1/ai/stats", "/ai/stats"]:
             self.send_response(200)
