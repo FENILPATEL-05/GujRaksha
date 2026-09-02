@@ -85,18 +85,23 @@ fi
 sleep 2
 
 # ------------------------------------------------------------------------------
-# 4. Launch Distributed AI Worker Node
+# 4. Launch Distributed AI Worker Node & AI Video Stream Service
 # ------------------------------------------------------------------------------
-echo -e "${YELLOW}🧠 [4/4] Launching Distributed AI Worker Node...${NC}"
+echo -e "${YELLOW}🧠 [4/4] Launching Distributed AI Worker & AI Stream Service...${NC}"
 if [ -d "3_ANPR_EDGE_WORKER" ]; then
     cd 3_ANPR_EDGE_WORKER
-    if command -v python3 &>/dev/null; then
-        python3 anpr_worker.py --backend "$TRITON_BACKEND" --central-url http://localhost:3000/api/v1 --max-capacity 100 &
+    if [ -f "start_worker.sh" ]; then
+        bash start_worker.sh http://localhost:3000/api/v1 node-1 100 > /tmp/gujraksha_worker.log 2>&1 &
+        PIDS+=($!)
+        echo -e "${GREEN}   • Distributed AI Edge Worker Node & AI Video Stream Service active!${NC}"
+    elif command -v python3 &>/dev/null; then
+        python3 anpr_worker.py --backend "$TRITON_BACKEND" --central-url http://localhost:3000/api/v1 --max-capacity 100 > /tmp/gujraksha_worker.log 2>&1 &
         PIDS+=($!)
         echo -e "${GREEN}   • Distributed AI Edge Worker Node active!${NC}"
     fi
     cd "$PROJECT_ROOT"
 fi
+
 
 # Auto-detect primary LAN IP address
 LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
