@@ -1116,9 +1116,6 @@ class CameraWorkerThread(threading.Thread):
             try:
                 frame = None
                 if cap and cap.isOpened():
-                    if str(self.stream_url).startswith("rtsp://") or str(self.stream_url).startswith("rtsps://") or "stream" in str(self.stream_url):
-                        for _ in range(4):
-                            cap.grab()
                     ret, frame = cap.read()
                     if not ret or frame is None or frame.shape[0] < 50:
                         cap.release()
@@ -1128,7 +1125,7 @@ class CameraWorkerThread(threading.Thread):
 
                 if frame is None and using_synthetic:
                     frame = self.generate_synthetic_frame(frame_counter)
-                    time.sleep(0.04) # ~25 FPS simulation rate
+                    time.sleep(0.016) # ~60 FPS smooth simulation rate
 
                 frame_counter += 1
                 now = time.time()
@@ -1161,10 +1158,10 @@ class CameraWorkerThread(threading.Thread):
 
                 if (is_obj_cam or is_selected_vision_cam) and self.object_detector is not None:
                     if hasattr(self.object_detector, "triton_client") or getattr(self.object_detector, "accel_mode", "").startswith("GPU"):
-                        raw_objects = self.object_detector.detect(frame, conf_thresh=0.30, iou_thresh=0.45)
+                        raw_objects = self.object_detector.detect(frame, conf_thresh=0.25, iou_thresh=0.45)
                     else:
                         with INFERENCE_LOCK:
-                            raw_objects = self.object_detector.detect(frame, conf_thresh=0.30, iou_thresh=0.45)
+                            raw_objects = self.object_detector.detect(frame, conf_thresh=0.25, iou_thresh=0.45)
 
 
                 # Initialize default virtual intrusion security perimeter zone if not present
@@ -1215,7 +1212,7 @@ class CameraWorkerThread(threading.Thread):
                 self.dwell_tracker.cleanup_stale(active_track_keys)
                 self.trail_tracker.cleanup_stale(max_age_seconds=8.0)
 
-                # 4.5. Terminal Log for Detected & Tracked Objects (Only for active vision camera)
+                # 4.5. Terminal Log for Detected & Tracked Objects
                 if (is_selected_vision_cam or is_obj_cam) and len(tracked_objects) > 0 and (now - self.last_obj_log >= 1.5):
                     self.last_obj_log = now
                     obj_counts = {}
@@ -1226,12 +1223,13 @@ class CameraWorkerThread(threading.Thread):
                     time_str = time.strftime('%H:%M:%S')
                     print(f"\x1b[35m[AI TRACK]\x1b[0m 🎯 \x1b[33m[{self.camera_code}]\x1b[0m ByteTrack: \x1b[1m\x1b[37m{details_str}\x1b[0m (Active Tracks: {len(tracked_objects)}) | Time: {time_str}", flush=True)
 
-                # 5. Process Plate OCR & Watchlist Ingestion
+                # 5. Process Plate OCR (Optimized fast recognition)
                 plate_detections_for_frame = []
                 for x1, y1, x2, y2, det_score in raw_boxes:
                     if (x2 - x1) < 20 or (y2 - y1) < 10:
                         continue
 
+                    raw_text, ocr_conf = "", 0.0
                     if getattr(self.ocr, "accel_mode", "").startswith("GPU"):
                         raw_text, ocr_conf = self.ocr.recognize(frame, (x1, y1, x2, y2))
                     else:
@@ -1243,22 +1241,12 @@ class CameraWorkerThread(threading.Thread):
                         last_seen = self.recent_detections.get(cleaned_text, 0)
                         if now - last_seen > 3.0:
                             self.recent_detections[cleaned_text] = now
-
-                            x1_c, y1_c, x2_c, y2_c = max(0, x1), max(0, y1), min(w, x2), min(h, y2)
-                            vehicle_crop = frame[y1_c:y2_c, x1_c:x2_c]
-                            v_color = classify_vehicle_color(vehicle_crop)
-                            v_type = classify_vehicle_type((x1, y1, x2, y2), (h, w))
                             time_str = time.strftime('%H:%M:%S')
-
-                            # ⚡ O(1) Fast Watchlist Hash Check
                             watchlist_hit = self.watchlist_mgr.is_target_hit(cleaned_text)
 
                             if watchlist_hit:
-                                # High Visibility Target Alert
                                 category = watchlist_hit.get("category", "STOLEN_VEHICLE") if isinstance(watchlist_hit, dict) else "HOTLIST"
                                 print(f"\n\x1b[41m\x1b[1m\x1b[37m 🚨 [WATCHLIST HIT] \x1b[0m \x1b[31m\x1b[1m{cleaned_text}\x1b[0m on camera \x1b[33m[{self.camera_code}]\x1b[0m at \x1b[36m{time_str}\x1b[0m ({category})", flush=True)
-
-                                # Immediate Real-Time Alert Dispatch to Central Server
                                 payload = {
                                     "vehicle_plate": cleaned_text,
                                     "camera_code": self.camera_code,
@@ -1275,12 +1263,10 @@ class CameraWorkerThread(threading.Thread):
                                         method="POST"
                                     )
                                     with urllib.request.urlopen(req, timeout=3.0) as resp:
-                                        res_data = json.loads(resp.read().decode('utf-8'))
-                                        print(f"   📡 Dispatched to Central CCC: {res_data.get('message')}\n", flush=True)
+                                        pass
                                 except Exception:
                                     pass
                             else:
-                                # Clean / normal vehicle scan (Clean, compact log)
                                 print(f"\x1b[36m[ANPR SCAN]\x1b[0m 🚗 \x1b[33m[{self.camera_code}]\x1b[0m Plate: \x1b[1m\x1b[37m{cleaned_text}\x1b[0m | Time: {time_str}", flush=True)
 
                         plate_detections_for_frame.append({
@@ -1300,8 +1286,8 @@ class CameraWorkerThread(threading.Thread):
                             "type": "PLATE"
                         })
 
-                # 6. Stream Live AI Bounding Boxes (Objects + Plates) to Central Platform for Live Surveillance Feed
-                if (now - self.last_live_dispatch >= 0.025) and (len(tracked_objects) > 0 or len(plate_detections_for_frame) > 0 or frame_counter % 5 == 0):
+                # 6. Stream Live AI Bounding Boxes (Objects + Plates) at 30-60 FPS Zero-Latency Rate
+                if (now - self.last_live_dispatch >= 0.015) and (len(tracked_objects) > 0 or len(plate_detections_for_frame) > 0 or frame_counter % 2 == 0):
                     self.last_live_dispatch = now
                     live_boxes = []
 
@@ -1335,7 +1321,6 @@ class CameraWorkerThread(threading.Thread):
 
                     live_boxes.extend(plate_detections_for_frame)
 
-
                     live_payload = {
                         "camera_code": self.camera_code,
                         "camera_id": self.camera_id,
@@ -1344,26 +1329,9 @@ class CameraWorkerThread(threading.Thread):
                         "timestamp": time.strftime('%Y-%m-%dT%H:%M:%SZ'),
                         "detections": live_boxes
                     }
-                    # Fast low-latency transmission over WebSocket
-                    sent_ws = False
+
                     if self.ws_client is not None:
-                        sent_ws = self.ws_client.send_frame(live_payload)
-
-                    if not sent_ws:
-                        try:
-                            live_bytes = json.dumps(live_payload).encode('utf-8')
-                            req_live = urllib.request.Request(
-                                f"{self.central_url}/anpr/live-detections",
-                                data=live_bytes,
-                                headers={"Content-Type": "application/json"},
-                                method="POST"
-                            )
-                            with urllib.request.urlopen(req_live, timeout=1.0) as resp:
-                                pass
-                        except Exception:
-                            pass
-
-                time.sleep(0.01)
+                        self.ws_client.send_frame(live_payload)
 
             except Exception:
                 if cap:
