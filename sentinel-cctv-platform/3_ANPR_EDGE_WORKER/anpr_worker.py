@@ -1223,18 +1223,22 @@ class CameraWorkerThread(threading.Thread):
                     time_str = time.strftime('%H:%M:%S')
                     print(f"\x1b[35m[AI TRACK]\x1b[0m 🎯 \x1b[33m[{self.camera_code}]\x1b[0m ByteTrack: \x1b[1m\x1b[37m{details_str}\x1b[0m (Active Tracks: {len(tracked_objects)}) | Time: {time_str}", flush=True)
 
-                # 5. Process Plate OCR (Optimized fast recognition)
+                # 5. Process Plate OCR (Optimized fast recognition - throttled to prevent CPU thread choking)
                 plate_detections_for_frame = []
+                should_run_ocr = getattr(self.ocr, "accel_mode", "").startswith("GPU") or (now - getattr(self, "last_ocr_run", 0) >= 0.35)
+
                 for x1, y1, x2, y2, det_score in raw_boxes:
                     if (x2 - x1) < 20 or (y2 - y1) < 10:
                         continue
 
                     raw_text, ocr_conf = "", 0.0
-                    if getattr(self.ocr, "accel_mode", "").startswith("GPU"):
-                        raw_text, ocr_conf = self.ocr.recognize(frame, (x1, y1, x2, y2))
-                    else:
-                        with INFERENCE_LOCK:
+                    if should_run_ocr:
+                        self.last_ocr_run = now
+                        if getattr(self.ocr, "accel_mode", "").startswith("GPU"):
                             raw_text, ocr_conf = self.ocr.recognize(frame, (x1, y1, x2, y2))
+                        else:
+                            with INFERENCE_LOCK:
+                                raw_text, ocr_conf = self.ocr.recognize(frame, (x1, y1, x2, y2))
                     cleaned_text = normalize_ocr_text(raw_text)
 
                     if cleaned_text and len(cleaned_text) >= 4:
@@ -1292,8 +1296,8 @@ class CameraWorkerThread(threading.Thread):
                     live_boxes = []
 
                     for obj in tracked_objects:
-                        lbl_lower = str(obj.get("label", "")).lower()
-                        if lbl_lower not in SURVEILLANCE_TARGET_CLASSES:
+                        lbl_lower = str(obj.get("class_name") or obj.get("label") or "").lower()
+                        if not any(tc in lbl_lower for tc in SURVEILLANCE_TARGET_CLASSES):
                             continue
 
                         bx = obj["box"]
@@ -1330,8 +1334,23 @@ class CameraWorkerThread(threading.Thread):
                         "detections": live_boxes
                     }
 
+                    sent_ws = False
                     if self.ws_client is not None:
-                        self.ws_client.send_frame(live_payload)
+                        sent_ws = self.ws_client.send_frame(live_payload)
+
+                    if not sent_ws:
+                        try:
+                            live_bytes = json.dumps(live_payload).encode('utf-8')
+                            req_live = urllib.request.Request(
+                                f"{self.central_url}/anpr/live-detections",
+                                data=live_bytes,
+                                headers={"Content-Type": "application/json"},
+                                method="POST"
+                            )
+                            with urllib.request.urlopen(req_live, timeout=0.5) as resp:
+                                pass
+                        except Exception:
+                            pass
 
             except Exception:
                 if cap:
