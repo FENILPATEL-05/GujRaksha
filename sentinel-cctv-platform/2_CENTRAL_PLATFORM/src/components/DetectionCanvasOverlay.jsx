@@ -73,7 +73,7 @@ export const DetectionCanvasOverlay = ({ camera, isPlaying = true }) => {
     if (!bboxes || bboxes.length === 0) return;
 
     bboxes.forEach((box) => {
-      let [xmin, ymin, xmax, ymax] = box.norm_box || box.bbox || [0, 0, 0, 0];
+      let [xmin, ymin, xmax, ymax] = box.norm_box || box.normalized_box || box.bbox || [0, 0, 0, 0];
       
       // If coordinates are in pixel resolution instead of 0..1 scale
       if (xmax > 1.0 || ymax > 1.0) {
@@ -89,22 +89,48 @@ export const DetectionCanvasOverlay = ({ camera, isPlaying = true }) => {
       const y = ymin * height;
       const w = Math.max(10, (xmax - xmin) * width);
       const h = Math.max(10, (ymax - ymin) * height);
+      const cx = x + w / 2;
+      const cy = y + h / 2;
 
-      const cls = (box.class || box.type || "object").toLowerCase();
+      const cls = (box.class_name || box.class || box.type || "object").toLowerCase();
       const isPlate = cls.includes("plate") || cls.includes("anpr");
       const isPerson = cls.includes("person") || cls.includes("pedestrian");
-      const isHit = box.is_watchlist;
+      const isHit = box.is_watchlist || box.is_loitering || box.is_intrusion;
 
       let color = "#22c55e"; // Default Green for Vehicles
-      if (isHit) color = "#ef4444"; // Red for Watchlist hits
+      if (isHit) color = "#ef4444"; // Red for Watchlist / Loitering / Intrusion
       else if (isPlate) color = "#eab308"; // Yellow for Plates
       else if (isPerson) color = "#3b82f6"; // Blue for Persons
 
-      // Draw bounding box
+      // 1. Render Motion Trajectory Trails (Neon Yellow/Cyan glowing path)
+      if (box.trail_points && box.trail_points.length > 1) {
+        ctx.save();
+        ctx.strokeStyle = isHit ? "#f87171" : "#00f0ff";
+        ctx.lineWidth = 2.0;
+        ctx.shadowColor = isHit ? "#ef4444" : "#00f0ff";
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        box.trail_points.forEach(([ptX, ptY], idx) => {
+          const px = ptX * width;
+          const py = ptY * height;
+          if (idx === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        });
+        ctx.stroke();
+        
+        // Centroid pulse dot
+        ctx.fillStyle = isHit ? "#ef4444" : "#00f0ff";
+        ctx.beginPath();
+        ctx.arc(cx, cy, 3.5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 2. Draw Bounding Box with Tech Shadow
       ctx.strokeStyle = color;
       ctx.lineWidth = 2.5;
       ctx.shadowColor = color;
-      ctx.shadowBlur = 6;
+      ctx.shadowBlur = isHit ? 10 : 6;
       ctx.strokeRect(x, y, w, h);
       ctx.shadowBlur = 0; // Reset shadow
 
@@ -123,7 +149,10 @@ export const DetectionCanvasOverlay = ({ camera, isPlaying = true }) => {
       ctx.stroke();
 
       // Label text preparation
-      const labelText = box.label || `${box.class || 'Object'} ${box.confidence ? Math.round(box.confidence * 100) + '%' : ''}`;
+      let labelText = box.label || `${box.class || 'Object'} ${box.confidence ? Math.round(box.confidence * 100) + '%' : ''}`;
+      if (box.track_id && !labelText.includes("#")) {
+        labelText = `${labelText} #${box.track_id}`;
+      }
       ctx.font = "bold 11px system-ui, sans-serif";
       const textMetrics = ctx.measureText(labelText);
       const bgW = textMetrics.width + 12;
@@ -137,12 +166,13 @@ export const DetectionCanvasOverlay = ({ camera, isPlaying = true }) => {
       ctx.fill();
 
       // Label text
-      ctx.fillStyle = "#000000";
+      ctx.fillStyle = isHit ? "#ffffff" : "#000000";
       ctx.fillText(labelText, x + 6, badgeY + 13);
 
       // If plate OCR string is present
-      if (box.plate_text) {
-        const plateText = `🚘 ${box.plate_text}`;
+      if (box.plate_text || box.plate) {
+        const pText = box.plate_text || box.plate;
+        const plateText = `🚘 ${pText}`;
         const plateMetrics = ctx.measureText(plateText);
         const pBgW = plateMetrics.width + 12;
         const pY = y + h + 2;

@@ -58,6 +58,18 @@ try:
 except ImportError:
     HAS_WEBSOCKET = False
 
+# Import Modular Tracking and Anomaly Detection Engines
+try:
+    from movement_tracking import TrailTracker
+    from anomaly_detection import DwellTracker
+    from intrusion_detection import IntrusionZone
+    from bytetrack_tracker import ByteTrackTracker
+except ImportError:
+    from .movement_tracking import TrailTracker
+    from .anomaly_detection import DwellTracker
+    from .intrusion_detection import IntrusionZone
+    from .bytetrack_tracker import ByteTrackTracker
+
 class VisionWebSocketClient:
     """Thread-safe WebSocket publisher & target synchronization with Central Command Platform."""
     def __init__(self, ws_url: str):
@@ -148,6 +160,10 @@ COCO_CLASSES = (
     'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink',
     'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
 )
+
+# Mandatory Surveillance Target Classes: Strictly Person, Car, Motorcycle, Bus, Truck
+SURVEILLANCE_TARGET_CLASSES = {'person', 'car', 'motorcycle', 'bus', 'truck'}
+
 
 INDIAN_STATE_CODES = (
     'GJ', 'MH', 'DL', 'KA', 'TN', 'UP', 'HR', 'RJ', 'MP', 'PB',
@@ -393,7 +409,7 @@ class ObjectDetectorONNX:
         blob = np.transpose(blob, (2, 0, 1))[np.newaxis, :]
         return blob, scale, (pad_w, pad_h)
 
-    def detect(self, img: np.ndarray, conf_thresh: float = 0.25, iou_thresh: float = 0.45):
+    def detect(self, img: np.ndarray, conf_thresh: float = 0.30, iou_thresh: float = 0.45):
         if img is None or img.size == 0:
             return []
         h, w = img.shape[:2]
@@ -444,6 +460,8 @@ class ObjectDetectorONNX:
                     bx, by, bw_b, bh_b = boxes[idx]
                     cid = int(filtered_classes[idx])
                     cname = COCO_CLASSES[cid] if cid < len(COCO_CLASSES) else f'object_{cid}'
+                    if cname not in SURVEILLANCE_TARGET_CLASSES:
+                        continue
                     detections.append({
                         'box': [int(bx), int(by), int(bx + bw_b), int(by + bh_b)],
                         'class_id': cid,
@@ -451,6 +469,7 @@ class ObjectDetectorONNX:
                         'confidence': float(scores_list[idx])
                     })
             return detections
+
         return []
 
 
@@ -607,7 +626,7 @@ class ObjectDetectorTFLite:
         blob = (canvas_rgb.astype(np.float32) / 255.0)[np.newaxis, :]
         return blob, scale, (pad_w, pad_h)
 
-    def detect(self, img: np.ndarray, conf_thresh: float = 0.10, iou_thresh: float = 0.40):
+    def detect(self, img: np.ndarray, conf_thresh: float = 0.30, iou_thresh: float = 0.45):
         if img is None or img.size == 0:
             return []
         h, w = img.shape[:2]
@@ -657,6 +676,8 @@ class ObjectDetectorTFLite:
                 bx, by, bw_b, bh_b = boxes[idx]
                 cid = int(filtered_classes[idx])
                 cname = COCO_CLASSES[cid] if cid < len(COCO_CLASSES) else f'object_{cid}'
+                if cname not in SURVEILLANCE_TARGET_CLASSES:
+                    continue
                 detections.append({
                     'box': [int(bx), int(by), int(bx + bw_b), int(by + bh_b)],
                     'class_id': cid,
@@ -982,6 +1003,10 @@ class CameraWorkerThread(threading.Thread):
         self.iou = iou
         self.frame_stride = max(1, frame_stride)
         self.speed_tracker = VehicleSpeedTracker(speed_limit=80)
+        self.byte_tracker = ByteTrackTracker(max_lost=25, iou_thresh=0.25, high_conf_thresh=0.25)
+        self.trail_tracker = TrailTracker(max_trail_length=45)
+        self.dwell_tracker = DwellTracker(dwell_threshold=8.0)
+        self.intrusion_zone = None
         self.running = True
         self.recent_detections = {}
         self.is_connected = False
@@ -1068,27 +1093,76 @@ class CameraWorkerThread(threading.Thread):
                         with INFERENCE_LOCK:
                             raw_boxes = self.detector.detect(frame, self.conf, self.iou)
 
-                # 4. Target-Specific Object & Vehicle Detection (Runs strictly on OBJECT_DETECTION cameras & active UI target)
+                # 4. Target-Specific Object & Vehicle Detection (Runs on OBJECT_DETECTION cameras & active UI target)
                 raw_objects = []
                 is_selected_vision_cam = self.ws_client.is_camera_active_target(self.camera_code, self.camera_id) if self.ws_client else True
 
                 if (is_obj_cam or (is_selected_vision_cam and cam_mode != "GENERAL_SURVEILLANCE")) and self.object_detector is not None:
                     if hasattr(self.object_detector, "triton_client") or getattr(self.object_detector, "accel_mode", "").startswith("GPU"):
-                        raw_objects = self.object_detector.detect(frame, conf_thresh=0.10, iou_thresh=0.40)
+                        raw_objects = self.object_detector.detect(frame, conf_thresh=0.30, iou_thresh=0.45)
                     else:
                         with INFERENCE_LOCK:
-                            raw_objects = self.object_detector.detect(frame, conf_thresh=0.10, iou_thresh=0.40)
+                            raw_objects = self.object_detector.detect(frame, conf_thresh=0.30, iou_thresh=0.45)
 
-                # 4.5. Terminal Log for Detected Objects (Only for active vision camera)
-                if (is_selected_vision_cam or is_obj_cam) and len(raw_objects) > 0 and (now - self.last_obj_log >= 1.5):
+
+                # Initialize default virtual intrusion security perimeter zone if not present
+                if self.intrusion_zone is None and (w > 0 and h > 0):
+                    default_pts = [
+                        [int(w * 0.15), int(h * 0.45)],
+                        [int(w * 0.85), int(h * 0.45)],
+                        [int(w * 0.95), int(h * 0.88)],
+                        [int(w * 0.05), int(h * 0.88)]
+                    ]
+                    self.intrusion_zone = IntrusionZone(default_pts)
+
+                # 4.2. ByteTrack Multi-Object Association & Persistent Tracking
+                tracked_objects = self.byte_tracker.update(raw_objects) if len(raw_objects) > 0 else []
+
+                # 4.3. Movement Trail Tracking, Dwell Loitering & Perimeter Intrusion Checks
+                active_track_keys = []
+                for obj in tracked_objects:
+                    bx = obj["box"]
+                    lbl = obj["label"]
+                    track_id = obj.get("track_id")
+                    x1, y1, x2, y2 = bx
+                    cx, cy = int((x1 + x2) / 2), int((y1 + y2) / 2)
+                    norm_cx, norm_cy = cx / max(1, w), cy / max(1, h)
+
+                    if track_id is not None:
+                        key = (lbl, track_id)
+                        active_track_keys.append(key)
+                        
+                        # 1. Update Motion Trajectory History
+                        self.trail_tracker.update(lbl, track_id, cx, cy, norm_cx, norm_cy, now)
+                        
+                        # 2. Check Loitering Anomaly (Dwell > 8.0s)
+                        is_loitering, dwell_time = self.dwell_tracker.update(lbl, track_id, inside=True)
+                        obj["is_loitering"] = is_loitering
+                        obj["dwell_time"] = round(dwell_time, 1)
+
+                        # 3. Check Virtual Perimeter Intrusion Zone
+                        if self.intrusion_zone is not None:
+                            is_inside, entered, _ = self.intrusion_zone.check(lbl, track_id, (x1, y1, x2, y2))
+                            obj["is_intrusion"] = is_inside
+                        else:
+                            obj["is_intrusion"] = False
+
+                        # Attach normalized movement trail points for frontend canvas HUD
+                        obj["trail_points"] = self.trail_tracker.get_normalized_points(lbl, track_id)
+
+                self.dwell_tracker.cleanup_stale(active_track_keys)
+                self.trail_tracker.cleanup_stale(max_age_seconds=8.0)
+
+                # 4.5. Terminal Log for Detected & Tracked Objects (Only for active vision camera)
+                if (is_selected_vision_cam or is_obj_cam) and len(tracked_objects) > 0 and (now - self.last_obj_log >= 1.5):
                     self.last_obj_log = now
                     obj_counts = {}
-                    for obj in raw_objects:
+                    for obj in tracked_objects:
                         lbl = obj["label"].capitalize()
                         obj_counts[lbl] = obj_counts.get(lbl, 0) + 1
                     details_str = ", ".join([f"{cnt}x {lbl}" for lbl, cnt in obj_counts.items()])
                     time_str = time.strftime('%H:%M:%S')
-                    print(f"\x1b[35m[AI DETECT]\x1b[0m 🎯 \x1b[33m[{self.camera_code}]\x1b[0m Detected Objects: \x1b[1m\x1b[37m{details_str}\x1b[0m | Time: {time_str}", flush=True)
+                    print(f"\x1b[35m[AI TRACK]\x1b[0m 🎯 \x1b[33m[{self.camera_code}]\x1b[0m ByteTrack: \x1b[1m\x1b[37m{details_str}\x1b[0m (Active Tracks: {len(tracked_objects)}) | Time: {time_str}", flush=True)
 
                 # 5. Process Plate OCR & Watchlist Ingestion
                 plate_detections_for_frame = []
@@ -1165,18 +1239,31 @@ class CameraWorkerThread(threading.Thread):
                         })
 
                 # 6. Stream Live AI Bounding Boxes (Objects + Plates) to Central Platform for Live Surveillance Feed
-                if (now - self.last_live_dispatch >= 0.15) and (len(raw_objects) > 0 or len(plate_detections_for_frame) > 0 or frame_counter % 6 == 0):
+                if (now - self.last_live_dispatch >= 0.15) and (len(tracked_objects) > 0 or len(plate_detections_for_frame) > 0 or frame_counter % 6 == 0):
                     self.last_live_dispatch = now
                     live_boxes = []
 
-                    for obj in raw_objects:
+                    for obj in tracked_objects:
                         bx = obj["box"]
+                        track_id = obj.get("track_id")
+                        label_str = obj["label"].upper() + (f" #{track_id}" if track_id is not None else "")
+                        if obj.get("is_loitering"):
+                            label_str += f" [LOITERING {obj.get('dwell_time', 0):.0f}s]"
+                        elif obj.get("is_intrusion"):
+                            label_str += " [INTRUSION]"
+
                         live_boxes.append({
                             "box": bx,
                             "normalized_box": [round(bx[1] / h, 4), round(bx[0] / w, 4), round(bx[3] / h, 4), round(bx[2] / w, 4)],
-                            "label": obj["label"].upper(),
-                            "class_id": obj["class_id"],
-                            "confidence": round(obj["confidence"] * 100.0, 1),
+                            "label": label_str,
+                            "class_name": obj["label"],
+                            "class_id": obj.get("class_id", 0),
+                            "confidence": round(obj.get("confidence", 0.0) * 100.0, 1),
+                            "track_id": track_id,
+                            "trail_points": obj.get("trail_points", []),
+                            "is_loitering": bool(obj.get("is_loitering")),
+                            "dwell_time": obj.get("dwell_time", 0.0),
+                            "is_intrusion": bool(obj.get("is_intrusion")),
                             "type": "OBJECT"
                         })
 
@@ -1204,7 +1291,8 @@ class CameraWorkerThread(threading.Thread):
                                 headers={"Content-Type": "application/json"},
                                 method="POST"
                             )
-                            urllib.request.urlopen(req_live, timeout=0.8)
+                            with urllib.request.urlopen(req_live, timeout=1.0) as resp:
+                                pass
                         except Exception:
                             pass
 
