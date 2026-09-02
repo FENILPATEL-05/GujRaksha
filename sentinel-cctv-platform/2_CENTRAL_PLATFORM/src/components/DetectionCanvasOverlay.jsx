@@ -34,7 +34,7 @@ export const DetectionCanvasOverlay = ({ camera, isPlaying = true }) => {
       if (staleTimer) clearTimeout(staleTimer);
       staleTimer = setTimeout(() => {
         if (isSubscribed) setBboxes([]);
-      }, 400);
+      }, 1500);
     };
 
     aiVisionSocket.subscribe(cameraCode, handleVisionFrame);

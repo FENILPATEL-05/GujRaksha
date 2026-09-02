@@ -179,7 +179,7 @@ export const LiveCCTVFeed = ({
         if (isSubscribed) {
           setLiveDetections([]);
         }
-      }, 400);
+      }, 1500);
     };
 
     const handleVisionFrame = (detections) => {

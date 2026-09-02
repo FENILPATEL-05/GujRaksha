@@ -1159,7 +1159,7 @@ class CameraWorkerThread(threading.Thread):
                 raw_objects = []
                 is_selected_vision_cam = self.ws_client.is_camera_active_target(self.camera_code, self.camera_id) if self.ws_client else True
 
-                if (is_obj_cam or (is_selected_vision_cam and cam_mode != "GENERAL_SURVEILLANCE")) and self.object_detector is not None:
+                if (is_obj_cam or is_selected_vision_cam) and self.object_detector is not None:
                     if hasattr(self.object_detector, "triton_client") or getattr(self.object_detector, "accel_mode", "").startswith("GPU"):
                         raw_objects = self.object_detector.detect(frame, conf_thresh=0.30, iou_thresh=0.45)
                     else:
