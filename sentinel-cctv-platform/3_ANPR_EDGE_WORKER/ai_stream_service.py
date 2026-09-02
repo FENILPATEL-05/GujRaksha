@@ -40,8 +40,8 @@ from bytetrack_tracker import ByteTrackTracker
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("AIStreamService")
 
-# Force RTSP over TCP
-os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
+## Low-latency TCP FFmpeg capture configuration to prevent video artifacts & glitching
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|fflags;nobuffer+discardcorrupt|flags;low_delay|max_delay;0|reorder_queue_size;0"
 
 # Strictly filtered 5 surveillance target classes (+ COCO class IDs)
 COCO_TARGET_CLASSES = {
@@ -57,7 +57,7 @@ SURVEILLANCE_TARGET_NAMES = set(COCO_TARGET_CLASSES.values())
 current_ai_stats: Dict[str, Any] = {
     "camera_id": "unknown",
     "is_active": False,
-    "backend_engine": "OpenCV DNN (ONNX GPU/CPU)",
+    "backend_engine": "CPU XNNPACK (LiteRT)",
     "current_frame_counts": {},
     "total_unique_counts": {},
     "active_dwell_alerts": [],
@@ -65,6 +65,86 @@ current_ai_stats: Dict[str, Any] = {
     "last_pts_ms": 0.0,
     "infer_time_ms": 0.0
 }
+
+
+class ObjectDetectorONNX:
+    """NVIDIA CUDA / TensorRT GPU YOLO Object Detector using ONNX Runtime."""
+    def __init__(self, model_path: str, conf_thresh: float = 0.30, iou_thresh: float = 0.45):
+        import onnxruntime as ort
+        providers = ['CUDAExecutionProvider', 'TensorrtExecutionProvider', 'CPUExecutionProvider']
+        avail = ort.get_available_providers()
+        valid_providers = [p for p in providers if p in avail]
+
+        sess_opts = ort.SessionOptions()
+        sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        sess_opts.log_severity_level = 3
+        self.session = ort.InferenceSession(model_path, sess_options=sess_opts, providers=valid_providers)
+        self.input_name = self.session.get_inputs()[0].name
+        self.output_name = self.session.get_outputs()[0].name
+        self.conf_thresh = conf_thresh
+        self.iou_thresh = iou_thresh
+        self.input_size = 640
+
+        active_provider = self.session.get_providers()[0]
+        self.accel_mode = "GPU (NVIDIA CUDA)" if "CUDA" in active_provider else ("GPU (TensorRT)" if "TensorRT" in active_provider else "CPU")
+
+    def detect(self, frame: np.ndarray) -> List[Dict[str, Any]]:
+        if frame is None or frame.size == 0:
+            return []
+        h, w = frame.shape[:2]
+
+        scale = self.input_size / max(h, w)
+        nh, nw = int(h * scale), int(w * scale)
+        resized = cv2.resize(frame, (nw, nh), interpolation=cv2.INTER_LINEAR)
+
+        canvas = np.full((self.input_size, self.input_size, 3), 114, dtype=np.uint8)
+        pad_w = (self.input_size - nw) // 2
+        pad_h = (self.input_size - nh) // 2
+        canvas[pad_h:pad_h + nh, pad_w:pad_w + nw] = resized
+
+        blob = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+        blob = np.transpose(blob, (2, 0, 1))[np.newaxis, :]
+
+        outputs = self.session.run([self.output_name], {self.input_name: blob})
+        preds = outputs[0][0]
+        if preds.shape[0] < preds.shape[1]:
+            preds = preds.T
+
+        boxes, scores, class_ids = [], [], []
+        for row in preds:
+            cx, cy, bw, bh = row[0:4]
+            class_scores = row[4:]
+            cls_id = int(np.argmax(class_scores))
+            score = float(class_scores[cls_id])
+            if cls_id in COCO_TARGET_CLASSES and score >= self.conf_thresh:
+                x1 = (cx - bw / 2.0 - pad_w) / scale
+                y1 = (cy - bh / 2.0 - pad_h) / scale
+                x2 = (cx + bw / 2.0 - pad_w) / scale
+                y2 = (cy + bh / 2.0 - pad_h) / scale
+                x1 = max(0, min(w - 1, int(x1)))
+                y1 = max(0, min(h - 1, int(y1)))
+                x2 = max(0, min(w - 1, int(x2)))
+                y2 = max(0, min(h - 1, int(y2)))
+                boxes.append([x1, y1, x2 - x1, y2 - y1])
+                scores.append(score)
+                class_ids.append(cls_id)
+
+        if not boxes:
+            return []
+
+        indices = cv2.dnn.NMSBoxes(boxes, scores, self.conf_thresh, self.iou_thresh)
+        detections = []
+        if len(indices) > 0:
+            for idx in (indices.flatten() if hasattr(indices, 'flatten') else indices):
+                i = int(idx)
+                x, y, bw, bh = boxes[i]
+                detections.append({
+                    "box": [x, y, x + bw, y + bh],
+                    "confidence": scores[i],
+                    "class_id": class_ids[i],
+                    "label": COCO_TARGET_CLASSES[class_ids[i]]
+                })
+        return detections
 
 
 class OpenCVONNXDetector:
@@ -93,12 +173,10 @@ class OpenCVONNXDetector:
                 try:
                     self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
                     self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
-                    current_ai_stats["backend_engine"] = "OpenCV DNN (CUDA GPU)"
                     logger.info("✅ ONNX Model running on CUDA GPU")
                 except Exception:
                     self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
                     self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
-                    current_ai_stats["backend_engine"] = "OpenCV DNN (CPU)"
                     logger.info("✅ ONNX Model running on CPU")
             except Exception as e:
                 logger.error(f"❌ Failed to load ONNX model: {e}")
@@ -165,152 +243,158 @@ class OpenCVONNXDetector:
         return detections
 
 
-# Initialize Global Object Detector
-detector = OpenCVONNXDetector()
-
-class OpenCVPlateDetector:
-    """High-Performance License Plate Detector using OpenCV DNN (Zero external dependencies)."""
-    def __init__(self, model_path: Optional[str] = None, conf_thresh: float = 0.15, iou_thresh: float = 0.45):
-        if model_path is None or not os.path.exists(model_path):
-            candidates = [
-                os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/onnx/plate_detector.onnx"),
-                os.path.join(SCRIPT_DIR, "models/onnx/plate_detector.onnx"),
-                os.path.join(SCRIPT_DIR, "models/plate_detector.onnx"),
-                "/home/dell-i5/nxon-projects/GujRaksha/sentinel-cctv-platform/2_CENTRAL_PLATFORM/models/onnx/plate_detector.onnx"
-            ]
-            for c in candidates:
-                if os.path.exists(c):
-                    model_path = os.path.abspath(c)
-                    break
-
-        self.conf_thresh = conf_thresh
-        self.iou_thresh = iou_thresh
-        self.net = None
-        self.input_size = (384, 384)
-
-        if model_path and os.path.exists(model_path):
-            try:
-                self.net = cv2.dnn.readNetFromONNX(model_path)
-                try:
-                    self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-                    self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
-                except Exception:
-                    self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
-                    self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
-                logger.info(f"✅ AI Stream: OpenCVPlateDetector Loaded ({model_path})")
-            except Exception as e:
-                logger.error(f"Failed to load OpenCVPlateDetector: {e}")
-
-    def detect(self, frame: np.ndarray) -> List[Any]:
-        if self.net is None or frame is None or frame.size == 0:
-            return []
-
-        h, w = frame.shape[:2]
-        blob = cv2.dnn.blobFromImage(frame, 1/255.0, self.input_size, swapRB=True, crop=False)
-        self.net.setInput(blob)
-        outputs = self.net.forward()
-
-        preds = outputs[0]
-        if preds.shape[0] < preds.shape[1]:
-            preds = preds.T
-
-        boxes = []
-        scores = []
-        x_scale = w / self.input_size[0]
-        y_scale = h / self.input_size[1]
-
-        for row in preds:
-            cx, cy, bw, bh, score = row[0:5]
-            if score >= self.conf_thresh:
-                x1 = int((cx - bw / 2.0) * x_scale)
-                y1 = int((cy - bh / 2.0) * y_scale)
-                x2 = int((cx + bw / 2.0) * x_scale)
-                y2 = int((cy + bh / 2.0) * y_scale)
-
-                x1 = max(0, min(w - 1, x1))
-                y1 = max(0, min(h - 1, y1))
-                x2 = max(0, min(w - 1, x2))
-                y2 = max(0, min(h - 1, y2))
-
-                boxes.append([x1, y1, x2 - x1, y2 - y1])
-                scores.append(float(score))
-
-        if not boxes:
-            return []
-
-        indices = cv2.dnn.NMSBoxes(boxes, scores, self.conf_thresh, self.iou_thresh)
-        detections = []
-        for idx in indices:
-            i = idx if isinstance(idx, (int, np.integer)) else idx[0]
-            bx, by, bw_b, bh_b = boxes[i]
-            detections.append((bx, by, bx + bw_b, by + bh_b, scores[i]))
-
-        return detections
-
-
-# Real Deep Learning ANPR Pipeline (GPU CUDA / TensorRT Priority -> CPU TFLite Fallback)
+# Initialize Global Object & Plate Detectors (GPU First -> CPU Fallback)
+detector = None
 real_plate_detector = None
 real_plate_ocr = None
 normalize_ocr_text = lambda x: x
-active_backend_mode = "CPU (TFLite)"
+active_backend_mode = "CPU"
+
+obj_onnx_path = os.path.abspath(os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/onnx/object_detection.onnx"))
+det_onnx_path = os.path.abspath(os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/onnx/plate_detector.onnx"))
+ocr_onnx_path = os.path.abspath(os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/onnx/plate_ocr.onnx"))
+tflite_det_path = os.path.abspath(os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/tflite/plate_detector.tflite"))
+tflite_ocr_path = os.path.abspath(os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/tflite/plate_ocr.tflite"))
+
+central_services_dir = os.path.abspath(os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/src/services"))
+if central_services_dir not in sys.path:
+    sys.path.insert(0, central_services_dir)
 
 try:
-    central_services_dir = os.path.abspath(os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/src/services"))
-    if central_services_dir not in sys.path:
-        sys.path.insert(0, central_services_dir)
-
-    det_onnx_path = os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/onnx/plate_detector.onnx")
-    ocr_onnx_path = os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/onnx/plate_ocr.onnx")
-    tflite_det_path = os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/tflite/plate_detector.tflite")
-    tflite_ocr_path = os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/tflite/plate_ocr.tflite")
-
     from anpr_tflite_scanner import normalize_ocr_text
+except Exception:
+    pass
 
-    # STEP 1: Attempt NVIDIA GPU (CUDA / TensorRT) via ONNX Runtime
-    gpu_success = False
-    try:
-        import onnxruntime as ort
-        providers = ort.get_available_providers()
-        cuda_available = any("CUDA" in p or "TensorRT" in p for p in providers)
-
-        if cuda_available and os.path.exists(det_onnx_path) and os.path.exists(ocr_onnx_path):
+# STEP 1: Attempt GPU (NVIDIA CUDA / TensorRT ONNX)
+gpu_loaded = False
+try:
+    import onnxruntime as ort
+    provs = ort.get_available_providers()
+    if any("CUDA" in p or "TensorRT" in p for p in provs):
+        if os.path.exists(obj_onnx_path):
+            detector = ObjectDetectorONNX(obj_onnx_path)
+        if os.path.exists(det_onnx_path) and os.path.exists(ocr_onnx_path):
             from anpr_worker import PlateDetectorONNX, PlateOCRONNX
             real_plate_detector = PlateDetectorONNX(det_onnx_path)
             real_plate_ocr = PlateOCRONNX(ocr_onnx_path)
-            active_backend_mode = real_plate_detector.accel_mode
-            current_ai_stats["backend_engine"] = f"GPU ({active_backend_mode})"
-            logger.info(f"🚀 [AI Engine] Priority 1 GPU Activated: {active_backend_mode}")
-            gpu_success = True
-    except Exception as gpu_err:
-        logger.info(f"ℹ️ [AI Engine] GPU ONNX not available ({gpu_err}), falling back to CPU...")
+        active_backend_mode = "GPU (NVIDIA CUDA Tensor Cores)"
+        current_ai_stats["backend_engine"] = active_backend_mode
+        logger.info(f"🚀 [AI Engine] Priority 1 NVIDIA GPU Activated: {active_backend_mode}")
+        gpu_loaded = True
+except Exception as gpu_e:
+    logger.info(f"ℹ️ [AI Engine] GPU ONNX not activated ({gpu_e}), activating optimized CPU pipeline...")
 
-    # STEP 2: Fallback to High-Performance Multi-threaded CPU (LiteRT / TFLite XNNPACK)
-    if not gpu_success:
+# STEP 2: Fallback to LiteRT / OpenCV DNN
+if not gpu_loaded:
+    if detector is None:
+        detector = OpenCVONNXDetector(obj_onnx_path if os.path.exists(obj_onnx_path) else None)
+    try:
         from anpr_tflite_scanner import PlateDetectorTFLite, PlateOCRTFLite
         if os.path.exists(tflite_det_path):
             real_plate_detector = PlateDetectorTFLite(tflite_det_path)
         if os.path.exists(tflite_ocr_path):
             real_plate_ocr = PlateOCRTFLite(tflite_ocr_path)
         active_backend_mode = "CPU XNNPACK (LiteRT)"
-        current_ai_stats["backend_engine"] = active_backend_mode
-        logger.info(f"✅ [AI Engine] Priority 2 CPU Activated: {active_backend_mode}")
-except Exception as e:
-    logger.error(f"Failed to initialize ANPR deep learning pipeline: {e}")
+    except Exception as e:
+        logger.error(f"Failed to load CPU ANPR models: {e}")
+    current_ai_stats["backend_engine"] = active_backend_mode
+    logger.info(f"✅ [AI Engine] Active Backend: {active_backend_mode}")
+
 
 
 
 STREAM_DYNAMIC_CONTROLS: Dict[str, Dict[str, bool]] = {}
 
 
+class AsyncFrameReader:
+    """Thread-Safe Double-Buffered RTSP / Camera Reader with Automated HTTP/HLS Fallback."""
+    def __init__(self, source: str, fallback_source: Optional[str] = None):
+        self.primary_source = str(source)
+        self.fallback_source = str(fallback_source) if (fallback_source and str(fallback_source) != self.primary_source) else None
+        self.active_source = self.primary_source
+        self.cap = None
+        self.lock = threading.Lock()
+        self.stopped = False
+        self._buffer = [None, None]
+        self._active_idx = 0
+        self.fail_count = 0
+        self._init_cap(self.active_source)
+        self.thread = threading.Thread(target=self._reader_loop, daemon=True)
+        self.thread.start()
+
+    def _init_cap(self, src: str):
+        if self.cap:
+            try:
+                self.cap.release()
+            except Exception:
+                pass
+        try:
+            if str(src).isdigit():
+                self.cap = cv2.VideoCapture(int(src), cv2.CAP_V4L2)
+            else:
+                self.cap = cv2.VideoCapture(str(src), cv2.CAP_FFMPEG)
+            if self.cap:
+                self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        except Exception:
+            self.cap = None
+
+    def _reader_loop(self):
+        backoff = 1.0
+        while not self.stopped:
+            if not self.cap or not self.cap.isOpened():
+                time.sleep(backoff)
+                self.fail_count += 1
+                if self.fail_count >= 2 and self.fallback_source and self.active_source != self.fallback_source:
+                    logger.warning(f"[AI Stream] Primary stream failed ({self.active_source}). Switching to fallback: {self.fallback_source}")
+                    self.active_source = self.fallback_source
+                else:
+                    self.active_source = self.primary_source
+                self._init_cap(self.active_source)
+                backoff = min(backoff * 1.5, 5.0)
+                continue
+
+            success, frame = self.cap.read()
+            if success and frame is not None and frame.shape[0] > 30:
+                self.fail_count = 0
+                write_idx = 1 - self._active_idx
+                self._buffer[write_idx] = frame
+                with self.lock:
+                    self._active_idx = write_idx
+                backoff = 1.0
+            else:
+                self.fail_count += 1
+                if self.fail_count >= 4 and self.fallback_source and self.active_source != self.fallback_source:
+                    logger.warning(f"[AI Stream] RTSP grab failed. Falling back to HTTP/HLS: {self.fallback_source}")
+                    self.active_source = self.fallback_source
+                    self._init_cap(self.active_source)
+                time.sleep(0.01)
+
+    def read(self) -> Optional[np.ndarray]:
+        with self.lock:
+            frame = self._buffer[self._active_idx]
+            if frame is not None:
+                return frame.copy()
+        return None
+
+    def release(self):
+        self.stopped = True
+        if self.cap:
+            try:
+                self.cap.release()
+            except Exception:
+                pass
+
+
 class AsyncAIStreamEngine:
     """
     Decoupled Dual-Thread AI Engine:
     - Thread 1: Camera Reader + 60 FPS MJPEG Streamer (0ms latency, zero delay).
-    - Thread 2: Background AI Inference Worker (runs deep learning in parallel).
+    - Thread 2: Background AI Inference Worker (runs deep learning in parallel on GPU/CPU).
     """
-    def __init__(self, source: str):
+    def __init__(self, source: str, fallback_source: Optional[str] = None):
         self.source = str(source)
-        self.reader = AsyncFrameReader(self.source)
+        self.fallback_source = fallback_source
+        self.reader = AsyncFrameReader(self.source, fallback_source=self.fallback_source)
         self.lock = threading.Lock()
         self.stopped = False
 
@@ -329,7 +413,7 @@ class AsyncAIStreamEngine:
         while not self.stopped:
             frame = self.reader.read()
             if frame is None or frame.size == 0:
-                time.sleep(0.015)
+                time.sleep(0.01)
                 continue
 
             frame_idx += 1
@@ -341,7 +425,7 @@ class AsyncAIStreamEngine:
 
             t0 = time.time()
             tracked = []
-            if enable_obj:
+            if enable_obj and detector is not None:
                 raw_dets = detector.detect(frame)
                 if raw_dets:
                     tracked = byte_tracker.update(raw_dets)
@@ -391,7 +475,7 @@ class AsyncAIStreamEngine:
                 self.latest_plate_boxes = p_boxes
                 self.infer_time_ms = infer_ms
 
-            time.sleep(0.01)
+            time.sleep(0.005)
 
     def get_frame_and_ai(self):
         frame = self.reader.read()
@@ -406,59 +490,6 @@ class AsyncAIStreamEngine:
         self.reader.release()
 
 
-class AsyncFrameReader:
-    """Threaded RTSP / Camera Reader ensuring ZERO buffer queue lag and native 30-60 FPS."""
-    def __init__(self, source: str):
-        self.source = str(source)
-        self.cap = None
-        self.latest_frame = None
-        self.lock = threading.Lock()
-        self.stopped = False
-        self._init_cap()
-        self.thread = threading.Thread(target=self._reader_loop, daemon=True)
-        self.thread.start()
-
-    def _init_cap(self):
-        try:
-            if self.source.isdigit():
-                self.cap = cv2.VideoCapture(int(self.source), cv2.CAP_V4L2)
-            else:
-                self.cap = cv2.VideoCapture(self.source, cv2.CAP_FFMPEG)
-            if self.cap:
-                self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        except Exception:
-            self.cap = None
-
-    def _reader_loop(self):
-        backoff = 1.0
-        while not self.stopped:
-            if not self.cap or not self.cap.isOpened():
-                time.sleep(backoff)
-                self._init_cap()
-                backoff = min(backoff * 1.5, 8.0)
-                continue
-
-            success, frame = self.cap.read()
-            if success and frame is not None and frame.shape[0] > 30:
-                with self.lock:
-                    self.latest_frame = frame
-                backoff = 1.0
-            else:
-                time.sleep(0.015)
-
-    def read(self) -> Optional[np.ndarray]:
-        with self.lock:
-            if self.latest_frame is not None:
-                return self.latest_frame.copy()
-            return None
-
-    def release(self):
-        self.stopped = True
-        if self.cap:
-            try:
-                self.cap.release()
-            except Exception:
-                pass
 
 
 def create_placeholder_frame(text: str) -> np.ndarray:
@@ -478,11 +509,12 @@ def generate_frames(
     enable_trails: bool = True,
     enable_dwell: bool = False,
     enable_zone: bool = False,
-    zone_polygon: Optional[List[List[int]]] = None
+    zone_polygon: Optional[List[List[int]]] = None,
+    fallback: Optional[str] = None
 ):
     """
     Generator yielding multipart MJPEG frames with full OpenCV HUD annotations.
-    Full hardware camera speed (60 FPS) with parallel background AI worker.
+    Full hardware camera speed (60 FPS) with automated HTTP/HLS fallback.
     """
     global current_ai_stats, STREAM_DYNAMIC_CONTROLS
 
@@ -497,9 +529,10 @@ def generate_frames(
     stream_trail_tracker = TrailTracker(max_trail_length=45)
     stream_dwell_tracker = DwellTracker(dwell_threshold=8.0)
 
-    engine = AsyncAIStreamEngine(source)
+    engine = AsyncAIStreamEngine(source, fallback_source=fallback)
     current_ai_stats["is_active"] = True
     intrusion_zone = None
+
 
     try:
         while True:
@@ -734,6 +767,7 @@ class AIStreamRequestHandler(BaseHTTPRequestHandler):
 
         if path in ["/api/v1/ai/video_feed", "/ai/video_feed"]:
             source = params.get("source", ["0"])[0]
+            fallback = params.get("fallback", [None])[0]
             objects = params.get("detect_objects", params.get("objects", ["true"]))[0].lower() == "true"
             plates = params.get("detect_plates", params.get("plates", ["true"]))[0].lower() == "true"
             trails = params.get("trails", ["true"])[0].lower() == "true"
@@ -741,7 +775,6 @@ class AIStreamRequestHandler(BaseHTTPRequestHandler):
             zone = params.get("zone", ["false"])[0].lower() == "true"
             zone_pts_raw = params.get("zone_pts", [None])[0]
             classes_param = params.get("classes", [None])[0]
-
 
             zone_pts = None
             if zone_pts_raw:
@@ -757,8 +790,9 @@ class AIStreamRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
             try:
-                for frame_bytes in generate_frames(source, objects, plates, trails, dwell, zone, zone_pts):
+                for frame_bytes in generate_frames(source, objects, plates, trails, dwell, zone, zone_pts, fallback=fallback):
                     self.wfile.write(frame_bytes)
+
             except (BrokenPipeError, ConnectionResetError):
                 pass
             except Exception as e:

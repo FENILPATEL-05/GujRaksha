@@ -317,7 +317,9 @@ export const LiveCCTVFeed = ({
   const rtspProxyUrl = `${apiPrefix}/api/v1/proxy-stream?url=${encodeURIComponent(camera?.stream_url || camera?.rtsp_url || '')}`;
 
   const aiSourceUrl = camera?.rtsp_url || camera?.stream_url || (camera?.urls && (camera.urls.rtsp || camera.urls.hls || camera.urls.whep)) || rawStreamUrl || "0";
-  const aiStreamUrl = `${apiPrefix}/api/v1/ai/video_feed?source=${encodeURIComponent(aiSourceUrl)}&trails=true&dwell=false&zone=false`;
+  const aiFallbackUrl = camera?.hls_url || (camera?.urls && (camera.urls.hls || camera.urls.whep)) || (camera?.stream_url && !camera.stream_url.startsWith('rtsp://') ? camera.stream_url : '') || rawStreamUrl || "";
+  const aiStreamUrl = `${apiPrefix}/api/v1/ai/video_feed?source=${encodeURIComponent(aiSourceUrl)}&fallback=${encodeURIComponent(aiFallbackUrl)}&trails=true&dwell=false&zone=false`;
+
 
   const handleToggleObjects = useCallback((e) => {
     e.stopPropagation();
