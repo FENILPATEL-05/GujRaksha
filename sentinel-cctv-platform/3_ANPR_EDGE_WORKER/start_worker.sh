@@ -22,14 +22,6 @@ else
   exit 1
 fi
 
-# Clean up previous stream service if running
-pkill -f "ai_stream_service.py" 2>/dev/null || true
-
-# Start AI MJPEG Stream Service on port 8090
-"$PY_BIN" "$SCRIPT_DIR/ai_stream_service.py" 8090 &
-AI_STREAM_PID=$!
-trap "kill -9 $AI_STREAM_PID 2>/dev/null || true" EXIT
-
 if [ "$1" == "--source" ]; then
   # Direct single source mode
   SOURCE="$2"
@@ -41,10 +33,8 @@ if [ "$1" == "--source" ]; then
   echo " 📡 Source       : $SOURCE"
   echo " 🏢 Central API  : $CENTRAL_URL"
   echo " 🎥 Camera Code  : $CAM_CODE"
-  echo " 📺 AI Stream    : http://localhost:8090/api/v1/ai/video_feed"
   echo "======================================================================"
   exec "$PY_BIN" "$SCRIPT_DIR/anpr_worker.py" --source "$SOURCE" --central-url "$CENTRAL_URL" --camera-code "$CAM_CODE"
-
 else
   # Central Cluster Managed Mode (Dynamic 100-Camera Dispatch & Watchlist Sync)
   CENTRAL_URL="${1:-http://localhost:3000/api/v1}"
@@ -64,3 +54,4 @@ else
   echo "======================================================================"
   exec "$PY_BIN" "$SCRIPT_DIR/anpr_worker.py" --central-url "$CENTRAL_URL" --worker-id "$WORKER_ID" --max-capacity "$MAX_CAPACITY"
 fi
+

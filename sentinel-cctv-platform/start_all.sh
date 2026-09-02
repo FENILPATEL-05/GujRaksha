@@ -34,25 +34,10 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM EXIT
 
+## ------------------------------------------------------------------------------
+# 1. Launch Central Command & Control Room Platform
 # ------------------------------------------------------------------------------
-# 1. Launch Stream Gateway (MediaMTX RTSP / WebRTC / HLS Server)
-# ------------------------------------------------------------------------------
-echo -e "${YELLOW}📡 [1/4] Starting Stream Gateway (MediaMTX RTSP / WebRTC / HLS)...${NC}"
-if [ -d "1_STREAM_GATEWAY" ]; then
-    cd 1_STREAM_GATEWAY
-    if [ -f "start_gateway.sh" ]; then
-        bash start_gateway.sh > /tmp/gujraksha_gateway.log 2>&1 &
-        PIDS+=($!)
-        echo -e "${GREEN}   • Stream Gateway running (RTSP: 8554 | WebRTC: 8889 | HLS: 8888)${NC}"
-    fi
-    cd "$PROJECT_ROOT"
-fi
-sleep 1
-
-# ------------------------------------------------------------------------------
-# 2. Launch Central Command & Control Room Platform
-# ------------------------------------------------------------------------------
-echo -e "${YELLOW}🏢 [2/4] Starting Central CCC Server & Web UI (Port 3000)...${NC}"
+echo -e "${YELLOW}🏢 [1/3] Starting Central CCC Server & Web UI (Port 3000)...${NC}"
 if [ -d "2_CENTRAL_PLATFORM" ]; then
     cd 2_CENTRAL_PLATFORM
     if [ -f "start_central.sh" ]; then
@@ -68,9 +53,9 @@ fi
 sleep 2
 
 # ------------------------------------------------------------------------------
-# 3. Launch NVIDIA Triton GPU Inference Server (If Docker/GPU available)
+# 2. Launch NVIDIA Triton GPU Inference Server (If Docker/GPU available)
 # ------------------------------------------------------------------------------
-echo -e "${YELLOW}⚡ [3/4] Launching NVIDIA Triton GPU Inference Server...${NC}"
+echo -e "${YELLOW}⚡ [2/3] Checking NVIDIA Triton GPU Inference Server...${NC}"
 TRITON_BACKEND="auto"
 if command -v docker &>/dev/null && command -v nvidia-smi &>/dev/null; then
     if [ -f "start_triton.sh" ]; then
@@ -82,26 +67,7 @@ if command -v docker &>/dev/null && command -v nvidia-smi &>/dev/null; then
 else
     echo -e "${YELLOW}   • Skipping Triton Docker launch (Docker or GPU not active). Using local engine.${NC}"
 fi
-sleep 2
-
-# ------------------------------------------------------------------------------
-# 4. Launch Distributed AI Worker Node & AI Video Stream Service
-# ------------------------------------------------------------------------------
-echo -e "${YELLOW}🧠 [4/4] Launching Distributed AI Worker & AI Stream Service...${NC}"
-if [ -d "3_ANPR_EDGE_WORKER" ]; then
-    cd 3_ANPR_EDGE_WORKER
-    if [ -f "start_worker.sh" ]; then
-        bash start_worker.sh http://localhost:3000/api/v1 node-1 100 > /tmp/gujraksha_worker.log 2>&1 &
-        PIDS+=($!)
-        echo -e "${GREEN}   • Distributed AI Edge Worker Node & AI Video Stream Service active!${NC}"
-    elif command -v python3 &>/dev/null; then
-        python3 anpr_worker.py --backend "$TRITON_BACKEND" --central-url http://localhost:3000/api/v1 --max-capacity 100 > /tmp/gujraksha_worker.log 2>&1 &
-        PIDS+=($!)
-        echo -e "${GREEN}   • Distributed AI Edge Worker Node active!${NC}"
-    fi
-    cd "$PROJECT_ROOT"
-fi
-
+sleep 1
 
 # Auto-detect primary LAN IP address
 LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
@@ -110,15 +76,24 @@ if [ -z "$LAN_IP" ]; then
 fi
 
 echo -e "\n${GREEN}======================================================================${NC}"
-echo -e "${GREEN} 🚀 ALL GUJRAKSHA SERVICES RUNNING IN FULL HARMONY! ${NC}"
+echo -e "${GREEN} 🚀 GUJRAKSHA PLATFORM READY! ${NC}"
 echo -e "${GREEN}======================================================================${NC}"
 echo -e " 💻 Local Access (This PC)       : ${CYAN}http://localhost:3000/${NC}"
 echo -e " 🌐 Remote Access (Other PC/LAN) : ${GREEN}http://${LAN_IP}:3000/${NC}"
-echo -e " 🔴 RTSP Video Gateway           : ${CYAN}rtsp://${LAN_IP}:8554/stream/1${NC}"
-echo -e " ⚡ Triton gRPC API              : ${CYAN}${LAN_IP}:8001${NC}"
-echo -e " 📊 Triton GPU Metrics           : ${CYAN}http://${LAN_IP}:8002/metrics${NC}"
-echo -e "======================================================================"
-echo -e "Press [Ctrl+C] anytime to stop all processes.\n"
+echo -e " ⚡ Distributed AI Ingestion API  : ${CYAN}http://${LAN_IP}:3000/api/v1/anpr/ingest${NC}"
+echo -e "======================================================================\n"
 
-# Keep master script alive while sub-processes run
-wait
+# ------------------------------------------------------------------------------
+# 3. Launch Distributed AI Worker Node (Live Logs to Terminal)
+# ------------------------------------------------------------------------------
+echo -e "${YELLOW}🧠 [3/3] Launching Distributed AI Worker Node (Live ANPR & Tracking Logs)...${NC}\n"
+if [ -d "3_ANPR_EDGE_WORKER" ]; then
+    cd 3_ANPR_EDGE_WORKER
+    if [ -f "start_worker.sh" ]; then
+        bash start_worker.sh http://localhost:3000/api/v1 node-1 100
+    elif command -v python3 &>/dev/null; then
+        python3 anpr_worker.py --backend "$TRITON_BACKEND" --central-url http://localhost:3000/api/v1 --max-capacity 100
+    fi
+    cd "$PROJECT_ROOT"
+fi
+

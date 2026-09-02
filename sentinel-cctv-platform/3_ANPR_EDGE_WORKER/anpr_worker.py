@@ -1084,11 +1084,10 @@ class CameraWorkerThread(threading.Thread):
                 h, w = frame.shape[:2]
 
                 cam_mode = str(self.cam_info.get("detection_mode") or "").upper()
-                is_obj_cam = (cam_mode in ["OBJECT_DETECTION", "AI_OBJECT_DETECTION", "TRAFFIC_MONITORING", "VEHICLE_COUNTING"] or bool(self.cam_info.get("enable_object_detection")))
-                is_anpr_cam = (cam_mode in ["ANPR_DETECTION", "ANPR", "TRAFFIC_MONITORING"] or not cam_mode)
+                is_anpr_cam = (cam_mode != "GENERAL_SURVEILLANCE") and (self.detector is not None)
+                is_obj_cam = (self.object_detector is not None)
 
-
-                # 3. License Plate Detection (Runs strictly on ANPR cameras)
+                # 3. License Plate Detection (ANPR & Vehicle OCR)
                 raw_boxes = []
                 if is_anpr_cam and self.detector is not None:
                     if hasattr(self.detector, "triton_client") or getattr(self.detector, "accel_mode", "").startswith("GPU"):
@@ -1097,16 +1096,17 @@ class CameraWorkerThread(threading.Thread):
                         with INFERENCE_LOCK:
                             raw_boxes = self.detector.detect(frame, self.conf, self.iou)
 
-                # 4. Target-Specific Object & Vehicle Detection (Runs on OBJECT_DETECTION cameras & active UI target)
+                # 4. Target-Specific Object & Vehicle Detection (Person, Car, Motorcycle, Bus, Truck)
                 raw_objects = []
                 is_selected_vision_cam = self.ws_client.is_camera_active_target(self.camera_code, self.camera_id) if self.ws_client else True
 
-                if (is_obj_cam or (is_selected_vision_cam and cam_mode != "GENERAL_SURVEILLANCE")) and self.object_detector is not None:
+                if (is_obj_cam or is_selected_vision_cam) and self.object_detector is not None:
                     if hasattr(self.object_detector, "triton_client") or getattr(self.object_detector, "accel_mode", "").startswith("GPU"):
-                        raw_objects = self.object_detector.detect(frame, conf_thresh=0.30, iou_thresh=0.45)
+                        raw_objects = self.object_detector.detect(frame, conf_thresh=0.25, iou_thresh=0.45)
                     else:
                         with INFERENCE_LOCK:
-                            raw_objects = self.object_detector.detect(frame, conf_thresh=0.30, iou_thresh=0.45)
+                            raw_objects = self.object_detector.detect(frame, conf_thresh=0.25, iou_thresh=0.45)
+
 
 
                 # Initialize default virtual intrusion security perimeter zone if not present
