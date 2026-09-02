@@ -92,15 +92,27 @@ export const DetectionCanvasOverlay = ({ camera, isPlaying = true }) => {
       const cx = x + w / 2;
       const cy = y + h / 2;
 
-      const cls = (box.class_name || box.class || box.type || "object").toLowerCase();
+      const cls = String(box.class_name || box.class || box.label || box.type || "object").toLowerCase();
       const isPlate = cls.includes("plate") || cls.includes("anpr");
       const isPerson = cls.includes("person") || cls.includes("pedestrian");
+      const isCar = cls.includes("car");
+      const isMotorcycle = cls.includes("motorcycle") || cls.includes("bike");
+      const isBus = cls.includes("bus");
+      const isTruck = cls.includes("truck");
+
+      // Strictly allow ONLY the 5 target classes + license plate
+      if (!isPerson && !isCar && !isMotorcycle && !isBus && !isTruck && !isPlate) {
+        return;
+      }
+
       const isHit = box.is_watchlist || box.is_loitering || box.is_intrusion;
 
       let color = "#22c55e"; // Default Green for Vehicles
       if (isHit) color = "#ef4444"; // Red for Watchlist / Loitering / Intrusion
       else if (isPlate) color = "#eab308"; // Yellow for Plates
       else if (isPerson) color = "#3b82f6"; // Blue for Persons
+      else if (isMotorcycle) color = "#a855f7"; // Purple for 2-Wheelers
+
 
       // 1. Render Motion Trajectory Trails (Neon Yellow/Cyan glowing path)
       if (box.trail_points && box.trail_points.length > 1) {

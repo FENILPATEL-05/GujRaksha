@@ -1075,7 +1075,10 @@ class CameraWorkerThread(threading.Thread):
                 frame_counter += 1
                 now = time.time()
 
-                if self.frame_stride > 1 and (frame_counter % self.frame_stride != 0):
+                is_selected_vision_cam = self.ws_client.is_camera_active_target(self.camera_code, self.camera_id) if self.ws_client else True
+                effective_stride = 1 if is_selected_vision_cam else self.frame_stride
+
+                if effective_stride > 1 and (frame_counter % effective_stride != 0):
                     continue
 
                 h, w = frame.shape[:2]
@@ -1083,6 +1086,7 @@ class CameraWorkerThread(threading.Thread):
                 cam_mode = str(self.cam_info.get("detection_mode") or "").upper()
                 is_obj_cam = (cam_mode in ["OBJECT_DETECTION", "AI_OBJECT_DETECTION", "TRAFFIC_MONITORING", "VEHICLE_COUNTING"] or bool(self.cam_info.get("enable_object_detection")))
                 is_anpr_cam = (cam_mode in ["ANPR_DETECTION", "ANPR", "TRAFFIC_MONITORING"] or not cam_mode)
+
 
                 # 3. License Plate Detection (Runs strictly on ANPR cameras)
                 raw_boxes = []
@@ -1239,11 +1243,15 @@ class CameraWorkerThread(threading.Thread):
                         })
 
                 # 6. Stream Live AI Bounding Boxes (Objects + Plates) to Central Platform for Live Surveillance Feed
-                if (now - self.last_live_dispatch >= 0.15) and (len(tracked_objects) > 0 or len(plate_detections_for_frame) > 0 or frame_counter % 6 == 0):
+                if (now - self.last_live_dispatch >= 0.025) and (len(tracked_objects) > 0 or len(plate_detections_for_frame) > 0 or frame_counter % 5 == 0):
                     self.last_live_dispatch = now
                     live_boxes = []
 
                     for obj in tracked_objects:
+                        lbl_lower = str(obj.get("label", "")).lower()
+                        if lbl_lower not in SURVEILLANCE_TARGET_CLASSES:
+                            continue
+
                         bx = obj["box"]
                         track_id = obj.get("track_id")
                         label_str = obj["label"].upper() + (f" #{track_id}" if track_id is not None else "")
@@ -1268,6 +1276,7 @@ class CameraWorkerThread(threading.Thread):
                         })
 
                     live_boxes.extend(plate_detections_for_frame)
+
 
                     live_payload = {
                         "camera_code": self.camera_code,

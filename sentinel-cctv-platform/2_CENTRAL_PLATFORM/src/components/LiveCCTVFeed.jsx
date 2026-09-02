@@ -133,8 +133,9 @@ export const LiveCCTVFeed = ({
         if (isSubscribed) {
           setLiveDetections([]);
         }
-      }, 2200);
+      }, 350);
     };
+
 
     const handleVisionFrame = (detections) => {
       if (!isSubscribed) return;
@@ -322,8 +323,24 @@ export const LiveCCTVFeed = ({
     setStreamError(false);
   };
 
-  // Only real detections from live AI models (No mock/random data!)
-  const displayDetections = liveDetections || [];
+  // Strictly filter to the 5 allowed surveillance classes (+ license plates)
+  const displayDetections = useMemo(() => {
+    if (!liveDetections || !Array.isArray(liveDetections)) return [];
+    return liveDetections.filter((det) => {
+      const cls = String(det.class_name || det.class || det.label || det.type || '').toLowerCase();
+      return (
+        cls.includes('person') ||
+        cls.includes('car') ||
+        cls.includes('motorcycle') ||
+        cls.includes('bike') ||
+        cls.includes('bus') ||
+        cls.includes('truck') ||
+        cls.includes('plate') ||
+        cls.includes('anpr')
+      );
+    });
+  }, [liveDetections]);
+
 
   return (
     <div style={{ width: "100%", height: "100%", position: "relative", background: "#000", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -506,8 +523,9 @@ export const LiveCCTVFeed = ({
                     background: style.bg,
                     boxShadow: style.shadow,
                     position: "absolute",
-                    transition: "top 0.15s cubic-bezier(0.25, 0.1, 0.25, 1.0), left 0.15s cubic-bezier(0.25, 0.1, 0.25, 1.0), width 0.15s cubic-bezier(0.25, 0.1, 0.25, 1.0), height 0.15s cubic-bezier(0.25, 0.1, 0.25, 1.0)"
+                    willChange: "top, left, width, height"
                   }}
+
                 >
                   {/* 4-Corner Reticle Brackets */}
                   <span className="ai-bbox-corner ai-bbox-tl" style={{ borderColor: style.borderColor }} />
