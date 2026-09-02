@@ -756,9 +756,21 @@ def create_anpr_pipeline(backend: str = "auto", num_threads: int = 4, triton_url
     - Auto-probes NVIDIA CUDA / TensorRT ONNX GPU acceleration.
     - Fallback to multi-threaded TFLite CPU engine if GPU is unavailable.
     """
-    det_onnx_path = DEFAULT_DET_ONNX
-    ocr_onnx_path = DEFAULT_OCR_ONNX
-    obj_onnx_path = DEFAULT_OBJ_ONNX
+    def resolve_onnx(filename: str) -> str:
+        candidates = [
+            os.path.join(SCRIPT_DIR, "models/onnx", filename),
+            os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/onnx", filename),
+            os.path.join(os.getcwd(), "2_CENTRAL_PLATFORM/models/onnx", filename),
+            os.path.join(os.getcwd(), "3_ANPR_EDGE_WORKER/models/onnx", filename)
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                return os.path.abspath(c)
+        return os.path.join(SCRIPT_DIR, "models/onnx", filename)
+
+    det_onnx_path = resolve_onnx("plate_detector.onnx")
+    ocr_onnx_path = resolve_onnx("plate_ocr.onnx")
+    obj_onnx_path = resolve_onnx("object_detection.onnx")
     det_tflite_path = DEFAULT_DET_TFLITE
     ocr_tflite_path = DEFAULT_OCR_TFLITE
     obj_tflite_path = DEFAULT_OBJ_TFLITE
@@ -798,8 +810,8 @@ def create_anpr_pipeline(backend: str = "auto", num_threads: int = 4, triton_url
                 ObjectDetectorTFLite(obj_tflite_path, num_threads=num_threads) if os.path.exists(obj_tflite_path) else None
             )
             return detector, ocr, obj_det, detector.accel_mode
-        except Exception:
-            pass
+        except Exception as err:
+            print(f"⚠️ \x1b[33m[GPU Pipeline Warning] GPU ONNX session init failed ({err}). Falling back to CPU...\x1b[0m", flush=True)
 
     detector = PlateDetectorTFLite(det_tflite_path, num_threads=num_threads)
     ocr = PlateOCRTFLite(ocr_tflite_path, num_threads=num_threads)

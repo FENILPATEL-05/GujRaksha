@@ -21,6 +21,13 @@ echo "⚙️  Installing AI packages (OpenCV, LiteRT, NumPy, Requests)..."
 "$VENV_DIR/bin/pip" install --upgrade pip
 "$VENV_DIR/bin/pip" install -r "$SCRIPT_DIR/requirements.txt"
 
+if command -v nvidia-smi &>/dev/null; then
+  echo "⚡ NVIDIA GPU Detected! Installing GPU-accelerated ONNX Runtime & cuDNN libraries..."
+  "$VENV_DIR/bin/pip" uninstall -y onnxruntime 2>/dev/null || true
+  "$VENV_DIR/bin/pip" install onnxruntime-gpu nvidia-cudnn-cu12 --quiet
+  echo "✅ GPU acceleration packages successfully installed."
+fi
+
 echo "======================================================================"
 echo " ✅ Environment ready! You can now run ./start_worker.sh"
 echo "======================================================================"

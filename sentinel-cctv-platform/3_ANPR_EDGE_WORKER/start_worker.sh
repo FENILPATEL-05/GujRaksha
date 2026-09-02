@@ -26,6 +26,17 @@ fi
 pkill -f "anpr_worker.py" 2>/dev/null || true
 pkill -f "ai_stream_service.py" 2>/dev/null || true
 
+# Auto-link NVIDIA cuDNN libraries if installed via pip package
+CUDNN_PATH=$("$PY_BIN" -c "import nvidia.cudnn; print(nvidia.cudnn.__path__[0] + '/lib')" 2>/dev/null || true)
+if [ -n "$CUDNN_PATH" ] && [ -d "$CUDNN_PATH" ]; then
+    export LD_LIBRARY_PATH="$CUDNN_PATH:${LD_LIBRARY_PATH:-}"
+fi
+
+BACKEND="auto"
+if command -v nvidia-smi &>/dev/null; then
+    BACKEND="onnx"
+fi
+
 if [ "$1" == "--source" ]; then
 
   # Direct single source mode
@@ -38,8 +49,9 @@ if [ "$1" == "--source" ]; then
   echo " 📡 Source       : $SOURCE"
   echo " 🏢 Central API  : $CENTRAL_URL"
   echo " 🎥 Camera Code  : $CAM_CODE"
+  echo " ⚡ Acceleration : $BACKEND"
   echo "======================================================================"
-  exec "$PY_BIN" "$SCRIPT_DIR/anpr_worker.py" --source "$SOURCE" --central-url "$CENTRAL_URL" --camera-code "$CAM_CODE"
+  exec "$PY_BIN" "$SCRIPT_DIR/anpr_worker.py" --backend "$BACKEND" --source "$SOURCE" --central-url "$CENTRAL_URL" --camera-code "$CAM_CODE"
 else
   # Central Cluster Managed Mode (Dynamic 100-Camera Dispatch & Watchlist Sync)
   CENTRAL_URL="${1:-http://localhost:3000/api/v1}"
@@ -52,12 +64,13 @@ else
   echo " 🏢 Central Server  : $CENTRAL_URL"
   echo " 🆔 Worker Node ID  : $WORKER_ID"
   echo " 🚀 Max Capacity    : $MAX_CAPACITY Cameras"
+  echo " ⚡ Acceleration    : $BACKEND"
   echo " 🐍 Python Runtime  : $PY_BIN"
   # Launch Sentinel-Compatible AI Video Stream Server (Port 8090) in Background
   echo "🚀 Launching AI Video Stream Service on port 8090 (/api/v1/ai/video_feed)..."
   "$PY_BIN" "$SCRIPT_DIR/ai_stream_service.py" 8090 > /tmp/gujraksha_ai_stream.log 2>&1 &
 
-  exec "$PY_BIN" "$SCRIPT_DIR/anpr_worker.py" --central-url "$CENTRAL_URL" --worker-id "$WORKER_ID" --max-capacity "$MAX_CAPACITY"
+  exec "$PY_BIN" "$SCRIPT_DIR/anpr_worker.py" --backend "$BACKEND" --central-url "$CENTRAL_URL" --worker-id "$WORKER_ID" --max-capacity "$MAX_CAPACITY"
 
 fi
 

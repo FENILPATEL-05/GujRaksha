@@ -64,6 +64,11 @@ echo -e "${GREEN}✅ Central Platform dependencies installed & built.${NC}"
 
 # 4. Setup Python AI Edge Worker
 echo -e "\n${YELLOW}🐍 [4/5] Setting up Python AI Edge Worker Environment...${NC}"
+mkdir -p 3_ANPR_EDGE_WORKER/models/onnx
+if [ -d "2_CENTRAL_PLATFORM/models/onnx" ]; then
+    cp -r 2_CENTRAL_PLATFORM/models/onnx/* 3_ANPR_EDGE_WORKER/models/onnx/ 2>/dev/null || true
+fi
+
 if [ -d "3_ANPR_EDGE_WORKER" ]; then
     cd 3_ANPR_EDGE_WORKER
     if [ -f "setup_env.sh" ]; then
@@ -75,8 +80,8 @@ if [ -d "3_ANPR_EDGE_WORKER" ]; then
 fi
 echo -e "${GREEN}✅ Python AI Edge Worker dependencies installed.${NC}"
 
-# 5. NVIDIA Triton Model Repository Setup
-echo -e "\n${YELLOW}⚡ [5/5] Configuring NVIDIA Triton Model Repository...${NC}"
+# 5. NVIDIA Triton Model Repository & ONNX Model Sync
+echo -e "\n${YELLOW}⚡ [5/5] Configuring NVIDIA Triton Model Repository & AI Model Sync...${NC}"
 mkdir -p triton_repository/yolo_detector/1
 mkdir -p triton_repository/object_detector/1
 mkdir -p triton_repository/plate_ocr/1
@@ -87,7 +92,10 @@ fi
 if [ -f "2_CENTRAL_PLATFORM/models/onnx/object_detection.onnx" ]; then
     cp 2_CENTRAL_PLATFORM/models/onnx/object_detection.onnx triton_repository/object_detector/1/model.onnx 2>/dev/null || true
 fi
-echo -e "${GREEN}✅ AI models synchronized.${NC}"
+if [ -f "2_CENTRAL_PLATFORM/models/onnx/plate_ocr.onnx" ]; then
+    cp 2_CENTRAL_PLATFORM/models/onnx/plate_ocr.onnx triton_repository/plate_ocr/1/model.onnx 2>/dev/null || true
+fi
+echo -e "${GREEN}✅ AI models synchronized across Central, Worker, and Triton repositories.${NC}"
 
 # Grant execution permissions to all scripts
 chmod +x start_all.sh setup_all.sh start_triton.sh 1_STREAM_GATEWAY/start_gateway.sh 2_CENTRAL_PLATFORM/start_central.sh 3_ANPR_EDGE_WORKER/start_worker.sh 3_ANPR_EDGE_WORKER/setup_env.sh 2>/dev/null || true
