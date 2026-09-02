@@ -1,6 +1,7 @@
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { AlertTriangle, RefreshCw, ExternalLink } from "lucide-react";
 import aiVisionSocket from "../services/aiVisionSocket.js";
+
 
 export const LiveCCTVFeed = ({
   camera,
