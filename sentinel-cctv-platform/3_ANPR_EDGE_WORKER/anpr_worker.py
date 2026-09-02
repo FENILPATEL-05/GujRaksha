@@ -257,6 +257,7 @@ class PlateDetectorONNX:
         
         sess_opts = ort.SessionOptions()
         sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        sess_opts.log_severity_level = 3
         self.session = ort.InferenceSession(model_path, sess_options=sess_opts, providers=valid_providers)
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name
@@ -330,6 +331,7 @@ class PlateOCRONNX:
         
         sess_opts = ort.SessionOptions()
         sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        sess_opts.log_severity_level = 3
         self.session = ort.InferenceSession(model_path, sess_options=sess_opts, providers=valid_providers)
         self.input_name = self.session.get_inputs()[0].name
         
@@ -384,6 +386,7 @@ class ObjectDetectorONNX:
         valid_providers = [p for p in providers if p in avail]
         sess_opts = ort.SessionOptions()
         sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        sess_opts.log_severity_level = 3
         self.session = ort.InferenceSession(model_path, sess_options=sess_opts, providers=valid_providers)
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name
@@ -990,6 +993,17 @@ def get_shared_vision_ws(central_url: str):
             GLOBAL_VISION_WS = VisionWebSocketClient(f"{ws_host}/ws/ai-vision")
         return GLOBAL_VISION_WS
 
+def extract_camera_code(cam_info: dict) -> str:
+    if not isinstance(cam_info, dict):
+        return "GJ-GOV-001"
+    code = cam_info.get("camera_code") or cam_info.get("code")
+    if code:
+        return str(code).strip()
+    cid = cam_info.get("id")
+    if cid is not None:
+        return f"CAM-{cid}"
+    return "GJ-GOV-001"
+
 
 class CameraWorkerThread(threading.Thread):
     """
@@ -1004,7 +1018,7 @@ class CameraWorkerThread(threading.Thread):
         super().__init__(daemon=True)
         self.cam_info = cam_info
         self.camera_id = cam_info.get("id") or "gov-feed-1"
-        self.camera_code = cam_info.get("camera_code") or "GJ-GOV-001"
+        self.camera_code = extract_camera_code(cam_info)
         self.stream_url = cam_info.get("rtsp_url") or cam_info.get("stream_url") or "0"
         self.detector = detector
         self.ocr = ocr
@@ -1462,7 +1476,7 @@ class DistributedWorkerManager:
         newly_attached = 0
 
         for cam in assigned_cameras:
-            code = cam.get("camera_code") or cam.get("code") or f"CAM-{cam.get('id')}"
+            code = extract_camera_code(cam)
             current_codes.add(code)
 
             if code not in self.workers or not self.workers[code].is_alive():
