@@ -70,10 +70,11 @@ export const StreamModal = ({ camera, onClose, onEditCamera }) => {
         </div>
         <div className="modal-body">
           <div className="stream-modal-layout">
-            {/* Left: Stream Monitor Screen */}
+            {/* Left: Stream Monitor Screen (Pure Raw Stream by default) */}
             <div className="stream-screen">
-              <LiveCCTVFeed camera={camera} isMuted={true} isDetailed={true} showAiVision={true} />
+              <LiveCCTVFeed camera={camera} isMuted={true} isDetailed={true} showAiVision={false} />
             </div>
+
 
             {/* Right: Metadata Grid + PTZ Controls */}
             <div>

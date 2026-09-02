@@ -437,8 +437,9 @@ export const ANPRIntelligencePage = ({
               camera={activeVisionCam}
               isMuted={true}
               isDetailed={false}
-              showAiVision={true}
+              showAiVision={false}
             />
+
           </div>
         </div>
         )

@@ -150,15 +150,9 @@ export const LiveCCTVFeed = ({
   const rawStreamUrl = camera ? (camera.stream_url || camera.rtsp_url || whepApiUrl) : "";
   const isRtspOnly = false;
 
-  // Determine if AI Vision overlay should be drawn (Supports ANPR, Object Detection, Traffic Monitoring)
-  const isAiActive = showAiVision || (
-    !camera?.detection_mode ||
-    (camera.detection_mode !== 'NO_AI' && camera.detection_mode !== 'GENERAL_SURVEILLANCE') ||
-    !!camera.enable_object_detection ||
-    camera.detection_mode === 'ANPR_DETECTION' ||
-    camera.detection_mode === 'OBJECT_DETECTION' ||
-    camera.detection_mode === 'ANPR'
-  );
+  // Determine if AI Vision overlay should be drawn (Only when explicitly enabled, otherwise raw stream stays 100% clean)
+  const isAiActive = Boolean(showAiVision && streamMode !== "ai_stream");
+
 
 
   // Single Shared WebSocket Engine for Real-Time AI Bounding Boxes
