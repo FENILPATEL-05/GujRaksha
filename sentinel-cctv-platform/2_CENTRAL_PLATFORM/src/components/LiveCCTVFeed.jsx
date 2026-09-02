@@ -12,6 +12,7 @@ export const LiveCCTVFeed = ({
   const videoRef = useRef(null);
   const imgRef = useRef(null);
   const iframeRef = useRef(null);
+  const containerRef = useRef(null);
 
   const [streamMode, setStreamMode] = useState("webrtc"); // "webrtc", "video", "mjpeg"
   const [streamError, setStreamError] = useState(false);
@@ -23,6 +24,40 @@ export const LiveCCTVFeed = ({
   // Real-time detections from AI Vision Engine (Drawn directly according to camera configuration)
   const [liveDetections, setLiveDetections] = useState([]);
   const [videoAspect, setVideoAspect] = useState(16 / 9);
+  const [stageDimensions, setStageDimensions] = useState({ width: "100%", height: "100%" });
+
+  // Calculate exact pixel dimensions of the active video area inside container (eliminating black bar offset)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const updateStageBox = () => {
+      const cW = el.clientWidth;
+      const cH = el.clientHeight;
+      if (!cW || !cH) return;
+
+      const targetAspect = videoAspect || (16 / 9);
+      let width = cW;
+      let height = width / targetAspect;
+
+      if (height > cH) {
+        height = cH;
+        width = height * targetAspect;
+      }
+
+      setStageDimensions({
+        width: `${Math.round(width)}px`,
+        height: `${Math.round(height)}px`
+      });
+    };
+
+    updateStageBox();
+    const observer = new ResizeObserver(updateStageBox);
+    observer.observe(el);
+
+    return () => observer.disconnect();
+  }, [videoAspect]);
+
 
   const getCleanId = useCallback((cam) => {
     if (!cam) return "1";
@@ -344,22 +379,32 @@ export const LiveCCTVFeed = ({
 
 
   return (
-    <div style={{ width: "100%", height: "100%", position: "relative", background: "#000", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      {/* Unified Aspect-Ratio Video & AI Stage */}
+    <div
+      ref={containerRef}
+      style={{
+        width: "100%",
+        height: "100%",
+        position: "relative",
+        background: "#000",
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }}
+    >
+      {/* Unified Aspect-Ratio Video & AI Stage (Pixel-Locked to visible video) */}
       <div
         style={{
           position: "relative",
-          width: "100%",
-          height: "100%",
-          maxWidth: "100%",
-          maxHeight: "100%",
-          aspectRatio: videoAspect ? `${videoAspect}` : "16 / 9",
+          width: stageDimensions.width,
+          height: stageDimensions.height,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           overflow: "hidden"
         }}
       >
+
         {/* 1. Direct MP4 / Static Sandbox Feeds */}
         {streamMode === "sandbox_video" && (
           <video
