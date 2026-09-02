@@ -1087,23 +1087,13 @@ class CameraWorkerThread(threading.Thread):
 
                 cam_mode = str(self.cam_info.get("detection_mode") or "ANPR_DETECTION").upper()
 
-                # Strict Mode Isolation:
-                # 1. ANPR Mode -> STRICTLY Plate Detector & OCR ONLY (NO object detection)
-                # 2. OBJECT Mode -> STRICTLY Object Detection & ByteTrack ONLY (NO ANPR plates)
-                # 3. GENERAL_SURVEILLANCE -> Standard video only (NO AI)
-                # 4. TRAFFIC_MONITORING / COMBINED -> Both
-                if cam_mode in ["ANPR_DETECTION", "ANPR"]:
-                    is_anpr_cam = (self.detector is not None)
-                    is_obj_cam = False
-                elif cam_mode in ["OBJECT_DETECTION", "AI_OBJECT_DETECTION", "VEHICLE_COUNTING"]:
-                    is_anpr_cam = False
-                    is_obj_cam = (self.object_detector is not None)
-                elif cam_mode == "GENERAL_SURVEILLANCE":
-                    is_anpr_cam = False
-                    is_obj_cam = False
-                else:  # TRAFFIC_MONITORING / default
-                    is_anpr_cam = (self.detector is not None)
-                    is_obj_cam = (self.object_detector is not None)
+                # Exact 3 Project Modes:
+                # - ANPR_DETECTION: Strictly Plate Detection & OCR Only
+                # - OBJECT_DETECTION: Strictly Object Detection & ByteTrack Only
+                # - GENERAL_SURVEILLANCE: Standard Video (No AI)
+                is_anpr_cam = (cam_mode == "ANPR_DETECTION") and (self.detector is not None)
+                is_obj_cam = (cam_mode == "OBJECT_DETECTION") and (self.object_detector is not None)
+
 
                 # 3. License Plate Detection (Runs strictly when is_anpr_cam is True)
                 raw_boxes = []
@@ -1423,7 +1413,8 @@ class DistributedWorkerManager:
 
         if newly_attached > 0:
             obj_cams = [c for c in assigned_cameras if c.get("detection_mode") == "OBJECT_DETECTION"]
-            anpr_cams = [c for c in assigned_cameras if c.get("detection_mode") != "OBJECT_DETECTION"]
+            anpr_cams = [c for c in assigned_cameras if c.get("detection_mode") == "ANPR_DETECTION"]
+
 
             print(f"\n⚡ \x1b[1m\x1b[32m[Cluster Dispatch] {len(assigned_cameras)} Cameras Auto-Assigned by Central CCC\x1b[0m", flush=True)
             if len(obj_cams) > 0:

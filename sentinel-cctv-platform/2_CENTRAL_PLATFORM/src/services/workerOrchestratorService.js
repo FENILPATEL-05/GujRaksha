@@ -48,12 +48,9 @@ class WorkerOrchestratorService {
     // Filter cameras with active AI detection
     const aiCams = allCams.filter(c => {
       const mode = String(c.detection_mode || "").toUpperCase();
-      return mode === "OBJECT_DETECTION" || 
-             mode === "AI_OBJECT_DETECTION" ||
-             mode === "ANPR_DETECTION" || 
-             mode === "ANPR" ||
-             mode === "TRAFFIC_MONITORING";
+      return mode === "ANPR_DETECTION" || mode === "OBJECT_DETECTION";
     });
+
 
     // Get all online workers in deterministic registration order
     const autoWorkers = Array.from(this.workers.values())
@@ -249,11 +246,9 @@ class WorkerOrchestratorService {
     if (anpr_only !== false) {
       const aiCams = allCams.filter(c => {
         const mode = String(c.detection_mode || "").toUpperCase();
-        return mode === "OBJECT_DETECTION" || 
-               mode === "AI_OBJECT_DETECTION" ||
-               mode === "ANPR_DETECTION" || 
-               mode === "ANPR";
+        return mode === "ANPR_DETECTION" || mode === "OBJECT_DETECTION";
       });
+
       candidateCams = aiCams;
     }
 
@@ -330,13 +325,11 @@ class WorkerOrchestratorService {
     if (anpr_only !== false) {
       const aiCams = allCams.filter(c => {
         const mode = String(c.detection_mode || "").toUpperCase();
-        return mode === "OBJECT_DETECTION" || 
-               mode === "AI_OBJECT_DETECTION" ||
-               mode === "ANPR_DETECTION" || 
-               mode === "ANPR";
+        return mode === "ANPR_DETECTION" || mode === "OBJECT_DETECTION";
       });
       allCams = aiCams;
     }
+
 
     onlineWorkers.forEach(w => { 
       w.assigned_cameras = []; 
