@@ -1085,11 +1085,27 @@ class CameraWorkerThread(threading.Thread):
 
                 h, w = frame.shape[:2]
 
-                cam_mode = str(self.cam_info.get("detection_mode") or "").upper()
-                is_anpr_cam = (cam_mode != "GENERAL_SURVEILLANCE") and (self.detector is not None)
-                is_obj_cam = (self.object_detector is not None)
+                cam_mode = str(self.cam_info.get("detection_mode") or "ANPR_DETECTION").upper()
 
-                # 3. License Plate Detection (ANPR & Vehicle OCR)
+                # Strict Mode Isolation:
+                # 1. ANPR Mode -> STRICTLY Plate Detector & OCR ONLY (NO object detection)
+                # 2. OBJECT Mode -> STRICTLY Object Detection & ByteTrack ONLY (NO ANPR plates)
+                # 3. GENERAL_SURVEILLANCE -> Standard video only (NO AI)
+                # 4. TRAFFIC_MONITORING / COMBINED -> Both
+                if cam_mode in ["ANPR_DETECTION", "ANPR"]:
+                    is_anpr_cam = (self.detector is not None)
+                    is_obj_cam = False
+                elif cam_mode in ["OBJECT_DETECTION", "AI_OBJECT_DETECTION", "VEHICLE_COUNTING"]:
+                    is_anpr_cam = False
+                    is_obj_cam = (self.object_detector is not None)
+                elif cam_mode == "GENERAL_SURVEILLANCE":
+                    is_anpr_cam = False
+                    is_obj_cam = False
+                else:  # TRAFFIC_MONITORING / default
+                    is_anpr_cam = (self.detector is not None)
+                    is_obj_cam = (self.object_detector is not None)
+
+                # 3. License Plate Detection (Runs strictly when is_anpr_cam is True)
                 raw_boxes = []
                 if is_anpr_cam and self.detector is not None:
                     if hasattr(self.detector, "triton_client") or getattr(self.detector, "accel_mode", "").startswith("GPU"):
@@ -1098,16 +1114,15 @@ class CameraWorkerThread(threading.Thread):
                         with INFERENCE_LOCK:
                             raw_boxes = self.detector.detect(frame, self.conf, self.iou)
 
-                # 4. Target-Specific Object & Vehicle Detection (Person, Car, Motorcycle, Bus, Truck)
+                # 4. Target-Specific Object Detection (Runs strictly when is_obj_cam is True)
                 raw_objects = []
-                is_selected_vision_cam = self.ws_client.is_camera_active_target(self.camera_code, self.camera_id) if self.ws_client else True
-
-                if (is_obj_cam or is_selected_vision_cam) and self.object_detector is not None:
+                if is_obj_cam and self.object_detector is not None:
                     if hasattr(self.object_detector, "triton_client") or getattr(self.object_detector, "accel_mode", "").startswith("GPU"):
                         raw_objects = self.object_detector.detect(frame, conf_thresh=0.25, iou_thresh=0.45)
                     else:
                         with INFERENCE_LOCK:
                             raw_objects = self.object_detector.detect(frame, conf_thresh=0.25, iou_thresh=0.45)
+
 
 
 
