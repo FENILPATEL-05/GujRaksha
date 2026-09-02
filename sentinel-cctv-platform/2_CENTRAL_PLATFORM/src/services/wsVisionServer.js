@@ -127,22 +127,9 @@ class VisionWebSocketServer {
             const codeDigits = getDigits(upperCamCode);
             const idDigits = getDigits(upperCamId);
 
-            for (const [client, subscriptions] of this.clients.entries()) {
+            for (const [client] of this.clients.entries()) {
               if (client.readyState === WebSocket.OPEN) {
-                const isSubscribed = Array.from(subscriptions).some(sub => {
-                  const s = String(sub).toUpperCase();
-                  if (s === 'ALL' || s === upperCamCode || s === upperCamId) return true;
-                  if (upperCamCode.includes(s) || s.includes(upperCamCode)) return true;
-                  if (upperCamId.includes(s) || s.includes(upperCamId)) return true;
-
-                  const subDigits = getDigits(s);
-                  if (subDigits && (subDigits === codeDigits || subDigits === idDigits)) return true;
-
-                  return false;
-                });
-                if (isSubscribed) {
-                  client.send(broadcastMsg);
-                }
+                client.send(broadcastMsg);
               }
             }
           }
@@ -168,8 +155,8 @@ class VisionWebSocketServer {
       camera_code: camCode,
       ...payload
     });
-    for (const [client, subscriptions] of this.clients.entries()) {
-      if (client.readyState === WebSocket.OPEN && (subscriptions.has(camCode) || subscriptions.has('ALL'))) {
+    for (const [client] of this.clients.entries()) {
+      if (client.readyState === WebSocket.OPEN) {
         client.send(msg);
       }
     }

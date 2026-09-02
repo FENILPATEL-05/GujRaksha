@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { AlertTriangle, RefreshCw, ExternalLink } from "lucide-react";
 import aiVisionSocket from "../services/aiVisionSocket.js";
+import { DetectionCanvasOverlay } from "./DetectionCanvasOverlay.jsx";
 
 
 export const LiveCCTVFeed = ({
@@ -503,7 +504,11 @@ export const LiveCCTVFeed = ({
           />
         )}
 
-        {/* 5. AI OBJECT DETECTION & BOUNDING BOX HUD OVERLAY (Pixel-Perfect Alignment with Video Viewport) */}
+        {/* 5. AI OBJECT DETECTION & BOUNDING BOX HUD OVERLAY (HTML5 Canvas 60FPS + DOM Overlay) */}
+        {isAiActive && (
+          <DetectionCanvasOverlay camera={camera} isPlaying={isPlaying} />
+        )}
+
         {isAiActive && displayDetections.length > 0 && (
           <div
             className="ai-hud-overlay"

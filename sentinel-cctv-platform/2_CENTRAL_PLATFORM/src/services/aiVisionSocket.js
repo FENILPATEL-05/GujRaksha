@@ -38,11 +38,17 @@ class VisionSocketClient {
             const camCode = (data.camera_code || "").toUpperCase();
             const camId = (data.camera_id || "").toUpperCase();
 
+            const getDigits = (str) => String(str || '').replace(/\D/g, '');
+            const codeNum = getDigits(upperCode);
+            const camCodeNum = getDigits(camCode);
+            const camIdNum = getDigits(camId);
+
             for (const [code, callbacks] of this.subscribers.entries()) {
               const upperCode = (code || "").toUpperCase();
               const isMatch = upperCode === camCode || upperCode === camId || upperCode === "ALL" ||
                               (camCode && camCode.includes(upperCode)) || (upperCode && upperCode.includes(camCode)) ||
-                              (camId && camId.includes(upperCode)) || (upperCode && upperCode.includes(camId));
+                              (camId && camId.includes(upperCode)) || (upperCode && upperCode.includes(camId)) ||
+                              (codeNum && (codeNum === camCodeNum || codeNum === camIdNum));
               if (isMatch) {
                 callbacks.forEach(cb => {
                   try {
