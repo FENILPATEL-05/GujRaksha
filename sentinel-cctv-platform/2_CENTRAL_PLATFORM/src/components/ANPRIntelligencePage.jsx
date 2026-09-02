@@ -74,8 +74,12 @@ export const ANPRIntelligencePage = ({
   const [watchlistOnly, setWatchlistOnly] = useState(false);
   const [selectedDistrict, setSelectedDistrict] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [edgePage, setEdgePage] = useState(1);
+  const [edgePerPage, setEdgePerPage] = useState(10);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+
+
 
   // Minimal Government Gateways Configuration Template
   const [testPlateInput, setTestPlateInput] = useState("GJ-01-ER-9821");
@@ -516,7 +520,7 @@ export const ANPRIntelligencePage = ({
                   </td>
                 </tr>
               ) : (
-                edgeNodes.map((node) => {
+                edgeNodes.slice((edgePage - 1) * edgePerPage, edgePage * edgePerPage).map((node) => {
                   const isOnline = node.status === "ONLINE";
                   const isScanning = node.state === "SCANNING";
                   const assignedCount = node.assigned_cameras?.length || node.active_cameras || 0;
@@ -530,7 +534,7 @@ export const ANPRIntelligencePage = ({
                         setSelectedWorkerModal(node);
                         setModalSearch("");
                       }}
-                      title="Click to view all 100 assigned cameras in modal"
+                      title="Click to view all assigned cameras in modal"
                     >
                       <td>
                         <div style={{ fontWeight: 700, color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>
@@ -614,8 +618,63 @@ export const ANPRIntelligencePage = ({
               )}
             </tbody>
           </table>
+
+          {/* Enhanced Responsive Pagination Footer for Edge Nodes */}
+          {edgeNodes.length > 0 && (
+            <div className="table-pagination-footer" style={{
+              padding: "12px 16px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              borderTop: "1px solid var(--panel-border)",
+              marginTop: "10px",
+              flexWrap: "wrap",
+              gap: "12px",
+              background: "rgba(15, 23, 42, 0.4)",
+              borderRadius: "0 0 8px 8px"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+                <div style={{ fontSize: "12.5px", color: "var(--text-secondary)" }}>
+                  Showing <strong style={{ color: "#fff" }}>{(edgePage - 1) * edgePerPage + 1}</strong>–<strong style={{ color: "#fff" }}>{Math.min(edgePage * edgePerPage, edgeNodes.length)}</strong> of <strong style={{ color: "var(--accent)" }}>{edgeNodes.length}</strong> edge nodes
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-dim)" }}>
+                  <span>Rows per page:</span>
+                  <select
+                    value={edgePerPage}
+                    onChange={(e) => {
+                      setEdgePerPage(Number(e.target.value));
+                      setEdgePage(1);
+                    }}
+                    style={{
+                      background: "rgba(30, 41, 59, 0.8)",
+                      color: "#fff",
+                      border: "1px solid var(--panel-border)",
+                      borderRadius: "6px",
+                      padding: "3px 8px",
+                      fontSize: "12px",
+                      outline: "none",
+                      cursor: "pointer"
+                    }}
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+              </div>
+
+              <Pagination
+                currentPage={edgePage}
+                totalPages={Math.max(1, Math.ceil(edgeNodes.length / edgePerPage))}
+                onPageChange={(p) => setEdgePage(p)}
+              />
+            </div>
+          )}
         </div>
       ) : activeTab === "gov_gateways" ? (
+
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           {/* Header Banner */}
           <div style={{
@@ -1077,22 +1136,63 @@ export const ANPRIntelligencePage = ({
             </table>
           </div>
 
-          {/* Pagination Footer */}
-          {Math.ceil(detections.length / itemsPerPage) > 1 && (
-            <div className="table-pagination-footer" style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--panel-border)", marginTop: "10px", flexWrap: "wrap", gap: "12px" }}>
-              <div style={{ fontSize: "12px", color: "var(--text-dim)" }}>
-                Showing {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, detections.length)} of {detections.length} intercepts
+          {/* Enhanced Responsive Pagination Footer */}
+          {detections.length > 0 && (
+            <div className="table-pagination-footer" style={{
+              padding: "12px 16px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              borderTop: "1px solid var(--panel-border)",
+              marginTop: "10px",
+              flexWrap: "wrap",
+              gap: "12px",
+              background: "rgba(15, 23, 42, 0.4)",
+              borderRadius: "0 0 8px 8px"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+                <div style={{ fontSize: "12.5px", color: "var(--text-secondary)" }}>
+                  Showing <strong style={{ color: "#fff" }}>{(currentPage - 1) * itemsPerPage + 1}</strong>–<strong style={{ color: "#fff" }}>{Math.min(currentPage * itemsPerPage, detections.length)}</strong> of <strong style={{ color: "var(--accent)" }}>{detections.length}</strong> detection records
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-dim)" }}>
+                  <span>Rows per page:</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    style={{
+                      background: "rgba(30, 41, 59, 0.8)",
+                      color: "#fff",
+                      border: "1px solid var(--panel-border)",
+                      borderRadius: "6px",
+                      padding: "3px 8px",
+                      fontSize: "12px",
+                      outline: "none",
+                      cursor: "pointer"
+                    }}
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
               </div>
 
               <Pagination
                 currentPage={currentPage}
-                totalPages={Math.ceil(detections.length / itemsPerPage)}
+                totalPages={Math.max(1, Math.ceil(detections.length / itemsPerPage))}
                 onPageChange={(p) => setCurrentPage(p)}
               />
             </div>
           )}
         </>
       )}
+
 
       {/* Clean Minimal Assigned Cameras Modal */}
       {selectedWorkerModal && (

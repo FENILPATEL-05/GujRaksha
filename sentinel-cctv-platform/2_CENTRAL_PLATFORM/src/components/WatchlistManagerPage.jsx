@@ -31,8 +31,9 @@ export const WatchlistManagerPage = ({
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+
   const [editingItem, setEditingItem] = useState(null);
 
   const fetchWatchlist = async () => {
@@ -416,20 +417,61 @@ export const WatchlistManagerPage = ({
         </table>
       </div>
 
-      {/* Pagination Footer */}
-      {Math.ceil(filteredWatchlist.length / itemsPerPage) > 1 && (
-        <div className="table-pagination-footer" style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--panel-border)", marginTop: "10px", flexWrap: "wrap", gap: "12px" }}>
-          <div style={{ fontSize: "12px", color: "var(--text-dim)" }}>
-            Showing {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filteredWatchlist.length)} of {filteredWatchlist.length} target records
+      {/* Enhanced Responsive Pagination Footer */}
+      {filteredWatchlist.length > 0 && (
+        <div className="table-pagination-footer" style={{
+          padding: "12px 16px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          borderTop: "1px solid var(--panel-border)",
+          marginTop: "10px",
+          flexWrap: "wrap",
+          gap: "12px",
+          background: "rgba(15, 23, 42, 0.4)",
+          borderRadius: "0 0 8px 8px"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+            <div style={{ fontSize: "12.5px", color: "var(--text-secondary)" }}>
+              Showing <strong style={{ color: "#fff" }}>{(currentPage - 1) * itemsPerPage + 1}</strong>–<strong style={{ color: "#fff" }}>{Math.min(currentPage * itemsPerPage, filteredWatchlist.length)}</strong> of <strong style={{ color: "var(--danger)" }}>{filteredWatchlist.length}</strong> target records
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-dim)" }}>
+              <span>Rows per page:</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                style={{
+                  background: "rgba(30, 41, 59, 0.8)",
+                  color: "#fff",
+                  border: "1px solid var(--panel-border)",
+                  borderRadius: "6px",
+                  padding: "3px 8px",
+                  fontSize: "12px",
+                  outline: "none",
+                  cursor: "pointer"
+                }}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
           </div>
 
           <Pagination
             currentPage={currentPage}
-            totalPages={Math.ceil(filteredWatchlist.length / itemsPerPage)}
+            totalPages={Math.max(1, Math.ceil(filteredWatchlist.length / itemsPerPage))}
             onPageChange={(p) => setCurrentPage(p)}
           />
         </div>
       )}
+
 
       {/* Edit Watchlist Target Modal */}
       {editingItem && (
