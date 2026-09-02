@@ -34,7 +34,73 @@ class WorkerOrchestratorService {
   }
 
   /**
-   * Register worker and AUTO-ASSIGN up to 100 ANPR cameras immediately.
+   * Rebalance camera assignments across all online auto-assigned worker nodes.
+   * Rules:
+   * 1. Strict Sequential Filling: Worker 1 (node-1) is filled up to max_capacity (100) FIRST.
+   * 2. Standby Buffer: Worker 2 receives 0 cameras (STANDBY) until total cameras exceed Worker 1's capacity.
+   * 3. Exclusive Assignment: Zero duplicate cameras across worker nodes.
+   * 4. Automatic Failover: If a worker goes OFFLINE, its cameras immediately reassign to the next online worker.
+   */
+  rebalanceClusterAllocation() {
+    const allCamsResult = cameraService.getCameras({ limit: 100000 });
+    const allCams = allCamsResult.cameras || [];
+
+    // Filter cameras with active AI detection
+    const aiCams = allCams.filter(c => {
+      const mode = String(c.detection_mode || "").toUpperCase();
+      return mode === "OBJECT_DETECTION" || 
+             mode === "AI_OBJECT_DETECTION" ||
+             mode === "ANPR_DETECTION" || 
+             mode === "ANPR" ||
+             mode === "TRAFFIC_MONITORING";
+    });
+
+    // Get all online workers in deterministic registration order
+    const autoWorkers = Array.from(this.workers.values())
+      .filter(w => w.status === "ONLINE" && !w.is_manually_assigned)
+      .sort((a, b) => (new Date(a.registered_at || 0).getTime()) - (new Date(b.registered_at || 0).getTime()));
+
+    let camCursor = 0;
+    const totalEligible = aiCams.length;
+
+    for (const worker of autoWorkers) {
+      const capacity = worker.max_capacity || 100;
+      
+      let poolForWorker = aiCams;
+      if (worker.district && worker.district.toLowerCase() !== "all") {
+        poolForWorker = aiCams.filter(c => String(c.district || "").toLowerCase() === worker.district.toLowerCase());
+      }
+
+      if (camCursor < poolForWorker.length) {
+        const remaining = poolForWorker.length - camCursor;
+        const takeCount = Math.min(capacity, remaining);
+        const assignedSlice = poolForWorker.slice(camCursor, camCursor + takeCount);
+        camCursor += assignedSlice.length;
+
+        worker.assigned_cameras = assignedSlice.map(c => ({
+          id: c.id,
+          camera_code: c.camera_code || c.code || `CAM-${c.id}`,
+          name: c.name || `Camera ${c.id}`,
+          district: c.district || worker.district || "All",
+          detection_mode: c.detection_mode || "ANPR_DETECTION",
+          rtsp_url: c.rtsp_url || c.stream_url || c.url || "0",
+          latitude: c.latitude,
+          longitude: c.longitude
+        }));
+      } else {
+        // Node 1 took all available cameras; this node sits in STANDBY buffer
+        worker.assigned_cameras = [];
+      }
+
+      worker.state = worker.assigned_cameras.length > 0 ? "SCANNING" : "STANDBY";
+      if (worker.stats) {
+        worker.stats.active_streams = worker.assigned_cameras.length;
+      }
+    }
+  }
+
+  /**
+   * Register worker and assign cameras according to sequential cluster policy.
    */
   registerWorker({ worker_id, hostname = "worker-node", district = "All", max_capacity = 100, hardware = "CPU" }) {
     if (!worker_id) {
@@ -42,41 +108,8 @@ class WorkerOrchestratorService {
     }
 
     const existing = this.workers.get(worker_id);
-    let assigned = existing?.assigned_cameras || [];
     const isReconnecting = existing && existing.status === "OFFLINE";
     const capacity = Math.max(1, parseInt(max_capacity) || 100);
-
-    // Auto-allocate max 100 ANPR cameras immediately upon connect
-    if (assigned.length === 0) {
-      const allCamsResult = cameraService.getCameras({ limit: 100000 });
-      let allCams = allCamsResult.cameras || [];
-
-      if (district && district.toLowerCase() !== "all") {
-        allCams = allCams.filter(c => String(c.district || "").toLowerCase() === district.toLowerCase());
-      }
-
-      // ONLY assign cameras that are explicitly configured for AI detection (OBJECT_DETECTION or ANPR_DETECTION)
-      const aiCams = allCams.filter(c => {
-        const mode = String(c.detection_mode || "").toUpperCase();
-        return mode === "OBJECT_DETECTION" || 
-               mode === "AI_OBJECT_DETECTION" ||
-               mode === "ANPR_DETECTION" || 
-               mode === "ANPR";
-      });
-      const candidates = aiCams;
-      const maxToTake = Math.min(capacity, candidates.length);
-
-      assigned = candidates.slice(0, maxToTake).map(c => ({
-        id: c.id,
-        camera_code: c.camera_code || c.code || `CAM-${c.id}`,
-        name: c.name || `Camera ${c.id}`,
-        district: c.district || district || "All",
-        detection_mode: c.detection_mode || "OBJECT_DETECTION",
-        rtsp_url: c.rtsp_url || c.stream_url || c.url || "0",
-        latitude: c.latitude,
-        longitude: c.longitude
-      }));
-    }
 
     const workerRecord = {
       worker_id,
@@ -85,14 +118,14 @@ class WorkerOrchestratorService {
       max_capacity: capacity,
       hardware,
       status: "ONLINE",
-      state: assigned.length > 0 ? "SCANNING" : "STANDBY",
+      state: "STANDBY",
       registered_at: existing?.registered_at || new Date().toISOString(),
       last_seen: Date.now(),
-      assigned_cameras: assigned,
-      is_manually_assigned: false,
+      assigned_cameras: existing?.is_manually_assigned ? (existing.assigned_cameras || []) : [],
+      is_manually_assigned: existing?.is_manually_assigned || false,
       stats: {
         fps: 0,
-        active_streams: assigned.length,
+        active_streams: 0,
         total_detections: existing?.stats?.total_detections || 0,
         cpu_load: "Low",
         memory_usage: "Normal"
@@ -101,15 +134,21 @@ class WorkerOrchestratorService {
 
     this.workers.set(worker_id, workerRecord);
 
+    // Rebalance all auto-assigned workers sequentially
+    this.rebalanceClusterAllocation();
+
+    const assigned = workerRecord.assigned_cameras || [];
     const logMsg = isReconnecting
-      ? `🟢 [Worker Orchestrator] Worker \x1b[32m${worker_id}\x1b[0m RECONNECTED (Auto-Assigned: ${assigned.length} cameras)!`
-      : `📡 [Worker Orchestrator] Worker \x1b[36m${worker_id}\x1b[0m (${hostname}) connected ➔ Auto-Assigned \x1b[32m${assigned.length} ANPR Cameras\x1b[0m (Status: \x1b[32m${workerRecord.state}\x1b[0m)`;
+      ? `🟢 [Worker Orchestrator] Worker \x1b[32m${worker_id}\x1b[0m RECONNECTED (Assigned: ${assigned.length} cameras, State: ${workerRecord.state})`
+      : `📡 [Worker Orchestrator] Worker \x1b[36m${worker_id}\x1b[0m (${hostname}) registered ➔ Assigned \x1b[32m${assigned.length} Cameras\x1b[0m (State: \x1b[33m${workerRecord.state}\x1b[0m | Max Capacity: ${capacity})`;
     
     console.log(logMsg);
     if (assigned.length > 0) {
       const sampleCodes = assigned.slice(0, 8).map(c => `${c.camera_code} (${c.district})`).join(', ');
       const moreMsg = assigned.length > 8 ? ` ... and ${assigned.length - 8} more` : '';
       console.log(`   📹 \x1b[33m[Assigned Cams]:\x1b[0m ${sampleCodes}${moreMsg}`);
+    } else {
+      console.log(`   ⏳ \x1b[33m[Cluster Standby]:\x1b[0m Node waiting for primary node to reach 100 cameras or camera volume expansion.`);
     }
 
     // Broadcast live SSE update to CCC Dashboard
@@ -145,33 +184,9 @@ class WorkerOrchestratorService {
 
     worker.last_seen = Date.now();
 
-    // Dynamically synchronize assigned cameras with current ANPR detection_mode state
+    // Rebalance sequential allocation
     if (!worker.is_manually_assigned) {
-      const allCamsResult = cameraService.getCameras({ limit: 100000 });
-      let allCams = allCamsResult.cameras || [];
-      if (worker.district && worker.district.toLowerCase() !== "all") {
-        allCams = allCams.filter(c => String(c.district || "").toLowerCase() === worker.district.toLowerCase());
-      }
-
-      const aiCams = allCams.filter(c => {
-        const mode = String(c.detection_mode || "").toUpperCase();
-        return mode === "OBJECT_DETECTION" || 
-               mode === "AI_OBJECT_DETECTION" ||
-               mode === "ANPR_DETECTION" || 
-               mode === "ANPR";
-      });
-
-      const maxToTake = Math.min(worker.max_capacity, aiCams.length);
-      worker.assigned_cameras = aiCams.slice(0, maxToTake).map(c => ({
-        id: c.id,
-        camera_code: c.camera_code || c.code || `CAM-${c.id}`,
-        name: c.name || `Camera ${c.id}`,
-        district: c.district || worker.district || "All",
-        detection_mode: c.detection_mode || "OBJECT_DETECTION",
-        rtsp_url: c.rtsp_url || c.stream_url || c.url || "0",
-        latitude: c.latitude,
-        longitude: c.longitude
-      }));
+      this.rebalanceClusterAllocation();
     }
 
     worker.state = worker.assigned_cameras.length > 0 ? "SCANNING" : "STANDBY";
@@ -206,6 +221,7 @@ class WorkerOrchestratorService {
       watchlist: this.getTargetWatchlist()
     };
   }
+
 
   /**
    * Central Admin explicitly assigns cameras to a specific worker node.
@@ -382,16 +398,20 @@ class WorkerOrchestratorService {
   /**
    * Watchdog: Runs every 3 seconds.
    * If a worker does not ping heartbeat for > 10 seconds -> Marks OFFLINE immediately!
+   * Automatically rebalances cameras to surviving online nodes.
    */
   initWatchdog() {
     setInterval(() => {
       const now = Date.now();
+      let stateChanged = false;
+
       for (const [id, worker] of this.workers.entries()) {
         if (worker.status === "ONLINE" && (now - worker.last_seen > this.HEARTBEAT_TIMEOUT_MS)) {
           console.warn(`🔴 [Worker Watchdog Alert] Worker \x1b[31m${id}\x1b[0m missed heartbeats for > 10s. Marked as \x1b[41m\x1b[1mOFFLINE\x1b[0m.`);
           worker.status = "OFFLINE";
           worker.state = "OFFLINE";
           worker.stats.active_streams = 0;
+          stateChanged = true;
 
           // Broadcast real-time RED offline alert to UI
           try {
@@ -405,8 +425,13 @@ class WorkerOrchestratorService {
           } catch (_) {}
         }
       }
+
+      if (stateChanged) {
+        this.rebalanceClusterAllocation();
+      }
     }, 3000);
   }
+
 }
 
 const workerOrchestrator = new WorkerOrchestratorService();
