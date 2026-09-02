@@ -178,7 +178,36 @@ router.get('/ai/video_feed', (req, res) => {
   proxyReq.end();
 });
 
+router.post('/ai/stream_controls', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const aiServiceHost = process.env.AI_STREAM_HOST || '127.0.0.1';
+  const aiServicePort = process.env.AI_STREAM_PORT || 8090;
+
+  const payload = JSON.stringify(req.body || {});
+  const proxyReq = http.request({
+    hostname: aiServiceHost,
+    port: aiServicePort,
+    path: '/api/v1/ai/stream_controls',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(payload)
+    }
+  }, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res);
+  });
+
+  proxyReq.on('error', (err) => {
+    res.json({ success: false, error: err.message });
+  });
+
+  proxyReq.write(payload);
+  proxyReq.end();
+});
+
 router.get('/ai/stats', (req, res) => {
+
   res.setHeader('Access-Control-Allow-Origin', '*');
   const aiServiceHost = process.env.AI_STREAM_HOST || '127.0.0.1';
   const aiServicePort = process.env.AI_STREAM_PORT || 8090;

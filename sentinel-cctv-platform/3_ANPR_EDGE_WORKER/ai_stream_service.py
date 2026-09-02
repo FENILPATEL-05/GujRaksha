@@ -248,29 +248,42 @@ class OpenCVPlateDetector:
         return detections
 
 
-# Initialize Global Plate Detector
-plate_detector = OpenCVPlateDetector()
+# Real Deep Learning ANPR Detector and OCR (YOLOv9 Plate Detector + CCT Transformer OCR)
+real_plate_detector = None
+real_plate_ocr = None
+normalize_ocr_text = lambda x: x
 
-DISTRICT_SERIES = ["01", "02", "03", "04", "05", "06", "18", "27", "38"]
-SERIES_LETTERS = ["AB", "AX", "BM", "CD", "EK", "FG", "HJ", "KL", "MN", "PQ", "RS", "TZ"]
+try:
+    from ai_edge_litert.interpreter import Interpreter
+    tflite_det_path = os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/tflite/plate_detector.tflite")
+    tflite_ocr_path = os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/models/tflite/plate_ocr.tflite")
+    if not os.path.exists(tflite_det_path):
+        tflite_det_path = "/home/dell-i5/nxon-projects/GujRaksha/sentinel-cctv-platform/2_CENTRAL_PLATFORM/models/tflite/plate_detector.tflite"
+    if not os.path.exists(tflite_ocr_path):
+        tflite_ocr_path = "/home/dell-i5/nxon-projects/GujRaksha/sentinel-cctv-platform/2_CENTRAL_PLATFORM/models/tflite/plate_ocr.tflite"
 
-def get_consistent_plate_number(track_id: Optional[int], seed_box: Any) -> str:
-    """Generates a stable, high-realism Gujarat plate number for any detected vehicle/plate."""
-    if track_id is not None and track_id >= 0:
-        seed = int(track_id)
-    else:
-        seed = abs(hash(f"{seed_box[0]}_{seed_box[1]}")) % 10000
+    central_services_dir = os.path.abspath(os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/src/services"))
+    if central_services_dir not in sys.path:
+        sys.path.insert(0, central_services_dir)
 
-    dist = DISTRICT_SERIES[seed % len(DISTRICT_SERIES)]
-    series = SERIES_LETTERS[(seed // 7) % len(SERIES_LETTERS)]
-    num = 1000 + (seed * 137 + 101) % 8990
-    return f"GJ{dist}{series}{num}"
+    from anpr_tflite_scanner import PlateDetectorTFLite, PlateOCRTFLite, normalize_ocr_text
 
+    if os.path.exists(tflite_det_path):
+        real_plate_detector = PlateDetectorTFLite(tflite_det_path)
+        logger.info(f"✅ Real YOLOv9 Plate Detector loaded from {tflite_det_path}")
+    if os.path.exists(tflite_ocr_path):
+        real_plate_ocr = PlateOCRTFLite(tflite_ocr_path)
+        logger.info(f"✅ Real CCT Transformer OCR loaded from {tflite_ocr_path}")
+except Exception as e:
+    logger.error(f"Failed to load real ANPR TFLite models: {e}")
+
+
+STREAM_DYNAMIC_CONTROLS: Dict[str, Dict[str, bool]] = {}
 
 
 def create_placeholder_frame(text: str) -> np.ndarray:
-
     """Creates a placeholder frame for connection/error states."""
+
     frame = np.zeros((480, 640, 3), dtype=np.uint8)
     y0, dy = 180, 35
     for i, line in enumerate(text.split('\n')):
@@ -290,9 +303,18 @@ def generate_frames(
 ):
     """
     Generator yielding multipart MJPEG frames with full OpenCV HUD annotations.
-    Supports dynamic toggles for Object Detection and License Plate Recognition.
+    Supports instant, zero-delay dynamic toggles for Object Detection and License Plate Recognition.
     """
-    global current_ai_stats
+    global current_ai_stats, STREAM_DYNAMIC_CONTROLS
+
+    # Initialize dynamic controls for this source
+    src_key = str(source)
+    if src_key not in STREAM_DYNAMIC_CONTROLS:
+        STREAM_DYNAMIC_CONTROLS[src_key] = {
+            "objects": enable_objects,
+            "plates": enable_plates,
+            "trails": enable_trails
+        }
 
     stream_trail_tracker = TrailTracker(max_trail_length=45)
     stream_dwell_tracker = DwellTracker(dwell_threshold=8.0)
@@ -350,6 +372,12 @@ def generate_frames(
 
         h, w = frame.shape[:2]
 
+        # Instant real-time dynamic settings read on EVERY single frame (0 delay)
+        dyn = STREAM_DYNAMIC_CONTROLS.get(src_key, {})
+        cur_enable_objects = dyn.get("objects", enable_objects)
+        cur_enable_plates = dyn.get("plates", enable_plates)
+        cur_enable_trails = dyn.get("trails", enable_trails)
+
         # 1. Initialize Intrusion Zone (Only if explicitly enabled and polygon provided)
         if enable_zone and intrusion_zone is None and zone_polygon and len(zone_polygon) >= 3:
             intrusion_zone = IntrusionZone(zone_polygon)
@@ -362,9 +390,9 @@ def generate_frames(
         intrusion_events = []
         tracked_objects = []
 
-        # 2. Run Object Detection & ByteTrack (Only when enable_objects is True)
+        # 2. Run Object Detection & ByteTrack (Only when cur_enable_objects is True)
         t_start = time.time()
-        if enable_objects:
+        if cur_enable_objects:
             raw_dets = detector.detect(frame)
             if raw_dets:
                 tracked_objects = byte_tracker.update(raw_dets)
@@ -373,7 +401,7 @@ def generate_frames(
         frame_counts = {}
 
         # 3. Process Tracked Detections (Trails, Zone Breaches, Loitering, Bounding Boxes)
-        if enable_objects:
+        if cur_enable_objects:
             for obj in tracked_objects:
                 x1, y1, x2, y2 = map(int, obj["box"])
                 cx, cy = int((x1 + x2) / 2), int((y1 + y2) / 2)
@@ -383,13 +411,14 @@ def generate_frames(
                 frame_counts[cls_name] = frame_counts.get(cls_name, 0) + 1
 
                 # 3.1. Movement Trajectory Trails
-                if enable_trails and track_id is not None:
+                if cur_enable_trails and track_id is not None:
                     stream_trail_tracker.update(cls_name, track_id, cx, cy, epoch=current_epoch)
                     trail_pts = stream_trail_tracker.get_points(cls_name, track_id)
                     if len(trail_pts) > 1:
                         for i in range(1, len(trail_pts)):
                             cv2.line(annotated_frame, trail_pts[i - 1], trail_pts[i], (0, 215, 255), 2)
                         cv2.circle(annotated_frame, (cx, cy), 4, (0, 255, 255), -1)
+
 
                 # 3.2. Intrusion Zone Perimeter Breach Check
                 is_inside_zone = False
@@ -436,45 +465,58 @@ def generate_frames(
                 cv2.putText(annotated_frame, label, (x1 + 5, max(y1 - 7, 18)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 2)
 
-        # 3.5. License Plate Detection & High-Contrast ANPR Tag Drawing (Only when enable_plates is True)
-        if enable_plates:
+        # 3.5. Real Deep Learning License Plate Recognition (YOLOv9 + CCT Transformer OCR)
+        if cur_enable_plates:
             plate_boxes = []
 
-            # Method A: Dedicated Plate Detector ONNX
-            if plate_detector is not None:
+            # Method A: Full-Frame Plate Detection + CCT OCR
+            if real_plate_detector is not None:
                 try:
-                    raw_plates = plate_detector.detect(frame)
+                    raw_plates = real_plate_detector.detect(frame, conf_thresh=0.20, iou_thresh=0.45)
                     for px1, py1, px2, py2, pconf in raw_plates:
-                        p_text = get_consistent_plate_number(None, (px1, py1, px2, py2))
-                        plate_boxes.append((px1, py1, px2, py2, p_text))
+                        plate_text = ""
+                        ocr_conf = 0.0
+                        if real_plate_ocr is not None:
+                            plate_text, ocr_conf = real_plate_ocr.recognize(frame, (px1, py1, px2, py2))
+                        clean_p = normalize_ocr_text(plate_text) if plate_text else ""
+                        if clean_p and len(clean_p) >= 4:
+                            plate_boxes.append((px1, py1, px2, py2, clean_p, ocr_conf))
                 except Exception:
                     pass
 
-            # Method B: Vehicle-Linked Plate Extraction (Runs on every detected vehicle)
-            for obj in tracked_objects:
-                if obj["label"] in ["car", "bus", "truck", "motorcycle"]:
-                    vx1, vy1, vx2, vy2 = map(int, obj["box"])
-                    vw, vh = vx2 - vx1, vy2 - vy1
-                    if vw > 35 and vh > 35:
-                        # Plate localized at lower bumper/grill
-                        px1 = int(vx1 + 0.22 * vw)
-                        px2 = int(vx1 + 0.78 * vw)
-                        py1 = int(vy1 + 0.65 * vh)
-                        py2 = int(vy1 + 0.88 * vh)
-                        px1, py1 = max(0, px1), max(0, py1)
-                        px2, py2 = min(w - 1, px2), min(h - 1, py2)
-
-                        track_id = obj.get("track_id")
-                        p_text = get_consistent_plate_number(track_id, (px1, py1, px2, py2))
-                        plate_boxes.append((px1, py1, px2, py2, p_text))
+            # Method B: Vehicle Crop Plate Detection + CCT OCR
+            if real_plate_detector is not None and tracked_objects:
+                for obj in tracked_objects:
+                    if obj["label"] in ["car", "bus", "truck", "motorcycle"]:
+                        vx1, vy1, vx2, vy2 = map(int, obj["box"])
+                        vw, vh = vx2 - vx1, vy2 - vy1
+                        if vw > 35 and vh > 35:
+                            v_crop = frame[max(0, vy1):min(h, vy2), max(0, vx1):min(w, vx2)]
+                            if v_crop.size > 0:
+                                try:
+                                    v_plates = real_plate_detector.detect(v_crop, conf_thresh=0.15, iou_thresh=0.45)
+                                    for cpx1, cpy1, cpx2, cpy2, pconf in v_plates:
+                                        g_px1 = max(0, vx1 + cpx1)
+                                        g_py1 = max(0, vy1 + cpy1)
+                                        g_px2 = min(w - 1, vx1 + cpx2)
+                                        g_py2 = min(h - 1, vy1 + cpy2)
+                                        plate_text, ocr_conf = "", 0.0
+                                        if real_plate_ocr is not None:
+                                            plate_text, ocr_conf = real_plate_ocr.recognize(frame, (g_px1, g_py1, g_px2, g_py2))
+                                        clean_p = normalize_ocr_text(plate_text) if plate_text else ""
+                                        if clean_p and len(clean_p) >= 4:
+                                            if not any(abs(g_px1 - b[0]) < 30 and abs(g_py1 - b[1]) < 30 for b in plate_boxes):
+                                                plate_boxes.append((g_px1, g_py1, g_px2, g_py2, clean_p, ocr_conf))
+                                except Exception:
+                                    pass
 
             if plate_boxes:
                 frame_counts["plates"] = len(plate_boxes)
-                for px1, py1, px2, py2, p_text in plate_boxes:
-                    # Draw Bright Yellow Bounding Box on Plate
+                for px1, py1, px2, py2, clean_p, ocr_conf in plate_boxes:
+                    # Draw Bright Yellow Bounding Box on Real Plate
                     cv2.rectangle(annotated_frame, (px1, py1), (px2, py2), (0, 230, 255), 2)
 
-                    p_label = f"PLATE: {p_text}"
+                    p_label = f"PLATE: {clean_p}"
                     (pw, ph), _ = cv2.getTextSize(p_label, cv2.FONT_HERSHEY_SIMPLEX, 0.52, 2)
                     # Draw Dark Solid Badge with Yellow Border
                     cv2.rectangle(annotated_frame, (px1, max(py1 - 24, 0)), (px1 + pw + 10, max(py1, 24)), (15, 23, 42), -1)
@@ -482,6 +524,7 @@ def generate_frames(
                     # Draw Crisp Pure White Bold Text
                     cv2.putText(annotated_frame, p_label, (px1 + 5, max(py1 - 7, 18)),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 2)
+
 
 
         # 4. Draw Intrusion Zone (Virtual Security Fence)
@@ -551,10 +594,53 @@ class AIStreamRequestHandler(BaseHTTPRequestHandler):
         # Suppress routine log spam
         pass
 
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path in ["/api/v1/ai/stream_controls", "/ai/stream_controls"]:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            try:
+                data = json.loads(body)
+                src_key = str(data.get("source", "0"))
+                if src_key not in STREAM_DYNAMIC_CONTROLS:
+                    STREAM_DYNAMIC_CONTROLS[src_key] = {}
+
+                if "detect_objects" in data:
+                    STREAM_DYNAMIC_CONTROLS[src_key]["objects"] = bool(data["detect_objects"])
+                if "detect_plates" in data:
+                    STREAM_DYNAMIC_CONTROLS[src_key]["plates"] = bool(data["detect_plates"])
+                if "trails" in data:
+                    STREAM_DYNAMIC_CONTROLS[src_key]["trails"] = bool(data["trails"])
+
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True, "controls": STREAM_DYNAMIC_CONTROLS[src_key]}).encode('utf-8'))
+                return
+            except Exception as e:
+                self.send_response(400)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
+                return
+
+        self.send_response(404)
+        self.end_headers()
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
         params = parse_qs(parsed.query)
+
 
         if path in ["/api/v1/ai/video_feed", "/ai/video_feed"]:
             source = params.get("source", ["0"])[0]

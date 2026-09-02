@@ -307,7 +307,43 @@ export const LiveCCTVFeed = ({
   const rtspProxyUrl = `${apiPrefix}/api/v1/proxy-stream?url=${encodeURIComponent(camera?.stream_url || camera?.rtsp_url || '')}`;
 
   const aiSourceUrl = camera?.rtsp_url || camera?.stream_url || (camera?.urls && (camera.urls.rtsp || camera.urls.hls || camera.urls.whep)) || rawStreamUrl || "0";
-  const aiStreamUrl = `${apiPrefix}/api/v1/ai/video_feed?source=${encodeURIComponent(aiSourceUrl)}&detect_objects=${enableObjDetection}&detect_plates=${enablePlateDetection}&trails=${enableObjDetection}&dwell=false&zone=false`;
+  const aiStreamUrl = `${apiPrefix}/api/v1/ai/video_feed?source=${encodeURIComponent(aiSourceUrl)}&trails=true&dwell=false&zone=false`;
+
+  const handleToggleObjects = useCallback((e) => {
+    e.stopPropagation();
+    const nextVal = !enableObjDetection;
+    setEnableObjDetection(nextVal);
+    try {
+      fetch(`${apiPrefix}/api/v1/ai/stream_controls`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: aiSourceUrl,
+          detect_objects: nextVal,
+          detect_plates: enablePlateDetection,
+          trails: nextVal
+        })
+      }).catch(() => {});
+    } catch (_) {}
+  }, [enableObjDetection, enablePlateDetection, apiPrefix, aiSourceUrl]);
+
+  const handleTogglePlates = useCallback((e) => {
+    e.stopPropagation();
+    const nextVal = !enablePlateDetection;
+    setEnablePlateDetection(nextVal);
+    try {
+      fetch(`${apiPrefix}/api/v1/ai/stream_controls`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: aiSourceUrl,
+          detect_objects: enableObjDetection,
+          detect_plates: nextVal
+        })
+      }).catch(() => {});
+    } catch (_) {}
+  }, [enableObjDetection, enablePlateDetection, apiPrefix, aiSourceUrl]);
+
 
 
 
@@ -705,10 +741,7 @@ export const LiveCCTVFeed = ({
               <button
                 type="button"
                 className="btn btn-xs"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEnableObjDetection(!enableObjDetection);
-                }}
+                onClick={handleToggleObjects}
                 title={enableObjDetection ? "Disable Object Detection (Hide Cars & Persons)" : "Enable Object Detection"}
                 style={{
                   fontSize: "9.5px",
@@ -733,10 +766,7 @@ export const LiveCCTVFeed = ({
               <button
                 type="button"
                 className="btn btn-xs"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEnablePlateDetection(!enablePlateDetection);
-                }}
+                onClick={handleTogglePlates}
                 title={enablePlateDetection ? "Disable Number Plate Recognition" : "Enable Number Plate Recognition"}
                 style={{
                   fontSize: "9.5px",
@@ -758,6 +788,7 @@ export const LiveCCTVFeed = ({
               </button>
             </>
           )}
+
 
           {/* Main Stream Mode Toggle */}
           <button
