@@ -1,9 +1,3 @@
-/**
- * GujRaksha (ગુજ રક્ષા) — Statewide CCTV Asset Registry & Spatial GIS Control Platform
- * Copyright (c) 2026 Fenil Patel. All Rights Reserved.
- * Proprietary & Confidential — Unauthorized copying or distribution is strictly prohibited.
- */
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -19,13 +13,15 @@ import {
   RefreshCw,
   PieChart,
   User,
+  Users,
+  UserPlus,
   LogOut,
   ChevronDown,
   Shield,
   Eye
 } from 'lucide-react';
 
-export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, departmentCount = 26 }) => {
+export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, onOpenUserMgmt, departmentCount = 26 }) => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout, isAdmin } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
@@ -115,6 +111,10 @@ export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, depar
             <button className="btn" onClick={onOpenGap}>
               <PieChart size={15} strokeWidth={2} /> Gap Analysis
             </button>
+
+            <button className="btn" onClick={onOpenUserMgmt} title="Manage System Users & Department Roles">
+              <Users size={15} strokeWidth={2} /> Users & Roles
+            </button>
           </>
         )}
 
@@ -150,6 +150,16 @@ export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, depar
 
               <div className="profile-dropdown-divider"></div>
 
+              {isAdmin && (
+                <>
+                  <button className="profile-dropdown-item" onClick={() => { if (onOpenUserMgmt) onOpenUserMgmt(); setIsProfileOpen(false); }}>
+                    <Users size={15} strokeWidth={2} />
+                    <span>User & Role Management</span>
+                  </button>
+                  <div className="profile-dropdown-divider"></div>
+                </>
+              )}
+
               <button className="profile-dropdown-item" onClick={() => { toggleTheme(); setIsProfileOpen(false); }}>
                 {theme === 'dark' ? <Moon size={15} strokeWidth={2} /> : <Sun size={15} strokeWidth={2} />}
                 <span>{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</span>
@@ -169,3 +179,4 @@ export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, depar
     </header>
   );
 };
+

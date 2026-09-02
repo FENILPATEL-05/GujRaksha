@@ -25,6 +25,7 @@ export const DepartmentDirectoryPage = ({
   onOpenAddDept,
   onEditDept,
   onViewCamerasForDept,
+  onOpenUserMgmt,
   addToast
 }) => {
   const [search, setSearch] = useState("");
@@ -209,6 +210,12 @@ export const DepartmentDirectoryPage = ({
 
         {/* Right: Refresh & Add Department Action Buttons */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {onOpenUserMgmt && (
+            <button className="btn" onClick={onOpenUserMgmt} title="Manage Department Users & Role Access" style={{ padding: "7px 12px", gap: "5px" }}>
+              <Users size={14} /> Users & Roles
+            </button>
+          )}
+
           <button className="btn" onClick={onRefresh} title="Reload Department List" style={{ padding: "7px 12px", gap: "5px" }}>
             <RefreshCw size={14} /> Refresh
           </button>

@@ -6,7 +6,7 @@ export const LiveCCTVFeed = ({
   camera,
   isMuted = true,
   isDetailed = false,
-  showAiVision = true
+  showAiVision = false
 }) => {
   const videoRef = useRef(null);
   const imgRef = useRef(null);

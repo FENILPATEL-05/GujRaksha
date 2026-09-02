@@ -326,6 +326,7 @@ export function AppContent() {
             handleFilterChange('department', deptCode);
             setActiveView('registry');
           }}
+          onOpenUserMgmt={() => setIsUserMgmtOpen(true)}
           addToast={addToast}
         />
       ) : activeView === 'videowall' ? (
