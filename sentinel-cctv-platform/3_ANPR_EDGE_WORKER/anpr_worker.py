@@ -1030,33 +1030,26 @@ class CameraWorkerThread(threading.Thread):
         self.dwell_tracker = DwellTracker(dwell_threshold=8.0)
         self.intrusion_zone = None
         self.running = True
+        self.reconnect_requested = False
         self.recent_detections = {}
         self.is_connected = False
         self.last_live_dispatch = 0
         self.last_obj_log = 0
-        self.cap = None
         
         # Single shared WebSocket connection for the entire edge worker process
         self.ws_client = get_shared_vision_ws(self.central_url)
 
     def stop(self):
         self.running = False
-        if self.cap is not None:
-            try:
-                self.cap.release()
-            except Exception:
-                pass
-            self.cap = None
+
+    def request_stream_update(self, new_url: str, new_cam_info: dict):
+        self.cam_info = new_cam_info
+        if str(self.stream_url) != str(new_url):
+            self.stream_url = new_url
+            self.reconnect_requested = True
 
     def open_capture(self):
         try:
-            if self.cap is not None:
-                try:
-                    self.cap.release()
-                except Exception:
-                    pass
-                self.cap = None
-
             if str(self.stream_url).isdigit():
                 cap = cv2.VideoCapture(int(self.stream_url), cv2.CAP_V4L2)
             else:
@@ -1067,63 +1060,77 @@ class CameraWorkerThread(threading.Thread):
                     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                 except Exception:
                     pass
-                self.cap = cap
-                return self.cap
+                return cap
         except Exception:
             pass
         return None
 
     def run(self):
         frame_counter = 0
+        cap = None
 
-        while self.running:
-            cam_mode = str(self.cam_info.get("detection_mode") or "ANPR_DETECTION").upper()
-            if cam_mode == "GENERAL_SURVEILLANCE":
-                GLOBAL_STATS.set_status(self.camera_code, "REMOVED")
-                break
+        try:
+            while self.running:
+                cam_mode = str(self.cam_info.get("detection_mode") or "ANPR_DETECTION").upper()
+                if cam_mode == "GENERAL_SURVEILLANCE":
+                    GLOBAL_STATS.set_status(self.camera_code, "REMOVED")
+                    break
 
-            # 1. Connect or Reconnect loop (Quiet background retry)
-            if self.cap is None or not self.cap.isOpened():
-                GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
-                self.is_connected = False
-                cap = self.open_capture()
+                if getattr(self, "reconnect_requested", False):
+
+                    self.reconnect_requested = False
+                    if cap is not None:
+                        try:
+                            cap.release()
+                        except Exception:
+                            pass
+                        cap = None
+
+                # 1. Connect or Reconnect loop (Quiet background retry)
                 if cap is None or not cap.isOpened():
-                    # Sleep quietly before retrying (No error spam!)
-                    for _ in range(30):
-                        if not self.running:
-                            break
-                        time.sleep(0.1)
-                    continue
-                else:
-                    GLOBAL_STATS.set_status(self.camera_code, "ACTIVE")
-                    self.is_connected = True
-                    cur_mode = str(self.cam_info.get("detection_mode") or "ANPR_DETECTION").upper()
-                    mode_label = "🚗 License Plates (ANPR)" if cur_mode == "ANPR_DETECTION" else ("🎯 Surveillance Objects" if cur_mode == "OBJECT_DETECTION" else "🛡️ Standard Stream (No AI)")
-                    print(f"\x1b[32m[CAMERA ONLINE]\x1b[0m 🎥 \x1b[33m[{self.camera_code}]\x1b[0m Connected to {self.stream_url} — Mode: {mode_label}", flush=True)
+                    GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
+                    self.is_connected = False
+                    cap = self.open_capture()
+                    if cap is None or not cap.isOpened():
+                        # Sleep quietly before retrying (No error spam!)
+                        for _ in range(30):
+                            if not self.running:
+                                break
+                            time.sleep(0.1)
+                        continue
+                    else:
+                        GLOBAL_STATS.set_status(self.camera_code, "ACTIVE")
+                        self.is_connected = True
+                        cur_mode = str(self.cam_info.get("detection_mode") or "ANPR_DETECTION").upper()
+                        mode_label = "🚗 License Plates (ANPR)" if cur_mode == "ANPR_DETECTION" else ("🎯 Surveillance Objects" if cur_mode == "OBJECT_DETECTION" else "🛡️ Standard Stream (No AI)")
+                        print(f"\x1b[32m[CAMERA ONLINE]\x1b[0m 🎥 \x1b[33m[{self.camera_code}]\x1b[0m Connected to {self.stream_url} — Mode: {mode_label}", flush=True)
 
-            # 2. Frame Processing Loop (Synchronized Real-Time Capture)
-            try:
+                # 2. Frame Processing Loop (Synchronized Real-Time Capture)
                 # Flush buffer for live network streams so inference is always on the latest frame
                 if str(self.stream_url).startswith("rtsp://") or str(self.stream_url).startswith("rtsps://") or "stream" in str(self.stream_url):
                     for _ in range(4):
-                        if self.cap:
-                            self.cap.grab()
-
-                if not self.cap or not self.running:
-                    break
-
-                ret, frame = self.cap.read()
-                if not ret or frame is None or frame.shape[0] < 50:
-                    if self.cap:
-                        self.cap.release()
-                    self.cap = None
-                    GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
-                    time.sleep(0.5)
-                    continue
+                        if cap and self.running:
+                            cap.grab()
 
 
-                frame_counter += 1
-                now = time.time()
+                    if not cap or not self.running:
+                        break
+
+                    ret, frame = cap.read()
+                    if not ret or frame is None or frame.shape[0] < 50:
+                        if cap:
+                            try:
+                                cap.release()
+                            except Exception:
+                                pass
+                        cap = None
+                        GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
+                        time.sleep(0.5)
+                        continue
+
+                    frame_counter += 1
+                    now = time.time()
+
 
                 is_selected_vision_cam = self.ws_client.is_camera_active_target(self.camera_code, self.camera_id) if self.ws_client else True
                 effective_stride = 1 if is_selected_vision_cam else self.frame_stride
@@ -1363,15 +1370,24 @@ class CameraWorkerThread(threading.Thread):
 
                 time.sleep(0.01)
 
-            except Exception:
-                if cap:
+        except Exception:
+            if cap:
+                try:
                     cap.release()
-                cap = None
-                GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
-                time.sleep(1.0)
+                except Exception:
+                    pass
+            cap = None
+            GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
 
-        if cap:
-            cap.release()
+        finally:
+            if cap:
+                try:
+                    cap.release()
+                except Exception:
+                    pass
+            cap = None
+            GLOBAL_STATS.set_status(self.camera_code, "REMOVED")
+
 
 
 class DistributedWorkerManager:
@@ -1472,19 +1488,13 @@ class DistributedWorkerManager:
                 old_url = str(existing_worker.stream_url)
                 old_mode = str(existing_worker.cam_info.get("detection_mode") or "").upper()
 
-                # If camera RTSP URL or detection mode was modified in UI, restart stream completely!
-                if old_url != new_url or old_mode != new_mode:
-                    print(f"🔄 \x1b[33m[{code}]\x1b[0m Camera config edited (Mode: {old_mode}➔{new_mode}) — Stopping & restarting RTSP stream...", flush=True)
-                    existing_worker.stop()
-                    existing_worker.join(timeout=1.0)
+                if old_mode != new_mode:
+                    existing_worker.cam_info["detection_mode"] = new_mode
+                    print(f"🔄 \x1b[33m[{code}]\x1b[0m AI Mode Switched: \x1b[35m{old_mode}\x1b[0m ➔ \x1b[32m{new_mode}\x1b[0m (Instant Hot-Reload)", flush=True)
 
-                    worker = CameraWorkerThread(
-                        cam, self.detector, self.ocr, self.object_detector, self.central_url, self.watchlist_mgr,
-                        conf=0.20, iou=0.45, frame_stride=3
-                    )
-                    worker.start()
-                    self.workers[code] = worker
-                    newly_attached += 1
+                if old_url != new_url:
+                    print(f"🔄 \x1b[33m[{code}]\x1b[0m RTSP Stream URL Updated: {old_url} ➔ {new_url} — Reconnecting...", flush=True)
+                    existing_worker.request_stream_update(new_url, cam)
             else:
                 worker = CameraWorkerThread(
                     cam, self.detector, self.ocr, self.object_detector, self.central_url, self.watchlist_mgr,
@@ -1493,6 +1503,7 @@ class DistributedWorkerManager:
                 worker.start()
                 self.workers[code] = worker
                 newly_attached += 1
+
 
         if newly_attached > 0:
             obj_cams = [c for c in active_ai_cameras if c.get("detection_mode") == "OBJECT_DETECTION"]
