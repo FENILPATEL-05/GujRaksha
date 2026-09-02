@@ -182,10 +182,11 @@ def create_placeholder_frame(text: str) -> np.ndarray:
 def generate_frames(
     source: str,
     enable_trails: bool = True,
-    enable_dwell: bool = True,
-    enable_zone: bool = True,
+    enable_dwell: bool = False,
+    enable_zone: bool = False,
     zone_polygon: Optional[List[List[int]]] = None
 ):
+
     """
     Generator yielding multipart MJPEG frames with full OpenCV HUD annotations.
     Replicates exact reference logic from sentinel-cctv-registry.
@@ -248,21 +249,12 @@ def generate_frames(
 
         h, w = frame.shape[:2]
 
-        # 1. Initialize Intrusion Zone (Virtual Perimeter)
-        if enable_zone and intrusion_zone is None:
-            if zone_polygon and len(zone_polygon) >= 3:
-                intrusion_zone = IntrusionZone(zone_polygon)
-            else:
-                # Default perimeter zone (lower portion of frame)
-                default_pts = [
-                    [int(w * 0.15), int(h * 0.45)],
-                    [int(w * 0.85), int(h * 0.45)],
-                    [int(w * 0.95), int(h * 0.88)],
-                    [int(w * 0.05), int(h * 0.88)]
-                ]
-                intrusion_zone = IntrusionZone(default_pts)
-        elif not enable_zone:
+        # 1. Initialize Intrusion Zone (Only if explicitly enabled and polygon provided)
+        if enable_zone and intrusion_zone is None and zone_polygon and len(zone_polygon) >= 3:
+            intrusion_zone = IntrusionZone(zone_polygon)
+        elif not enable_zone or not zone_polygon:
             intrusion_zone = None
+
 
         annotated_frame = frame.copy()
         dwell_alerts_list = []
@@ -407,9 +399,10 @@ class AIStreamRequestHandler(BaseHTTPRequestHandler):
         if path in ["/api/v1/ai/video_feed", "/ai/video_feed"]:
             source = params.get("source", ["0"])[0]
             trails = params.get("trails", ["true"])[0].lower() == "true"
-            dwell = params.get("dwell", ["true"])[0].lower() == "true"
-            zone = params.get("zone", ["true"])[0].lower() == "true"
+            dwell = params.get("dwell", ["false"])[0].lower() == "true"
+            zone = params.get("zone", ["false"])[0].lower() == "true"
             zone_pts_raw = params.get("zone_pts", [None])[0]
+
 
             zone_pts = None
             if zone_pts_raw:
