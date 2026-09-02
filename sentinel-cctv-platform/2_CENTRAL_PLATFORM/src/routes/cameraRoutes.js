@@ -19,8 +19,9 @@ router.get('/sync-list', (req, res, next) => {
         district: c.district,
         department_name: c.department_name,
         camera_type: c.camera_type,
-        detection_mode: c.detection_mode || 'TRAFFIC_MONITORING',
+        detection_mode: c.detection_mode || 'GENERAL_SURVEILLANCE',
         stream_url: c.stream_url,
+
         status: c.status,
         latitude: c.latitude,
         longitude: c.longitude

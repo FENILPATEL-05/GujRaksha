@@ -42,8 +42,9 @@ class OnboardingService {
           address: record.address || '',
           ownership_type: (record.ownership || record.ownership_type || 'GOVERNMENT').toUpperCase(),
           camera_type: (record.camera_type || 'PTZ').toUpperCase(),
-          detection_mode: (record.detection_mode || record.ai_mode || record.mode || 'TRAFFIC_MONITORING').toUpperCase(),
+          detection_mode: (record.detection_mode || record.ai_mode || record.mode || 'GENERAL_SURVEILLANCE').toUpperCase(),
           vms_vendor: record.vms_vendor || 'Live Sentinel Feeder (H264/MP4)',
+
           status: (record.status || 'ACTIVE').toUpperCase(),
           stream_url: record.stream_url || record.rtsp_url || '',
           rtsp_url: record.rtsp_url || (record.stream_url && record.stream_url.startsWith('rtsp://') ? record.stream_url : ''),
@@ -221,8 +222,9 @@ class OnboardingService {
           address: cam.address || cam.location || `${cam.name || camId}, ${locMeta.district}, Gujarat`,
           ownership_type: cam.ownership_type || 'GOVERNMENT',
           camera_type: cam.camera_type || camType,
-          detection_mode: cam.detection_mode || 'TRAFFIC_MONITORING',
+          detection_mode: cam.detection_mode || 'GENERAL_SURVEILLANCE',
           vms_vendor: cam.vms_vendor || 'Sentinel Netra Feeder (cctv.corp8.cloud)',
+
           status: cam.status || (cam.live !== false ? 'ACTIVE' : 'INACTIVE'),
           stream_url: rtspUrl,
           rtsp_url: rtspUrl,

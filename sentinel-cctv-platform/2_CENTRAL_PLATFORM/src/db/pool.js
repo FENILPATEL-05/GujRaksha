@@ -47,8 +47,9 @@ class CameraDataStore {
       c._norm_dept = ((c.department_id || '') + ' ' + (c.department_name || '')).toLowerCase();
       c._norm_dist = ((c.district || '') + ' ' + (c.taluka || '')).toLowerCase();
       c._norm_status = String(c.status || '').toLowerCase().trim();
-      c._norm_mode = String(c.detection_mode || 'TRAFFIC_MONITORING').toUpperCase().trim();
+      c._norm_mode = String(c.detection_mode || 'GENERAL_SURVEILLANCE').toUpperCase().trim();
       c._norm_ownership = String(c.ownership_type || '').toLowerCase().trim();
+
       c._norm_search = (
         (c.camera_code || '') + ' ' +
         (c.name || '') + ' ' +
