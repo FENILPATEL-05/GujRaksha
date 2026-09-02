@@ -65,8 +65,10 @@ export const ANPRIntelligencePage = ({
   const [detections, setDetections] = useState([]);
   const [edgeNodes, setEdgeNodes] = useState([]);
   const [selectedWorkerModal, setSelectedWorkerModal] = useState(null);
+  const [selectedSnapshotDet, setSelectedSnapshotDet] = useState(null);
   const [modalSearch, setModalSearch] = useState("");
   const [watchlistCount, setWatchlistCount] = useState(0);
+
   const [loading, setLoading] = useState(false);
   const [searchPlate, setSearchPlate] = useState("");
   const [watchlistOnly, setWatchlistOnly] = useState(false);
@@ -990,11 +992,29 @@ export const ANPRIntelligencePage = ({
                     return (
                       <tr key={det.id} style={{ background: isHit ? "rgba(244,63,94,0.06)" : "transparent" }}>
                         <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                             <div className="vehicle-plate-box" style={{ margin: "2px 0" }}>
                               <span className="plate-flag">IND</span>
                               <span className="plate-number">{det.vehicle_plate}</span>
                             </div>
+                            {det.snapshot_url && (
+                              <button
+                                className="btn btn-sm"
+                                onClick={() => setSelectedSnapshotDet(det)}
+                                style={{
+                                  padding: "2px 7px",
+                                  fontSize: "10.5px",
+                                  gap: "4px",
+                                  background: "rgba(56, 189, 248, 0.12)",
+                                  borderColor: "rgba(56, 189, 248, 0.3)",
+                                  color: "#38bdf8"
+                                }}
+                                title="View Captured Vehicle Crop Snapshot"
+                              >
+                                <Camera size={11} />
+                                <span>Photo</span>
+                              </button>
+                            )}
                             {isHit ? (
                               <span className="threat-severity-badge critical" style={{ fontSize: "10.5px", padding: "3px 8px", display: "inline-flex" }}>
                                 🚨 {det.watchlist_category ? det.watchlist_category.replace(/_/g, " ") : "WATCHLIST HIT"} ({det.watchlist_fir || "Active FIR"})
@@ -1006,6 +1026,7 @@ export const ANPRIntelligencePage = ({
                             )}
                           </div>
                         </td>
+
 
                         <td>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -1207,7 +1228,141 @@ export const ANPRIntelligencePage = ({
           </div>
         </div>
       )}
+
+      {/* Captured ANPR Snapshot Modal */}
+      {selectedSnapshotDet && (
+
+        <div
+          className="modal-overlay"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "20px"
+          }}
+          onClick={() => setSelectedSnapshotDet(null)}
+        >
+          <div
+            className="modal-content"
+            style={{
+              backgroundColor: "#0f172a",
+              border: "1px solid rgba(56, 189, 248, 0.3)",
+              borderRadius: "12px",
+              width: "100%",
+              maxWidth: "520px",
+              padding: "20px",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.7)"
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Camera size={18} style={{ color: "var(--accent)" }} />
+                <h3 style={{ margin: 0, fontSize: "16px", color: "var(--text-primary)", fontWeight: 700 }}>
+                  Captured Vehicle Snapshot
+                </h3>
+              </div>
+              <button
+                className="btn btn-sm btn-icon"
+                onClick={() => setSelectedSnapshotDet(null)}
+                style={{ background: "transparent", border: "none", color: "var(--text-secondary)", cursor: "pointer" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Snapshot Image */}
+            <div style={{
+              width: "100%",
+              height: "260px",
+              backgroundColor: "#020617",
+              borderRadius: "8px",
+              overflow: "hidden",
+              border: "1px solid var(--panel-border)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: "16px"
+            }}>
+              {selectedSnapshotDet.snapshot_url ? (
+                <img
+                  src={selectedSnapshotDet.snapshot_url}
+                  alt={selectedSnapshotDet.vehicle_plate}
+                  style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <div style={{ display: selectedSnapshotDet.snapshot_url ? 'none' : 'flex', flexDirection: "column", alignItems: "center", gap: "8px", color: "var(--text-dim)" }}>
+                <Car size={36} />
+                <span style={{ fontSize: "12px" }}>Raw Crop Snapshot Stored on Disk</span>
+              </div>
+            </div>
+
+            {/* Metadata Grid */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "10px",
+              backgroundColor: "rgba(30, 41, 59, 0.5)",
+              padding: "12px",
+              borderRadius: "8px",
+              fontSize: "12px",
+              marginBottom: "16px"
+            }}>
+              <div>
+                <span style={{ color: "var(--text-dim)", display: "block", fontSize: "11px" }}>License Plate</span>
+                <strong style={{ color: "#38bdf8", fontFamily: "var(--font-mono)", fontSize: "14px" }}>
+                  {selectedSnapshotDet.vehicle_plate}
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: "var(--text-dim)", display: "block", fontSize: "11px" }}>Confidence</span>
+                <strong style={{ color: "#4ade80" }}>
+                  {selectedSnapshotDet.confidence || 95}%
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: "var(--text-dim)", display: "block", fontSize: "11px" }}>Camera Node</span>
+                <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                  [{selectedSnapshotDet.camera_code || selectedSnapshotDet.camera_id}] {selectedSnapshotDet.camera_name || "CCTV Node"}
+                </span>
+              </div>
+              <div>
+                <span style={{ color: "var(--text-dim)", display: "block", fontSize: "11px" }}>Detection Time</span>
+                <span style={{ color: "var(--text-primary)" }}>
+                  {new Date(selectedSnapshotDet.timestamp).toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => {
+                  const plate = selectedSnapshotDet.vehicle_plate;
+                  setSelectedSnapshotDet(null);
+                  onTrackVehicleOnMap(plate);
+                }}
+              >
+                <LocateFixed size={13} /> Trace Route on Map
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
 
