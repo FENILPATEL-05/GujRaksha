@@ -7,7 +7,14 @@ export const DetectionCanvasOverlay = ({ camera, isPlaying = true }) => {
 
   const getCleanCode = (cam) => {
     if (!cam) return "GJ-GOV-001";
-    return cam.camera_code || cam.id || "GJ-GOV-001";
+    if (cam.camera_code) return cam.camera_code;
+    if (cam.id) return cam.id;
+    if (cam.name) {
+      const match = String(cam.name).match(/\(([^)]+)\)/);
+      if (match && match[1]) return match[1].trim();
+      return cam.name;
+    }
+    return "GJ-GOV-001";
   };
 
   const cameraCode = getCleanCode(camera);

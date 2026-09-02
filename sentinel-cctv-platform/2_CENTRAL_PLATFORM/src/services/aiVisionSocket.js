@@ -37,28 +37,36 @@ class VisionSocketClient {
           if (data && data.type === "STREAM_AI_DETECTIONS") {
             const camCode = (data.camera_code || "").toUpperCase();
             const camId = (data.camera_id || "").toUpperCase();
-
             const getDigits = (str) => String(str || '').replace(/\D/g, '');
-            const codeNum = getDigits(upperCode);
             const camCodeNum = getDigits(camCode);
             const camIdNum = getDigits(camId);
 
+            const totalSubs = this.subscribers.size;
+
             for (const [code, callbacks] of this.subscribers.entries()) {
               const upperCode = (code || "").toUpperCase();
-              const isMatch = upperCode === camCode || upperCode === camId || upperCode === "ALL" ||
+              const codeNum = getDigits(upperCode);
+
+              const isMatch = totalSubs === 1 ||
+                              upperCode === camCode || upperCode === camId || upperCode === "ALL" ||
                               (camCode && camCode.includes(upperCode)) || (upperCode && upperCode.includes(camCode)) ||
                               (camId && camId.includes(upperCode)) || (upperCode && upperCode.includes(camId)) ||
                               (codeNum && (codeNum === camCodeNum || codeNum === camIdNum));
+
               if (isMatch) {
                 callbacks.forEach(cb => {
                   try {
                     cb(data.detections || [], data.counts || null);
-                  } catch (_) {}
+                  } catch (err) {
+                    console.error("Error in AI vision callback:", err);
+                  }
                 });
               }
             }
           }
-        } catch (_) {}
+        } catch (err) {
+          console.error("Error parsing WebSocket message in aiVisionSocket:", err);
+        }
       };
 
       this.ws.onerror = () => {};
