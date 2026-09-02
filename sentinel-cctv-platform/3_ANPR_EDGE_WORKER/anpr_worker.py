@@ -1056,9 +1056,12 @@ class CameraWorkerThread(threading.Thread):
                 else:
                     GLOBAL_STATS.set_status(self.camera_code, "ACTIVE")
                     self.is_connected = True
-                    print(f"\x1b[32m[CAMERA ONLINE]\x1b[0m 🎥 \x1b[33m[{self.camera_code}]\x1b[0m Connected to {self.stream_url} — Scanning ANPR Plates & Objects", flush=True)
+                    cur_mode = str(self.cam_info.get("detection_mode") or "ANPR_DETECTION").upper()
+                    mode_label = "🚗 License Plates (ANPR)" if cur_mode == "ANPR_DETECTION" else ("🎯 Surveillance Objects" if cur_mode == "OBJECT_DETECTION" else "🛡️ Standard Stream (No AI)")
+                    print(f"\x1b[32m[CAMERA ONLINE]\x1b[0m 🎥 \x1b[33m[{self.camera_code}]\x1b[0m Connected to {self.stream_url} — Mode: {mode_label}", flush=True)
 
             # 2. Frame Processing Loop (Synchronized Real-Time Capture)
+
 
             try:
                 # Flush buffer for live network streams so inference is always on the latest frame
@@ -1402,7 +1405,14 @@ class DistributedWorkerManager:
             code = cam.get("camera_code") or cam.get("code") or f"CAM-{cam.get('id')}"
             current_codes.add(code)
 
-            if code not in self.workers or not self.workers[code].is_alive():
+            if code in self.workers and self.workers[code].is_alive():
+                # Dynamically update cam_info in running worker thread
+                old_mode = str(self.workers[code].cam_info.get("detection_mode") or "").upper()
+                new_mode = str(cam.get("detection_mode") or "ANPR_DETECTION").upper()
+                if old_mode != new_mode:
+                    self.workers[code].cam_info["detection_mode"] = new_mode
+                    print(f"🔄 \x1b[33m[{code}]\x1b[0m AI Mode Switched: \x1b[31m{old_mode}\x1b[0m ➔ \x1b[32m{new_mode}\x1b[0m (Instant Hot-Reload)", flush=True)
+            else:
                 worker = CameraWorkerThread(
                     cam, self.detector, self.ocr, self.object_detector, self.central_url, self.watchlist_mgr,
                     conf=0.20, iou=0.45, frame_stride=3
@@ -1410,6 +1420,7 @@ class DistributedWorkerManager:
                 worker.start()
                 self.workers[code] = worker
                 newly_attached += 1
+
 
         if newly_attached > 0:
             obj_cams = [c for c in assigned_cameras if c.get("detection_mode") == "OBJECT_DETECTION"]
