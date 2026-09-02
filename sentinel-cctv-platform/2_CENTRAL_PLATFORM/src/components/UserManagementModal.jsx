@@ -166,7 +166,7 @@ export const UserManagementModal = ({ isOpen, onClose, departments = [], addToas
 
   return (
     <div className="modal-overlay">
-      <div className="modal modal-lg" style={{ maxWidth: '850px', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="modal modal-lg" style={{ maxWidth: '1200px', width: '92vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         {/* Modal Head */}
         <div className="modal-head">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -197,7 +197,7 @@ export const UserManagementModal = ({ isOpen, onClose, departments = [], addToas
         {/* Modal Body */}
         <div className="modal-body" style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
           {activeTab === 'list' ? (
-            <div className="table-wrap" style={{ margin: 0, maxHeight: '420px' }}>
+            <div className="table-wrap" style={{ margin: 0, maxHeight: '520px' }}>
               <table>
                 <thead>
                   <tr>

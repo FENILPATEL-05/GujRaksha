@@ -435,7 +435,8 @@ export const ANPRIntelligencePage = ({
               isMuted={true}
               isDetailed={false}
               showAiVision={false}
-              defaultAiStream={true}
+              defaultAiStream={false}
+              allowAiStreamControls={true}
             />
 
 

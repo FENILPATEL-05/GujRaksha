@@ -9,7 +9,8 @@ export const LiveCCTVFeed = ({
   isMuted = true,
   isDetailed = false,
   showAiVision = false,
-  defaultAiStream = false
+  defaultAiStream = false,
+  allowAiStreamControls = false
 }) => {
   const videoRef = useRef(null);
   const imgRef = useRef(null);
@@ -22,10 +23,19 @@ export const LiveCCTVFeed = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
   const [activeProtocol, setActiveProtocol] = useState("WHEP WebRTC");
-  const [preferAiStream, setPreferAiStream] = useState(defaultAiStream);
+  const [preferAiStream, setPreferAiStream] = useState(allowAiStreamControls && defaultAiStream);
+
 
   const [enableObjDetection, setEnableObjDetection] = useState(true);
   const [enablePlateDetection, setEnablePlateDetection] = useState(true);
+  const [selectedClasses, setSelectedClasses] = useState({
+    person: true,
+    car: true,
+    bike: true,
+    truck_bus: true,
+    other: true
+  });
+
 
 
 
@@ -321,11 +331,12 @@ export const LiveCCTVFeed = ({
           source: aiSourceUrl,
           detect_objects: nextVal,
           detect_plates: enablePlateDetection,
-          trails: nextVal
+          trails: nextVal,
+          classes: selectedClasses
         })
       }).catch(() => {});
     } catch (_) {}
-  }, [enableObjDetection, enablePlateDetection, apiPrefix, aiSourceUrl]);
+  }, [enableObjDetection, enablePlateDetection, selectedClasses, apiPrefix, aiSourceUrl]);
 
   const handleTogglePlates = useCallback((e) => {
     e.stopPropagation();
@@ -338,11 +349,33 @@ export const LiveCCTVFeed = ({
         body: JSON.stringify({
           source: aiSourceUrl,
           detect_objects: enableObjDetection,
-          detect_plates: nextVal
+          detect_plates: nextVal,
+          classes: selectedClasses
         })
       }).catch(() => {});
     } catch (_) {}
+  }, [enableObjDetection, enablePlateDetection, selectedClasses, apiPrefix, aiSourceUrl]);
+
+  const handleToggleClass = useCallback((classKey, e) => {
+    if (e) e.stopPropagation();
+    setSelectedClasses(prev => {
+      const nextClasses = { ...prev, [classKey]: !prev[classKey] };
+      try {
+        fetch(`${apiPrefix}/api/v1/ai/stream_controls`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source: aiSourceUrl,
+            detect_objects: enableObjDetection,
+            detect_plates: enablePlateDetection,
+            classes: nextClasses
+          })
+        }).catch(() => {});
+      } catch (_) {}
+      return nextClasses;
+    });
   }, [enableObjDetection, enablePlateDetection, apiPrefix, aiSourceUrl]);
+
 
 
 
@@ -724,100 +757,162 @@ export const LiveCCTVFeed = ({
         </div>
       )}
 
-      {/* Stream Switcher Toggle & Dynamic Detection Filters */}
-      {!streamError && (
-        <div style={{
-          position: "absolute",
-          top: "8px",
-          right: "8px",
-          zIndex: 25,
-          display: "flex",
-          alignItems: "center",
-          gap: "4px"
-        }}>
+      {/* Stream Switcher Toggle & Dynamic Detection Filter Panel (Only when allowAiStreamControls is enabled) */}
+      {!streamError && allowAiStreamControls && (
+        <>
+          {/* Main Stream Mode Toggle (Segmented Switch: Raw Stream | AI Stream) */}
+          <div style={{
+            position: "absolute",
+            top: "8px",
+            right: "8px",
+            zIndex: 25,
+            display: "flex",
+            alignItems: "center",
+            background: "rgba(15, 23, 42, 0.92)",
+            padding: "3px",
+            borderRadius: "6px",
+            border: "1px solid rgba(255, 255, 255, 0.22)",
+            backdropFilter: "blur(8px)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+            gap: "3px"
+          }}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPreferAiStream(false);
+              }}
+              title="Standard Ultra-Fast Raw CCTV Feed (Hardware Acceleration)"
+              style={{
+                fontSize: "10px",
+                padding: "3px 8px",
+                background: !preferAiStream ? "rgba(59, 130, 246, 0.9)" : "transparent",
+                border: !preferAiStream ? "1px solid #3b82f6" : "1px solid transparent",
+                color: !preferAiStream ? "#fff" : "rgba(255, 255, 255, 0.65)",
+                borderRadius: "4px",
+                fontWeight: !preferAiStream ? 700 : 500,
+                cursor: "pointer",
+                transition: "all 0.15s ease"
+              }}
+            >
+              Raw Stream
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPreferAiStream(true);
+              }}
+              title="Real-Time AI Video Stream with Object Detection and ANPR Plates"
+              style={{
+                fontSize: "10px",
+                padding: "3px 8px",
+                background: preferAiStream ? "rgba(16, 185, 129, 0.9)" : "transparent",
+                border: preferAiStream ? "1px solid #10b981" : "1px solid transparent",
+                color: preferAiStream ? "#fff" : "rgba(255, 255, 255, 0.65)",
+                borderRadius: "4px",
+                fontWeight: preferAiStream ? 700 : 500,
+                cursor: "pointer",
+                transition: "all 0.15s ease"
+              }}
+            >
+              AI Stream
+            </button>
+          </div>
+
+
+          {/* AI Stream Checkboxes Panel (Directly below AI Stream) */}
           {preferAiStream && (
-            <>
-              {/* Toggle 1: Object Detection (Cars, Persons, Trails) */}
-              <button
-                type="button"
-                className="btn btn-xs"
-                onClick={handleToggleObjects}
-                title={enableObjDetection ? "Disable Object Detection (Hide Cars & Persons)" : "Enable Object Detection"}
-                style={{
-                  fontSize: "9.5px",
-                  padding: "2px 7px",
-                  background: enableObjDetection ? "rgba(59, 130, 246, 0.85)" : "rgba(15, 23, 42, 0.75)",
-                  border: enableObjDetection ? "1px solid #3b82f6" : "1px solid rgba(255, 255, 255, 0.2)",
-                  color: "#fff",
-                  borderRadius: "5px",
-                  backdropFilter: "blur(6px)",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "3px"
-                }}
-              >
-                <span>{enableObjDetection ? "✓" : "✗"}</span>
-                <span>🎯 Objects</span>
-              </button>
-
-              {/* Toggle 2: Number Plate Recognition (ANPR + OCR) */}
-              <button
-                type="button"
-                className="btn btn-xs"
-                onClick={handleTogglePlates}
-                title={enablePlateDetection ? "Disable Number Plate Recognition" : "Enable Number Plate Recognition"}
-                style={{
-                  fontSize: "9.5px",
-                  padding: "2px 7px",
-                  background: enablePlateDetection ? "rgba(234, 179, 8, 0.85)" : "rgba(15, 23, 42, 0.75)",
-                  border: enablePlateDetection ? "1px solid #eab308" : "1px solid rgba(255, 255, 255, 0.2)",
-                  color: "#fff",
-                  borderRadius: "5px",
-                  backdropFilter: "blur(6px)",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "3px"
-                }}
-              >
-                <span>{enablePlateDetection ? "✓" : "✗"}</span>
-                <span>🚘 Plates</span>
-              </button>
-            </>
-          )}
-
-
-          {/* Main Stream Mode Toggle */}
-          <button
-            type="button"
-            className="btn btn-xs"
-            onClick={(e) => {
-              e.stopPropagation();
-              setPreferAiStream(!preferAiStream);
-            }}
-            title={preferAiStream ? "Switch to Normal Raw Video Feed" : "Switch to Real-Time Baked-in AI Stream (Zero-Latency Sync)"}
-            style={{
-              fontSize: "10px",
-              padding: "2px 7px",
-              background: preferAiStream ? "rgba(16, 185, 129, 0.9)" : "rgba(15, 23, 42, 0.8)",
-              border: preferAiStream ? "1px solid #10b981" : "1px solid rgba(255, 255, 255, 0.2)",
-              color: "#fff",
-              borderRadius: "5px",
-              backdropFilter: "blur(6px)",
-              fontWeight: 700,
-              cursor: "pointer",
+            <div style={{
+              position: "absolute",
+              top: "38px",
+              right: "8px",
+              zIndex: 25,
+              background: "rgba(15, 23, 42, 0.92)",
+              padding: "7px 10px",
+              borderRadius: "6px",
+              border: "1px solid rgba(255, 255, 255, 0.18)",
+              backdropFilter: "blur(8px)",
+              boxShadow: "0 4px 14px rgba(0, 0, 0, 0.5)",
               display: "flex",
-              alignItems: "center",
-              gap: "4px"
-            }}
-          >
-            {preferAiStream ? "🎯 AI Stream (Sync)" : "🎥 Raw Stream"}
-          </button>
-        </div>
+              flexDirection: "column",
+              gap: "5px",
+              minWidth: "155px",
+              color: "#fff",
+              fontSize: "11px",
+              userSelect: "none"
+            }}>
+              {/* 1. Parent Checkbox: Object Detection */}
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontWeight: 700, margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={enableObjDetection}
+                  onChange={handleToggleObjects}
+                  style={{ accentColor: "#3b82f6", cursor: "pointer", width: "13px", height: "13px" }}
+                />
+                <span>Object Detection</span>
+              </label>
+
+              {/* Nested Child Checkboxes: Specific Classes */}
+              {enableObjDetection && (
+                <div style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "4px",
+                  paddingLeft: "16px",
+                  borderLeft: "2px solid rgba(59, 130, 246, 0.4)",
+                  marginLeft: "5px"
+                }}>
+                  {[
+                    { id: "person", label: "Person" },
+                    { id: "car", label: "Car" },
+                    { id: "bike", label: "Bike" },
+                    { id: "truck_bus", label: "Truck / Bus" },
+                    { id: "other", label: "Other" }
+                  ].map(item => (
+                    <label
+                      key={item.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        cursor: "pointer",
+                        fontSize: "10.5px",
+                        color: selectedClasses[item.id] ? "#fff" : "rgba(255, 255, 255, 0.5)",
+                        margin: 0
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!!selectedClasses[item.id]}
+                        onChange={(e) => handleToggleClass(item.id, e)}
+                        style={{ accentColor: "#3b82f6", cursor: "pointer", width: "12px", height: "12px" }}
+                      />
+                      <span>{item.label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ height: "1px", background: "rgba(255, 255, 255, 0.12)", margin: "2px 0" }} />
+
+              {/* 2. Parent Checkbox: Number Plate Recognition */}
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontWeight: 700, margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={enablePlateDetection}
+                  onChange={handleTogglePlates}
+                  style={{ accentColor: "#eab308", cursor: "pointer", width: "13px", height: "13px" }}
+                />
+                <span>Number Plate Recognition</span>
+              </label>
+            </div>
+          )}
+        </>
       )}
+
+
 
 
 
