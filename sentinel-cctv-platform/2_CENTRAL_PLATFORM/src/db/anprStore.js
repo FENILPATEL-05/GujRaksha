@@ -382,6 +382,7 @@ class AnprDataStore {
       vehicle_plate: cleanPlate,
       vehicle_type: payload.vehicle_type || (watchlistHit ? watchlistHit.vehicle_type : "Motor Vehicle"),
       vehicle_color: payload.vehicle_color || "Standard",
+      snapshot_url: payload.snapshot_url || null,
       camera_id: payload.camera_id || (camMeta ? camMeta.id : "gov-feed-1"),
       camera_code: payload.camera_code || (camMeta ? camMeta.camera_code : "GJ-GOV-001"),
       camera_name: payload.camera_name || (camMeta ? camMeta.name : "State CCTV Node"),
@@ -402,6 +403,37 @@ class AnprDataStore {
       dismissed_at: null
     };
 
+    // Save detection in in-memory list & JSON file
+    this.detections.unshift(newDetection);
+    if (this.detections.length > 500) {
+      this.detections = this.detections.slice(0, 500);
+    }
+    this.saveToFile();
+
+    // Direct Database Persistence (PostgreSQL)
+    if (pgClient.isConnected()) {
+      try {
+        await pgClient.query(
+          `INSERT INTO anpr_detections (
+            id, vehicle_plate, confidence, camera_id, camera_code, camera_name,
+            district, location_lat, location_lng, speed_kmh, vehicle_type,
+            is_watchlist_hit, watchlist_category, watchlist_fir, raw_payload, timestamp,
+            is_read, is_dismissed
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, FALSE, FALSE)
+          ON CONFLICT (id) DO NOTHING`,
+          [
+            newDetection.id, newDetection.vehicle_plate, parseInt(newDetection.confidence, 10) || 95,
+            newDetection.camera_id, newDetection.camera_code, newDetection.camera_name, newDetection.district,
+            newDetection.latitude, newDetection.longitude, newDetection.speed_kmh, newDetection.vehicle_type,
+            newDetection.is_watchlist_hit, newDetection.watchlist_category, newDetection.watchlist_fir, JSON.stringify(newDetection),
+            newDetection.timestamp
+          ]
+        );
+      } catch (err) {
+        console.warn("PG ANPR Detection Insert Error:", err.message);
+      }
+    }
+
     if (watchlistHit) {
       // Print High-Visibility Alert in Terminal
       console.log(`\n\x1b[41m\x1b[1m\x1b[37m 🚨 [ANPR ALERT] POLICE WATCHLIST TARGET DETECTED! \x1b[0m`);
@@ -415,37 +447,6 @@ class AnprDataStore {
       console.log(`   🕒 \x1b[1mTimestamp      :\x1b[0m ${newDetection.timestamp}`);
       console.log(`\x1b[31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m\n`);
 
-      // Keep in detections store
-      this.detections.unshift(newDetection);
-      if (this.detections.length > 500) {
-        this.detections = this.detections.slice(0, 500);
-      }
-      this.saveToFile();
-
-      // Direct Database Persistence (PostgreSQL)
-      if (pgClient.isConnected()) {
-        try {
-          await pgClient.query(
-            `INSERT INTO anpr_detections (
-              id, vehicle_plate, confidence, camera_id, camera_code, camera_name,
-              district, location_lat, location_lng, speed_kmh, vehicle_type,
-              is_watchlist_hit, watchlist_category, watchlist_fir, raw_payload, timestamp,
-              is_read, is_dismissed
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, FALSE, FALSE)
-            ON CONFLICT (id) DO NOTHING`,
-            [
-              newDetection.id, newDetection.vehicle_plate, parseInt(newDetection.confidence, 10) || 95,
-              newDetection.camera_id, newDetection.camera_code, newDetection.camera_name, newDetection.district,
-              newDetection.latitude, newDetection.longitude, newDetection.speed_kmh, newDetection.vehicle_type,
-              true, newDetection.watchlist_category, newDetection.watchlist_fir, JSON.stringify(newDetection),
-              newDetection.timestamp
-            ]
-          );
-        } catch (err) {
-          console.warn("PG ANPR Detection Insert Error:", err.message);
-        }
-      }
-
       // Broadcast ONLY watchlist hits to live SSE radar/alerts
       const alertObject = {
         id: `alert-${newDetection.id}`,
@@ -453,6 +454,7 @@ class AnprDataStore {
         title: `🚨 WATCHLIST ALERT: ${newDetection.watchlist_category ? newDetection.watchlist_category.replace("_", " ") : "SUSPECT DETECTED"}`,
         vehicleNo: newDetection.vehicle_plate,
         vehicle_plate: newDetection.vehicle_plate,
+        snapshot_url: newDetection.snapshot_url,
         description: `${newDetection.vehicle_plate} (${newDetection.vehicle_type}) · Matched ${newDetection.watchlist_fir || "Police Watchlist"} at ${newDetection.speed_kmh} km/h`,
         severity: newDetection.watchlist_category === "STOLEN_VEHICLE" ? "CRITICAL" : "HIGH",
         is_watchlist_hit: true,
@@ -467,17 +469,12 @@ class AnprDataStore {
         isNew: true
       };
       this.broadcastAlert(alertObject);
-      return newDetection;
     } else {
-      // Clean / non-watchlist vehicles are logged in console only (no popup alerts)
-      console.log(`\x1b[36m[ANPR SCAN]\x1b[0m 🚗 Plate: \x1b[1m\x1b[37m${cleanPlate}\x1b[0m | Camera: \x1b[33m${newDetection.camera_code}\x1b[0m | Status: \x1b[32mPASS (Clean Vehicle - No Alert)\x1b[0m`);
-      return {
-        vehicle_plate: cleanPlate,
-        is_watchlist_hit: false,
-        stored: false,
-        message: "Clean vehicle passed (Logged in console, no alert broadcasted)."
-      };
+      console.log(`\x1b[36m[ANPR SCAN]\x1b[0m 🚗 Plate: \x1b[1m\x1b[37m${cleanPlate}\x1b[0m | Camera: \x1b[33m${newDetection.camera_code}\x1b[0m | Snapshot: \x1b[32m${newDetection.snapshot_url || 'Saved'}\x1b[0m`);
     }
+
+    return newDetection;
+
   }
 
   async ingestBatch(payloads = []) {

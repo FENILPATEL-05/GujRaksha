@@ -385,15 +385,117 @@ class AsyncFrameReader:
                 pass
 
 
+# Local Disk Snapshot Storage Directory for ANPR Cameras
+SNAPSHOTS_BASE_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "../2_CENTRAL_PLATFORM/public/snapshots/anpr"))
+os.makedirs(SNAPSHOTS_BASE_DIR, exist_ok=True)
+CENTRAL_API_URL = os.environ.get("CENTRAL_API_URL", "http://localhost:3000/api/v1/anpr/ingest")
+
+
+class ANPRMetadataQueue:
+    """
+    Non-blocking background thread for saving local disk crop snapshots & indexing in Central DB.
+    Zero latency impact on 60 FPS video stream.
+    """
+    def __init__(self):
+        import queue
+        self.queue = queue.Queue(maxsize=1000)
+        self.plate_cooldown: Dict[str, float] = {}  # "camCode_plate" -> last_saved_epoch
+        self.thread = threading.Thread(target=self._worker_loop, daemon=True)
+        self.thread.start()
+
+    def submit(self, camera_id: str, camera_code: str, plate_text: str, ocr_conf: float, vehicle_crop: np.ndarray, vehicle_type: str = "Car"):
+        if not plate_text or len(plate_text) < 4:
+            return
+        clean_p = plate_text.upper().strip()
+        cooldown_key = f"{camera_code}_{clean_p}"
+        now = time.time()
+        # 30-second cooldown per vehicle plate on the same camera to prevent duplicate DB spam
+        if cooldown_key in self.plate_cooldown and (now - self.plate_cooldown[cooldown_key]) < 30.0:
+            return
+        self.plate_cooldown[cooldown_key] = now
+        try:
+            self.queue.put_nowait({
+                "camera_id": camera_id or "gov-feed-1",
+                "camera_code": camera_code or "GJ-GOV-001",
+                "plate_text": clean_p,
+                "ocr_conf": ocr_conf,
+                "crop": vehicle_crop.copy() if vehicle_crop is not None else None,
+                "vehicle_type": vehicle_type,
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            })
+        except Exception:
+            pass
+
+    def _worker_loop(self):
+        import urllib.request
+        while True:
+            try:
+                item = self.queue.get(timeout=1.0)
+            except Exception:
+                continue
+
+            try:
+                cam_code = item["camera_code"]
+                cam_id = item["camera_id"]
+                plate = item["plate_text"]
+                conf = int(item["ocr_conf"] * 100) if item["ocr_conf"] <= 1.0 else int(item["ocr_conf"])
+                v_type = item["vehicle_type"]
+                ts = item["timestamp"]
+
+                # 1. Save Snapshot JPEG to Local Disk (/public/snapshots/anpr/YYYY-MM-DD/...)
+                today_dir_name = time.strftime("%Y-%m-%d")
+                target_dir = os.path.join(SNAPSHOTS_BASE_DIR, today_dir_name)
+                os.makedirs(target_dir, exist_ok=True)
+
+                filename = f"{plate}_{int(time.time())}_{cam_code}.jpg"
+                filepath = os.path.join(target_dir, filename)
+                rel_url = f"/snapshots/anpr/{today_dir_name}/{filename}"
+
+                if item["crop"] is not None and item["crop"].size > 0:
+                    cv2.imwrite(filepath, item["crop"], [cv2.IMWRITE_JPEG_QUALITY, 85])
+
+                # 2. Ingest Metadata into Central Platform DB / anpr_detections
+                payload = json.dumps({
+                    "vehicle_plate": plate,
+                    "confidence": conf,
+                    "camera_id": cam_id,
+                    "camera_code": cam_code,
+                    "vehicle_type": v_type,
+                    "snapshot_url": rel_url,
+                    "timestamp": ts
+                }).encode("utf-8")
+
+                req = urllib.request.Request(
+                    CENTRAL_API_URL,
+                    data=payload,
+                    headers={"Content-Type": "application/json"}
+                )
+                try:
+                    with urllib.request.urlopen(req, timeout=3.0) as resp:
+                        pass
+                except Exception:
+                    # Non-fatal if node backend endpoint is momentarily restarting
+                    pass
+                logger.info(f"📸 [ANPR Snapshot Saved & DB Indexed] Plate: {plate} ({conf}%) | Cam: {cam_code} | Path: {rel_url}")
+            except Exception as e:
+                logger.error(f"Error persisting ANPR metadata: {e}")
+
+
+anpr_metadata_queue = ANPRMetadataQueue()
+
+
 class AsyncAIStreamEngine:
     """
     Decoupled Dual-Thread AI Engine:
     - Thread 1: Camera Reader + 60 FPS MJPEG Streamer (0ms latency, zero delay).
     - Thread 2: Background AI Inference Worker (runs deep learning in parallel on GPU/CPU).
     """
-    def __init__(self, source: str, fallback_source: Optional[str] = None):
+    def __init__(self, source: str, fallback_source: Optional[str] = None, is_anpr_camera: bool = False, camera_id: str = "", camera_code: str = ""):
         self.source = str(source)
         self.fallback_source = fallback_source
+        self.is_anpr_camera = bool(is_anpr_camera)
+        self.camera_id = camera_id or "gov-feed-1"
+        self.camera_code = camera_code or "GJ-GOV-001"
         self.reader = AsyncFrameReader(self.source, fallback_source=self.fallback_source)
         self.lock = threading.Lock()
         self.stopped = False
@@ -406,6 +508,7 @@ class AsyncAIStreamEngine:
 
         self.ai_thread = threading.Thread(target=self._ai_worker_loop, daemon=True)
         self.ai_thread.start()
+
 
     def _ai_worker_loop(self):
         byte_tracker = ByteTrackTracker(max_lost=30, iou_thresh=0.25, high_conf_thresh=0.25)
@@ -464,6 +567,16 @@ class AsyncAIStreamEngine:
                                                 if tr_id is not None:
                                                     self.vehicle_plate_cache[tr_id] = (clean_p, o_conf)
                                                 p_boxes.append((g_px1, g_py1, g_px2, g_py2, clean_p, o_conf))
+                                                # PERSIST SNAPSHOT & DB INDEX ONLY FOR ANPR-ENABLED CAMERAS
+                                                if self.is_anpr_camera:
+                                                    anpr_metadata_queue.submit(
+                                                        camera_id=self.camera_id,
+                                                        camera_code=self.camera_code,
+                                                        plate_text=clean_p,
+                                                        ocr_conf=o_conf,
+                                                        vehicle_crop=v_crop,
+                                                        vehicle_type=obj.get("label", "car").capitalize()
+                                                    )
                                                 break
                                     except Exception:
                                         pass
@@ -510,11 +623,14 @@ def generate_frames(
     enable_dwell: bool = False,
     enable_zone: bool = False,
     zone_polygon: Optional[List[List[int]]] = None,
-    fallback: Optional[str] = None
+    fallback: Optional[str] = None,
+    is_anpr: bool = False,
+    camera_id: Optional[str] = None,
+    camera_code: Optional[str] = None
 ):
     """
     Generator yielding multipart MJPEG frames with full OpenCV HUD annotations.
-    Full hardware camera speed (60 FPS) with automated HTTP/HLS fallback.
+    Full hardware camera speed (60 FPS) with automated HTTP/HLS fallback and ANPR snapshot storage.
     """
     global current_ai_stats, STREAM_DYNAMIC_CONTROLS
 
@@ -529,9 +645,16 @@ def generate_frames(
     stream_trail_tracker = TrailTracker(max_trail_length=45)
     stream_dwell_tracker = DwellTracker(dwell_threshold=8.0)
 
-    engine = AsyncAIStreamEngine(source, fallback_source=fallback)
+    engine = AsyncAIStreamEngine(
+        source,
+        fallback_source=fallback,
+        is_anpr_camera=is_anpr,
+        camera_id=camera_id or "gov-feed-1",
+        camera_code=camera_code or "GJ-GOV-001"
+    )
     current_ai_stats["is_active"] = True
     intrusion_zone = None
+
 
 
     try:
@@ -777,6 +900,9 @@ class AIStreamRequestHandler(BaseHTTPRequestHandler):
         if path in ["/api/v1/ai/video_feed", "/ai/video_feed"]:
             source = params.get("source", ["0"])[0]
             fallback = params.get("fallback", [None])[0]
+            is_anpr = params.get("is_anpr", ["false"])[0].lower() == "true"
+            camera_id = params.get("camera_id", ["gov-feed-1"])[0]
+            camera_code = params.get("camera_code", ["GJ-GOV-001"])[0]
             objects = params.get("detect_objects", params.get("objects", ["true"]))[0].lower() == "true"
             plates = params.get("detect_plates", params.get("plates", ["true"]))[0].lower() == "true"
             trails = params.get("trails", ["true"])[0].lower() == "true"
@@ -799,8 +925,21 @@ class AIStreamRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
             try:
-                for frame_bytes in generate_frames(source, objects, plates, trails, dwell, zone, zone_pts, fallback=fallback):
+                for frame_bytes in generate_frames(
+                    source,
+                    objects,
+                    plates,
+                    trails,
+                    dwell,
+                    zone,
+                    zone_pts,
+                    fallback=fallback,
+                    is_anpr=is_anpr,
+                    camera_id=camera_id,
+                    camera_code=camera_code
+                ):
                     self.wfile.write(frame_bytes)
+
 
             except (BrokenPipeError, ConnectionResetError):
                 pass

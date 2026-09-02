@@ -316,9 +316,13 @@ export const LiveCCTVFeed = ({
   const apiPrefix = typeof window !== 'undefined' && window.location.pathname.startsWith('/gujraksha') ? '/gujraksha' : '';
   const rtspProxyUrl = `${apiPrefix}/api/v1/proxy-stream?url=${encodeURIComponent(camera?.stream_url || camera?.rtsp_url || '')}`;
 
+  const isAnprCamera = !!(camera?.detection_mode === 'ANPR' || camera?.detection_mode === 'AI_ANPR' || camera?.ai_type === 'anpr' || (camera?.stream_properties && camera.stream_properties.enable_anpr));
+  const camId = camera?.id || camera?.camera_code || 'cam-1';
+  const camCode = camera?.camera_code || camera?.id || 'GJ-GOV-001';
   const aiSourceUrl = camera?.rtsp_url || camera?.stream_url || (camera?.urls && (camera.urls.rtsp || camera.urls.hls || camera.urls.whep)) || rawStreamUrl || "0";
   const aiFallbackUrl = camera?.hls_url || (camera?.urls && (camera.urls.hls || camera.urls.whep)) || (camera?.stream_url && !camera.stream_url.startsWith('rtsp://') ? camera.stream_url : '') || rawStreamUrl || "";
-  const aiStreamUrl = `${apiPrefix}/api/v1/ai/video_feed?source=${encodeURIComponent(aiSourceUrl)}&fallback=${encodeURIComponent(aiFallbackUrl)}&trails=true&dwell=false&zone=false`;
+  const aiStreamUrl = `${apiPrefix}/api/v1/ai/video_feed?source=${encodeURIComponent(aiSourceUrl)}&fallback=${encodeURIComponent(aiFallbackUrl)}&camera_id=${encodeURIComponent(camId)}&camera_code=${encodeURIComponent(camCode)}&is_anpr=${isAnprCamera}&trails=true&dwell=false&zone=false`;
+
 
 
   const handleToggleObjects = useCallback((e) => {
