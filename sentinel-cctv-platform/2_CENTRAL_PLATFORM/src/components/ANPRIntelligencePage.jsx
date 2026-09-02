@@ -170,11 +170,13 @@ export const ANPRIntelligencePage = ({
     return mode === 'ANPR_DETECTION' || mode === 'ANPR';
   }).length;
 
-  // STRICT Filter: ONLY cameras configured with detection_mode === "OBJECT_DETECTION"
-  const selectableCams = cameras.filter(c => 
+  // Allow explicit AI object detection cameras or fallback to all active system cameras
+  const explicitAiCams = cameras.filter(c => 
     c.detection_mode === "OBJECT_DETECTION" || 
-    c.detection_mode === "AI_OBJECT_DETECTION"
+    c.detection_mode === "AI_OBJECT_DETECTION" ||
+    !!c.enable_object_detection
   );
+  const selectableCams = explicitAiCams.length > 0 ? explicitAiCams : cameras;
 
   const activeVisionCam = selectableCams.find(c => String(c.id) === String(selectedVisionCamId)) || selectableCams[0] || null;
 

@@ -147,9 +147,8 @@ export const LiveCCTVFeed = ({
   const rawStreamUrl = camera ? (camera.stream_url || camera.rtsp_url || whepApiUrl) : "";
   const isRtspOnly = false;
 
-  // Determine if AI Vision overlay should be drawn based on camera's detection mode
-  const hasAiMode = !camera?.detection_mode || camera.detection_mode !== 'GENERAL_SURVEILLANCE' || !!camera.enable_object_detection;
-  const isAiActive = showAiVision && hasAiMode;
+  // Determine if AI Vision overlay should be drawn
+  const isAiActive = showAiVision || (!camera?.detection_mode || camera.detection_mode !== 'GENERAL_SURVEILLANCE' || !!camera.enable_object_detection);
 
   // Single Shared WebSocket Engine for Real-Time AI Bounding Boxes
   useEffect(() => {
@@ -159,7 +158,17 @@ export const LiveCCTVFeed = ({
     if (!isAiActive || !camera) {
       return;
     }
-    const camCode = camera.camera_code || camera.id || "GJ-GOV-001";
+
+    const primaryCode = camera.camera_code || camera.id || "GJ-GOV-001";
+    const subCodes = Array.from(new Set([
+      primaryCode,
+      camera.id,
+      camera.camera_code,
+      `cam-${camera.id}`,
+      `gov-feed-${camera.id}`,
+      String(camera.id || '').replace('gov-feed-', '')
+    ].filter(Boolean)));
+
     let isSubscribed = true;
     let staleDetectionTimer = null;
 
@@ -169,9 +178,8 @@ export const LiveCCTVFeed = ({
         if (isSubscribed) {
           setLiveDetections([]);
         }
-      }, 350);
+      }, 400);
     };
-
 
     const handleVisionFrame = (detections) => {
       if (!isSubscribed) return;
@@ -179,14 +187,14 @@ export const LiveCCTVFeed = ({
       resetStaleTimer();
     };
 
-    // Subscribe via single shared WebSocket singleton
-    aiVisionSocket.subscribe(camCode, handleVisionFrame);
+    // Subscribe via single shared WebSocket singleton across all code aliases
+    subCodes.forEach(code => aiVisionSocket.subscribe(code, handleVisionFrame));
 
     return () => {
       isSubscribed = false;
       setLiveDetections([]);
       if (staleDetectionTimer) clearTimeout(staleDetectionTimer);
-      aiVisionSocket.unsubscribe(camCode, handleVisionFrame);
+      subCodes.forEach(code => aiVisionSocket.unsubscribe(code, handleVisionFrame));
     };
   }, [isAiActive, camera?.camera_code, camera?.id]);
 

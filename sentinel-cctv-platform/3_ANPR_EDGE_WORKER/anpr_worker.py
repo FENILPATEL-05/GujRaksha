@@ -89,10 +89,7 @@ class VisionWebSocketClient:
             return
         self.last_attempt = now
         try:
-            ws = websocket.create_connection(self.ws_url, timeout=2.0)
-            ws.settimeout(0.3)
-            self.ws = ws
-            print(f"⚡ \x1b[32m[AI Vision WebSocket]\x1b[0m Connected to Central CCC at {self.ws_url}", flush=True)
+            self.ws = websocket.create_connection(self.ws_url, timeout=1.5)
             # Background listener to receive active camera target updates from UI
             threading.Thread(target=self._read_loop, daemon=True).start()
         except Exception:
@@ -108,8 +105,6 @@ class VisionWebSocketClient:
                         target = data.get("active_camera_code")
                         if target:
                             self.active_camera_target = str(target).strip()
-            except (websocket.WebSocketTimeoutException, socket.timeout):
-                continue
             except Exception:
                 break
 
@@ -131,8 +126,7 @@ class VisionWebSocketClient:
             if self.ws is not None:
                 try:
                     payload["type"] = "DETECTIONS_FRAME"
-                    data_str = json.dumps(payload)
-                    self.ws.send(data_str)
+                    self.ws.send(json.dumps(payload))
                     return True
                 except Exception:
                     try:
@@ -141,7 +135,6 @@ class VisionWebSocketClient:
                         pass
                     self.ws = None
             return False
-
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DET_TFLITE = os.path.join(SCRIPT_DIR, "models/tflite/plate_detector.tflite")
@@ -981,24 +974,9 @@ def get_shared_vision_ws(central_url: str):
     global GLOBAL_VISION_WS
     with GLOBAL_VISION_WS_LOCK:
         if GLOBAL_VISION_WS is None:
-            u = (central_url or "http://localhost:3000/api/v1").rstrip("/")
-            if u.endswith("/api/v1"):
-                base = u[:-7]
-            elif u.endswith("/api"):
-                base = u[:-4]
-            else:
-                base = u
-
-            if base.startswith("https://"):
-                ws_url = "wss://" + base[8:] + "/ws/ai-vision"
-            elif base.startswith("http://"):
-                ws_url = "ws://" + base[7:] + "/ws/ai-vision"
-            else:
-                ws_url = f"ws://{base}/ws/ai-vision"
-
-            GLOBAL_VISION_WS = VisionWebSocketClient(ws_url)
+            ws_host = central_url.replace("http://", "ws://").replace("https://", "wss://").replace("/api/v1", "").replace("/api", "").rstrip("/")
+            GLOBAL_VISION_WS = VisionWebSocketClient(f"{ws_host}/ws/ai-vision")
         return GLOBAL_VISION_WS
-
 
 
 class CameraWorkerThread(threading.Thread):
@@ -1030,7 +1008,6 @@ class CameraWorkerThread(threading.Thread):
         self.dwell_tracker = DwellTracker(dwell_threshold=8.0)
         self.intrusion_zone = None
         self.running = True
-        self.reconnect_requested = False
         self.recent_detections = {}
         self.is_connected = False
         self.last_live_dispatch = 0
@@ -1041,12 +1018,6 @@ class CameraWorkerThread(threading.Thread):
 
     def stop(self):
         self.running = False
-
-    def request_stream_update(self, new_url: str, new_cam_info: dict):
-        self.cam_info = new_cam_info
-        if str(self.stream_url) != str(new_url):
-            self.stream_url = new_url
-            self.reconnect_requested = True
 
     def open_capture(self):
         try:
@@ -1069,68 +1040,40 @@ class CameraWorkerThread(threading.Thread):
         frame_counter = 0
         cap = None
 
-        try:
-            while self.running:
-                cam_mode = str(self.cam_info.get("detection_mode") or "ANPR_DETECTION").upper()
-                if cam_mode == "GENERAL_SURVEILLANCE":
-                    GLOBAL_STATS.set_status(self.camera_code, "REMOVED")
-                    break
-
-                if getattr(self, "reconnect_requested", False):
-
-                    self.reconnect_requested = False
-                    if cap is not None:
-                        try:
-                            cap.release()
-                        except Exception:
-                            pass
-                        cap = None
-
-                # 1. Connect or Reconnect loop (Quiet background retry)
+        while self.running:
+            # 1. Connect or Reconnect loop (Quiet background retry)
+            if cap is None or not cap.isOpened():
+                GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
+                self.is_connected = False
+                cap = self.open_capture()
                 if cap is None or not cap.isOpened():
-                    GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
-                    self.is_connected = False
-                    cap = self.open_capture()
-                    if cap is None or not cap.isOpened():
-                        # Sleep quietly before retrying (No error spam!)
-                        for _ in range(30):
-                            if not self.running:
-                                break
-                            time.sleep(0.1)
-                        continue
-                    else:
-                        GLOBAL_STATS.set_status(self.camera_code, "ACTIVE")
-                        self.is_connected = True
-                        cur_mode = str(self.cam_info.get("detection_mode") or "ANPR_DETECTION").upper()
-                        mode_label = "🚗 License Plates (ANPR)" if cur_mode == "ANPR_DETECTION" else ("🎯 Surveillance Objects" if cur_mode == "OBJECT_DETECTION" else "🛡️ Standard Stream (No AI)")
-                        print(f"\x1b[32m[CAMERA ONLINE]\x1b[0m 🎥 \x1b[33m[{self.camera_code}]\x1b[0m Connected to {self.stream_url} — Mode: {mode_label}", flush=True)
+                    # Sleep quietly before retrying (No error spam!)
+                    for _ in range(30):
+                        if not self.running:
+                            break
+                        time.sleep(0.1)
+                    continue
+                else:
+                    GLOBAL_STATS.set_status(self.camera_code, "ACTIVE")
+                    self.is_connected = True
 
-                # 2. Frame Processing Loop (Synchronized Real-Time Capture)
+            # 2. Frame Processing Loop (Synchronized Real-Time Capture)
+            try:
                 # Flush buffer for live network streams so inference is always on the latest frame
                 if str(self.stream_url).startswith("rtsp://") or str(self.stream_url).startswith("rtsps://") or "stream" in str(self.stream_url):
                     for _ in range(4):
-                        if cap and self.running:
-                            cap.grab()
+                        cap.grab()
 
+                ret, frame = cap.read()
+                if not ret or frame is None or frame.shape[0] < 50:
+                    cap.release()
+                    cap = None
+                    GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
+                    time.sleep(0.5)
+                    continue
 
-                    if not cap or not self.running:
-                        break
-
-                    ret, frame = cap.read()
-                    if not ret or frame is None or frame.shape[0] < 50:
-                        if cap:
-                            try:
-                                cap.release()
-                            except Exception:
-                                pass
-                        cap = None
-                        GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
-                        time.sleep(0.5)
-                        continue
-
-                    frame_counter += 1
-                    now = time.time()
-
+                frame_counter += 1
+                now = time.time()
 
                 is_selected_vision_cam = self.ws_client.is_camera_active_target(self.camera_code, self.camera_id) if self.ws_client else True
                 effective_stride = 1 if is_selected_vision_cam else self.frame_stride
@@ -1140,17 +1083,12 @@ class CameraWorkerThread(threading.Thread):
 
                 h, w = frame.shape[:2]
 
-                cam_mode = str(self.cam_info.get("detection_mode") or "ANPR_DETECTION").upper()
-
-                # Exact 3 Project Modes:
-                # - ANPR_DETECTION: Strictly Plate Detection & OCR Only
-                # - OBJECT_DETECTION: Strictly Object Detection & ByteTrack Only
-                # - GENERAL_SURVEILLANCE: Standard Video (No AI)
-                is_anpr_cam = (cam_mode == "ANPR_DETECTION") and (self.detector is not None)
-                is_obj_cam = (cam_mode == "OBJECT_DETECTION") and (self.object_detector is not None)
+                cam_mode = str(self.cam_info.get("detection_mode") or "").upper()
+                is_obj_cam = (cam_mode in ["OBJECT_DETECTION", "AI_OBJECT_DETECTION", "TRAFFIC_MONITORING", "VEHICLE_COUNTING"] or bool(self.cam_info.get("enable_object_detection")))
+                is_anpr_cam = (cam_mode in ["ANPR_DETECTION", "ANPR", "TRAFFIC_MONITORING"] or not cam_mode)
 
 
-                # 3. License Plate Detection (Runs strictly when is_anpr_cam is True)
+                # 3. License Plate Detection (Runs strictly on ANPR cameras)
                 raw_boxes = []
                 if is_anpr_cam and self.detector is not None:
                     if hasattr(self.detector, "triton_client") or getattr(self.detector, "accel_mode", "").startswith("GPU"):
@@ -1159,16 +1097,16 @@ class CameraWorkerThread(threading.Thread):
                         with INFERENCE_LOCK:
                             raw_boxes = self.detector.detect(frame, self.conf, self.iou)
 
-                # 4. Target-Specific Object Detection (Runs strictly when is_obj_cam is True)
+                # 4. Target-Specific Object & Vehicle Detection (Runs on OBJECT_DETECTION cameras & active UI target)
                 raw_objects = []
-                if is_obj_cam and self.object_detector is not None:
+                is_selected_vision_cam = self.ws_client.is_camera_active_target(self.camera_code, self.camera_id) if self.ws_client else True
+
+                if (is_obj_cam or (is_selected_vision_cam and cam_mode != "GENERAL_SURVEILLANCE")) and self.object_detector is not None:
                     if hasattr(self.object_detector, "triton_client") or getattr(self.object_detector, "accel_mode", "").startswith("GPU"):
-                        raw_objects = self.object_detector.detect(frame, conf_thresh=0.25, iou_thresh=0.45)
+                        raw_objects = self.object_detector.detect(frame, conf_thresh=0.30, iou_thresh=0.45)
                     else:
                         with INFERENCE_LOCK:
-                            raw_objects = self.object_detector.detect(frame, conf_thresh=0.25, iou_thresh=0.45)
-
-
+                            raw_objects = self.object_detector.detect(frame, conf_thresh=0.30, iou_thresh=0.45)
 
 
                 # Initialize default virtual intrusion security perimeter zone if not present
@@ -1285,10 +1223,9 @@ class CameraWorkerThread(threading.Thread):
                                     pass
                             else:
                                 # Clean / normal vehicle scan (Clean, compact log)
-                                print(f"\x1b[36m[ANPR SCAN]\x1b[0m 🚗 \x1b[33m[{self.camera_code}]\x1b[0m Plate: \x1b[1m\x1b[37m{cleaned_text}\x1b[0m ({v_color} {v_type} | Conf: {ocr_conf * 100:.1f}%) | Time: {time_str}", flush=True)
+                                print(f"\x1b[36m[ANPR SCAN]\x1b[0m 🚗 \x1b[33m[{self.camera_code}]\x1b[0m Plate: \x1b[1m\x1b[37m{cleaned_text}\x1b[0m | Time: {time_str}", flush=True)
 
                         plate_detections_for_frame.append({
-
                             "box": [x1, y1, x2, y2],
                             "normalized_box": [round(y1 / h, 4), round(x1 / w, 4), round(y2 / h, 4), round(x2 / w, 4)],
                             "label": f"PLATE: {cleaned_text}" if cleaned_text else "LICENSE_PLATE",
@@ -1370,24 +1307,15 @@ class CameraWorkerThread(threading.Thread):
 
                 time.sleep(0.01)
 
-        except Exception:
-            if cap:
-                try:
+            except Exception:
+                if cap:
                     cap.release()
-                except Exception:
-                    pass
-            cap = None
-            GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
+                cap = None
+                GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
+                time.sleep(1.0)
 
-        finally:
-            if cap:
-                try:
-                    cap.release()
-                except Exception:
-                    pass
-            cap = None
-            GLOBAL_STATS.set_status(self.camera_code, "REMOVED")
-
+        if cap:
+            cap.release()
 
 
 class DistributedWorkerManager:
@@ -1418,24 +1346,16 @@ class DistributedWorkerManager:
             req = urllib.request.Request(reg_url, data=data_bytes, headers={"Content-Type": "application/json"}, method="POST")
             with urllib.request.urlopen(req, timeout=4.0) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
-                worker_data = data.get("data", {})
-                watchlist = worker_data.get("watchlist") or []
+                watchlist = data.get("data", {}).get("watchlist") or []
                 self.watchlist_mgr.update_from_list(watchlist)
-                assigned = worker_data.get("assigned_cameras") or []
-
                 print(f"📡 [Central Orchestrator] Worker \x1b[36m{self.worker_id}\x1b[0m connected to Central CCC", flush=True)
                 print(f"   🧠 AI Vision Engine: \x1b[1m\x1b[32mACTIVE\x1b[0m (YOLOv9 Object Detection & ANPR OCR Pipeline | {self.accel_mode})", flush=True)
                 print(f"   📋 Watchlist Database: \x1b[33m{len(self.watchlist_mgr.watchlist_map)} suspect targets\x1b[0m loaded", flush=True)
-
-                if assigned:
-                    self.sync_camera_workers(assigned)
-                else:
-                    print(f"   📊 Node Status: \x1b[35mSTANDBY / READY\x1b[0m (Awaiting Central camera dispatch)", flush=True)
+                print(f"   📊 Node Status: \x1b[35mSTANDBY / READY\x1b[0m (Awaiting Central camera dispatch)", flush=True)
                 return True
         except Exception as e:
-            print(f"⚠️ [Central Orchestrator] Standby waiting for Central CCC ({e})...", flush=True)
+            print(f"⚠️ [Central Orchestrator] Standby waiting for Central CCC...", flush=True)
             return False
-
 
     def heartbeat(self):
         """Send heartbeat and receive assigned cameras + updated watchlist."""
@@ -1467,35 +1387,14 @@ class DistributedWorkerManager:
         if assigned_cameras is None:
             return
 
-        # Strictly filter assigned cameras to active AI modes (ANPR_DETECTION or OBJECT_DETECTION)
-        active_ai_cameras = [
-            c for c in assigned_cameras
-            if str(c.get("detection_mode") or "").upper() in ["ANPR_DETECTION", "OBJECT_DETECTION"]
-        ]
-
         current_codes = set()
         newly_attached = 0
 
-        for cam in active_ai_cameras:
+        for cam in assigned_cameras:
             code = cam.get("camera_code") or cam.get("code") or f"CAM-{cam.get('id')}"
             current_codes.add(code)
 
-            new_url = str(cam.get("rtsp_url") or cam.get("stream_url") or cam.get("url") or "0")
-            new_mode = str(cam.get("detection_mode") or "ANPR_DETECTION").upper()
-
-            if code in self.workers and self.workers[code].is_alive():
-                existing_worker = self.workers[code]
-                old_url = str(existing_worker.stream_url)
-                old_mode = str(existing_worker.cam_info.get("detection_mode") or "").upper()
-
-                if old_mode != new_mode:
-                    existing_worker.cam_info["detection_mode"] = new_mode
-                    print(f"🔄 \x1b[33m[{code}]\x1b[0m AI Mode Switched: \x1b[35m{old_mode}\x1b[0m ➔ \x1b[32m{new_mode}\x1b[0m (Instant Hot-Reload)", flush=True)
-
-                if old_url != new_url:
-                    print(f"🔄 \x1b[33m[{code}]\x1b[0m RTSP Stream URL Updated: {old_url} ➔ {new_url} — Reconnecting...", flush=True)
-                    existing_worker.request_stream_update(new_url, cam)
-            else:
+            if code not in self.workers or not self.workers[code].is_alive():
                 worker = CameraWorkerThread(
                     cam, self.detector, self.ocr, self.object_detector, self.central_url, self.watchlist_mgr,
                     conf=0.20, iou=0.45, frame_stride=3
@@ -1504,20 +1403,19 @@ class DistributedWorkerManager:
                 self.workers[code] = worker
                 newly_attached += 1
 
-
         if newly_attached > 0:
-            obj_cams = [c for c in active_ai_cameras if c.get("detection_mode") == "OBJECT_DETECTION"]
-            anpr_cams = [c for c in active_ai_cameras if c.get("detection_mode") == "ANPR_DETECTION"]
+            obj_cams = [c for c in assigned_cameras if c.get("detection_mode") == "OBJECT_DETECTION"]
+            anpr_cams = [c for c in assigned_cameras if c.get("detection_mode") != "OBJECT_DETECTION"]
 
-            print(f"\n⚡ \x1b[1m\x1b[32m[Cluster Dispatch] {len(active_ai_cameras)} AI Cameras Auto-Assigned by Central CCC\x1b[0m", flush=True)
+            print(f"\n⚡ \x1b[1m\x1b[32m[Cluster Dispatch] {len(assigned_cameras)} Cameras Auto-Assigned by Central CCC\x1b[0m", flush=True)
             if len(obj_cams) > 0:
                 obj_codes = ", ".join([c.get("camera_code") or c.get("id") for c in obj_cams[:4]])
                 print(f"   🎯 \x1b[35m[AI OBJECT DETECTION]\x1b[0m {len(obj_cams)} Feeds Active ({obj_codes})", flush=True)
             if len(anpr_cams) > 0:
                 print(f"   🚗 \x1b[36m[ANPR SCANNER]\x1b[0m {len(anpr_cams)} Feeds Active (License Plate Recognition & Watchlist)", flush=True)
-            print(f"   🚀 Live multi-threaded AI vision scanning running across all {len(active_ai_cameras)} cameras...\n", flush=True)
+            print(f"   🚀 Live multi-threaded AI vision scanning running across all {len(assigned_cameras)} cameras...\n", flush=True)
 
-        # Detach unassigned or No AI (GENERAL_SURVEILLANCE) cameras
+        # Detach unassigned cameras
         detached = 0
         for code in list(self.workers.keys()):
             if code not in current_codes:
@@ -1527,8 +1425,7 @@ class DistributedWorkerManager:
                 detached += 1
 
         if detached > 0:
-            print(f"⏹️ \x1b[33m[Cluster Dispatch]\x1b[0m Detached {detached} cameras (No AI / Removed). Active AI feeds: {len(self.workers)}", flush=True)
-
+            print(f"⏹️ [Cluster Dispatch] Revoked {detached} cameras (Active feeds: {len(assigned_cameras)}).", flush=True)
 
     def start(self):
         print("======================================================================")
