@@ -3,7 +3,9 @@ import L from 'leaflet';
 import { useTheme } from '../context/ThemeContext';
 import { IncidentRadarPanel } from './IncidentRadarPanel';
 import { PoliceTacticalDock } from './PoliceTacticalDock';
-import { Plus, Minus, Crosshair, Radio, ShieldAlert, Layers, Eye, MapPin, Shield } from 'lucide-react';
+import { Plus, Minus, Crosshair, Radio, ShieldAlert, Layers, Eye, MapPin, Shield, X, AlertTriangle } from 'lucide-react';
+
+
 
 const GUJARAT_DISTRICT_COORDS = {
   'Ahmedabad': [23.0225, 72.5714],
@@ -189,11 +191,12 @@ export const MapView = ({
             // Display Toast notification
             if (typeof addToast === 'function') {
               addToast(
-                `🚨 POLICE WATCHLIST HIT: ${data.vehicleNo || data.vehicle_plate} spotted at ${cam.name} (${cam.district || 'Gujarat'})`,
+                `POLICE WATCHLIST HIT: ${data.vehicleNo || data.vehicle_plate} spotted at ${cam.name} (${cam.district || 'Gujarat'})`,
                 'error',
                 'CRITICAL SECURITY THREAT'
               );
             }
+
 
             // Auto-pan to camera location on real incoming alert
             if (leafletMap.current && cam.latitude && cam.longitude) {
@@ -391,7 +394,7 @@ export const MapView = ({
       return `
         <div class="popup-card alarm-popup">
           <div class="alarm-popup-banner">
-            <span class="alarm-live-badge">🚨 REAL-TIME AI THREAT ACTIVE</span>
+            <span class="alarm-live-badge">REAL-TIME AI THREAT ACTIVE</span>
             <span class="threat-severity-badge ${(activeThreat.severity || 'HIGH').toLowerCase()}">${activeThreat.severity || 'HIGH'}</span>
           </div>
           <div class="popup-head" style="margin-top: 8px;">
@@ -452,7 +455,6 @@ export const MapView = ({
         <div class="popup-head" style="border-bottom: 1px solid var(--panel-border-strong); padding-bottom: 8px; margin-bottom: 8px;">
           <div>
             <div class="pname" style="display: flex; align-items: center; gap: 6px;">
-              ${hasAlarm ? '<span>🚨</span>' : ''}
               <span>${count} Cameras Grouped</span>
             </div>
             <div class="pid">${clusterCameras[0]?.district || 'Gujarat'} Area · Co-located Cameras</div>
@@ -689,7 +691,7 @@ export const MapView = ({
         if (isAlarmActive) {
           const severityClass = (activeThreat.severity || 'high').toLowerCase();
           markerHtml = `
-            <div class="cam-pin cam-badge-pin alarm-active ${severityClass}" title="${cam.name} (${cam.camera_code || cam.id}) · 🚨 Real-Time Threat Active">
+            <div class="cam-pin cam-badge-pin alarm-active ${severityClass}" title="${cam.name} (${cam.camera_code || cam.id}) · Real-Time Threat Active">
               <div class="alarm-tight-pulse"></div>
               <div class="cam-badge-core alarm-core">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
@@ -698,6 +700,7 @@ export const MapView = ({
             </div>
           `;
         } else {
+
           markerHtml = `
             <div class="cam-pin cam-badge-pin ${statusClass}" title="${cam.name} (${cam.camera_code || cam.id})">
               <div class="ring"></div>
@@ -980,7 +983,7 @@ export const MapView = ({
             <span className="alarm-pulse-dot"></span>
             <div>
               <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--danger)', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-                🚨 ACTIVE VEHICLE ROUTE TRAJECTORY TRACED
+                ACTIVE VEHICLE ROUTE TRAJECTORY TRACED
               </div>
               <div style={{ fontSize: '13px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
                 <span className="plate-number" style={{ background: '#000', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>
@@ -997,9 +1000,9 @@ export const MapView = ({
           <button
             className="btn btn-sm"
             onClick={onClearTrackVehicle}
-            style={{ background: 'var(--danger)', color: '#fff', fontSize: '11px', padding: '5px 12px', fontWeight: 700 }}
+            style={{ background: 'var(--danger)', color: '#fff', fontSize: '11px', padding: '5px 12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
-            ✕ Exit Route Mode
+            <X size={12} /> Exit Route Mode
           </button>
         </div>
       )}
@@ -1026,8 +1029,8 @@ export const MapView = ({
             maxWidth: '92vw'
           }}
         >
-          <div style={{ background: '#fff', color: '#e11d48', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '18px', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-            🚨
+          <div style={{ background: '#fff', color: '#e11d48', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+            <ShieldAlert size={20} color="#e11d48" strokeWidth={2.4} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -1038,10 +1041,12 @@ export const MapView = ({
                 {latestLiveHit.watchlist_category || 'STOLEN VEHICLE'}
               </span>
             </div>
-            <div style={{ fontSize: '11px', opacity: 0.95, marginTop: '2px' }}>
-              📍 Spotted at <b>{latestLiveHit.camera?.name || latestLiveHit.cameraName || 'Gujarat CCTV Node'}</b> [{latestLiveHit.camera?.camera_code || latestLiveHit.cameraCode || 'GJ-GOV'}] ({latestLiveHit.district || 'Gujarat'})
+            <div style={{ fontSize: '11px', opacity: 0.95, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <MapPin size={11} style={{ flexShrink: 0 }} />
+              <span>Spotted at <b>{latestLiveHit.camera?.name || latestLiveHit.cameraName || 'Gujarat CCTV Node'}</b> [{latestLiveHit.camera?.camera_code || latestLiveHit.cameraCode || 'GJ-GOV'}] ({latestLiveHit.district || 'Gujarat'})</span>
             </div>
           </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
             <button
               className="btn btn-sm"

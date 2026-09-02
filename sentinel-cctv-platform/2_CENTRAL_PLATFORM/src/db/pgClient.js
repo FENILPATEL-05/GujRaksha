@@ -124,11 +124,24 @@ class PostgresDatabase extends EventEmitter {
           }
           await this.autoSeedInitialData(client);
         }
+
+        // Drop deprecated columns from departments table
+        try {
+          await client.query(`
+            ALTER TABLE departments DROP COLUMN IF EXISTS status;
+            ALTER TABLE departments DROP COLUMN IF EXISTS category;
+            ALTER TABLE departments DROP COLUMN IF EXISTS description;
+            ALTER TABLE departments DROP COLUMN IF EXISTS icon;
+          `);
+        } catch (migErr) {
+          // Ignore if columns already removed or table not present
+        }
       } catch (checkErr) {
         console.warn('⚠️ [PostgreSQL Check Notice]:', checkErr.message);
       }
 
       client.release();
+
       this.ready = true;
       this.emit('ready');
     } catch (err) {
@@ -164,13 +177,14 @@ class PostgresDatabase extends EventEmitter {
       if (parseInt(deptRes.rows[0].count, 10) === 0) {
         for (const d of initialDepartments) {
           await client.query(
-            `INSERT INTO departments (code, name, category, nodal_officer, contact_email, contact_phone, status, icon, color, description)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            `INSERT INTO departments (code, name, nodal_officer, contact_email, contact_phone, color)
+             VALUES ($1, $2, $3, $4, $5, $6)
              ON CONFLICT (code) DO NOTHING`,
-            [d.code, d.name, d.category, d.nodal_officer, d.contact_email, d.contact_phone, d.status, d.icon, d.color, d.description]
+            [d.code, d.name, d.nodal_officer, d.contact_email, d.contact_phone, d.color]
           );
         }
         console.log(`📦 [PostgreSQL Seed] Inserted ${initialDepartments.length} departments into database.`);
+
       }
 
       // Check Cameras

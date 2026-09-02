@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
 import {
+  Camera,
+  Cctv,
+  Radar,
+  Disc,
+  Video,
   FileSpreadsheet,
   Search,
   FolderOpen,
@@ -19,29 +24,82 @@ import {
   Layers,
   Eye,
   Building2,
-  Lock
+  Lock,
+  RefreshCw,
+  Info
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Pagination } from './Pagination';
 
+const renderCameraTypeIcon = (type, size = 16) => {
+  const normalized = String(type || '').toUpperCase();
+  if (normalized.includes('ANPR')) {
+    return <Zap size={size} strokeWidth={2.4} style={{ color: '#38bdf8' }} title="ANPR Special Camera" />;
+  }
+  if (normalized.includes('PTZ') || normalized.includes('SPEED')) {
+    return <Radar size={size} strokeWidth={2.2} style={{ color: '#818cf8' }} title="PTZ Speed Dome Camera" />;
+  }
+  if (normalized.includes('DOME')) {
+    return <Disc size={size} strokeWidth={2.2} style={{ color: '#34d399' }} title="Dome Indoor Camera" />;
+  }
+  if (normalized.includes('BULLET') || normalized.includes('FIXED')) {
+    return <Video size={size} strokeWidth={2.2} style={{ color: '#f59e0b' }} title="Fixed Bullet HD Camera" />;
+  }
+  return <Cctv size={size} strokeWidth={2.2} style={{ color: 'var(--accent)' }} title="CCTV Camera Node" />;
+};
+
 const renderDetectionModeBadge = (mode) => {
+
   const normalized = String(mode || '').toUpperCase();
   if (normalized.includes('ANPR') && !normalized.includes('NO_ANPR') && !normalized.includes('GENERAL')) {
     return (
-      <span className="badge-ai-mode anpr" title="ANPR: Automatic License Plate Recognition Enabled">
-        <Zap size={11} strokeWidth={2.4} />
-        <span>ANPR</span>
+      <span
+        className="badge-ai-mode anpr"
+        title="ANPR Active: Automatic License Plate Recognition Enabled"
+        style={{
+          background: 'rgba(34, 211, 238, 0.16)',
+          border: '1.2px solid rgba(34, 211, 238, 0.55)',
+          color: '#38bdf8',
+          fontWeight: 800,
+          padding: '3px 8px',
+          borderRadius: '6px',
+          boxShadow: '0 0 10px -2px rgba(34, 211, 238, 0.4)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          fontSize: '11px'
+        }}
+      >
+        <Zap size={11} strokeWidth={2.6} style={{ color: '#38bdf8' }} />
+        <span>ANPR ACTIVE</span>
       </span>
+
     );
   } else {
     return (
-      <span className="badge-ai-mode surveillance" title="Standard Video Surveillance (No ANPR)">
-        <Eye size={11} strokeWidth={2.2} />
+      <span
+        className="badge-ai-mode surveillance"
+        title="Standard Video Surveillance (No ANPR)"
+        style={{
+          background: 'rgba(100, 116, 139, 0.12)',
+          border: '1px solid rgba(100, 116, 139, 0.25)',
+          color: '#94a3b8',
+          fontWeight: 500,
+          padding: '3px 8px',
+          borderRadius: '6px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          fontSize: '11px'
+        }}
+      >
+        <Eye size={11} strokeWidth={2} />
         <span>No ANPR</span>
       </span>
     );
   }
 };
+
 
 
 
@@ -55,16 +113,30 @@ export const CameraRegistryPage = ({
   onBulkDeleteCameras,
   onExportCsv,
   onAddCamera,
+  onSyncFeeds,
   departments = [],
   isLoading = false
 }) => {
   const { isSuperAdmin, isDeptAdmin, isViewer, userDepartmentId, userDepartmentName, canManageCameras } = useAuth();
-  const [expandedCameraId, setExpandedCameraId] = useState(null);
+  const [selectedCameraForDetails, setSelectedCameraForDetails] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [selectedCameraIds, setSelectedCameraIds] = useState(new Set());
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+
+  const handleSyncClick = async () => {
+    if (!onSyncFeeds) return;
+    setIsSyncing(true);
+    try {
+      await onSyncFeeds();
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
 
   // Pagination calculation
   const totalItems = cameras.length;
@@ -72,16 +144,13 @@ export const CameraRegistryPage = ({
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentCameras = cameras.slice(startIndex, startIndex + itemsPerPage);
 
-  const toggleExpand = (id) => {
-    setExpandedCameraId(prev => (prev === id ? null : id));
-  };
-
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
-      setExpandedCameraId(null);
+      setSelectedCameraForDetails(null);
     }
   };
+
 
   // Multi-Selection Handlers
   const isAllCurrentPageSelected = currentCameras.length > 0 && currentCameras.every(c => selectedCameraIds.has(c.id));
@@ -146,38 +215,52 @@ export const CameraRegistryPage = ({
     <div className="table-view">
       {/* Unified Single-Row Search, Filter & Action Toolbar */}
       <div className="table-unified-toolbar">
-        {/* Title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 800, whiteSpace: "nowrap" }}>
+        {/* Title & Count Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 800, whiteSpace: "nowrap" }}>
             Cameras
           </h2>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: 800,
+            padding: '2px 8px',
+            borderRadius: '6px',
+            background: 'var(--input-bg)',
+            border: '1px solid var(--panel-border)',
+            color: 'var(--text-secondary)'
+          }}>
+            {cameras.length} Assets
+          </span>
+
           {isDeptAdmin && (
-            <span className="badge" style={{ background: 'rgba(34, 211, 238, 0.15)', color: '#22d3ee', border: '1px solid rgba(34, 211, 238, 0.3)', fontSize: '11px', gap: '4px' }}>
+            <span className="badge" style={{ background: 'rgba(34, 211, 238, 0.12)', color: 'var(--accent)', border: '1px solid rgba(34, 211, 238, 0.3)', fontSize: '11px', gap: '4px' }}>
               <Building2 size={11} strokeWidth={2.5} /> {userDepartmentName || userDepartmentId}
             </span>
           )}
         </div>
 
-        {/* Left Side: Search & Popover Filter Button */}
-        <div className="toolbar-filters-group">
-          <div className="search-box">
+        {/* Right Side: Compact Search, Filter & Action Buttons */}
+        <div className="toolbar-actions-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginLeft: 'auto' }}>
+          {/* Compact Search Box */}
+          <div className="search-box" style={{ width: '230px', minWidth: '180px', flex: 'none', height: '36px' }}>
             {isLoading ? (
-              <Loader2 size={14} strokeWidth={2.5} className="animate-spin" style={{ color: 'var(--accent)', flexShrink: 0 }} />
+              <Loader2 size={13} strokeWidth={2.5} className="animate-spin" style={{ color: 'var(--accent)', flexShrink: 0 }} />
             ) : (
-              <Search size={14} strokeWidth={2.2} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+              <Search size={13} strokeWidth={2.2} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
             )}
             <input
               type="text"
-              placeholder={isLoading ? "Searching statewide cameras..." : "Search ID, Location, District, VMS..."}
+              placeholder={isLoading ? "Searching..." : "Search cameras..."}
               value={filters.search}
               onChange={(e) => {
                 onFilterChange('search', e.target.value);
                 setCurrentPage(1);
               }}
+              style={{ fontSize: '12px' }}
             />
             {filters.search && (
               <X
-                size={13}
+                size={12}
                 style={{ cursor: 'pointer', color: 'var(--text-dim)' }}
                 onClick={() => {
                   onFilterChange('search', '');
@@ -187,18 +270,18 @@ export const CameraRegistryPage = ({
             )}
           </div>
 
-          {/* Single Filter Popover Button */}
+          {/* Filter Popover Button */}
           <div style={{ position: 'relative', zIndex: 1000 }}>
             <button
               className="btn"
               onClick={() => setShowFilterMenu(!showFilterMenu)}
               style={{
                 height: '36px',
-                padding: '0 13px',
-                gap: '6px',
+                padding: '0 11px',
+                gap: '5px',
                 fontSize: '12px',
-                background: activeFilterCount > 0 ? 'rgba(34, 211, 238, 0.15)' : 'rgba(30, 41, 59, 0.55)',
-                borderColor: activeFilterCount > 0 ? 'var(--accent)' : 'rgba(255, 255, 255, 0.1)',
+                background: activeFilterCount > 0 ? 'rgba(34, 211, 238, 0.12)' : 'var(--input-bg)',
+                borderColor: activeFilterCount > 0 ? 'var(--accent)' : 'var(--panel-border)',
                 color: activeFilterCount > 0 ? 'var(--accent)' : 'var(--text-primary)'
               }}
               title="Open Camera Filters"
@@ -225,141 +308,209 @@ export const CameraRegistryPage = ({
                   style={{ position: 'fixed', inset: 0, zIndex: 999 }}
                   onClick={() => setShowFilterMenu(false)}
                 />
-                <div className="filter-popover-dropdown">
-                <div className="filter-popover-header">
-                  <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <SlidersHorizontal size={12} style={{ color: 'var(--accent)' }} /> Filter Options
-                  </div>
-                  {activeFilterCount > 0 && (
-                    <button className="filter-popover-reset" onClick={handleResetFilters}>
-                      Reset All
-                    </button>
-                  )}
-                </div>
-
-                <div className="filter-popover-field">
-                  <label className="filter-popover-label">Department</label>
-                  {isDeptAdmin && userDepartmentId !== 'ALL' ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', background: 'var(--panel-bg)', borderRadius: '6px', border: '1px solid var(--panel-border)', fontSize: '12px', color: 'var(--accent)' }}>
-                      <Lock size={12} />
-                      <span style={{ fontWeight: 600 }}>{userDepartmentName || userDepartmentId}</span>
+                <div className="filter-popover-dropdown" style={{ right: 0, left: 'auto' }}>
+                  <div className="filter-popover-header">
+                    <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <SlidersHorizontal size={12} style={{ color: 'var(--accent)' }} /> Filter Options
                     </div>
-                  ) : (
+                    {activeFilterCount > 0 && (
+                      <button className="filter-popover-reset" onClick={handleResetFilters}>
+                        Reset All
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="filter-popover-field">
+                    <label className="filter-popover-label">Department</label>
+                    {isDeptAdmin && userDepartmentId !== 'ALL' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', background: 'var(--panel-bg)', borderRadius: '6px', border: '1px solid var(--panel-border)', fontSize: '12px', color: 'var(--accent)' }}>
+                        <Lock size={12} />
+                        <span style={{ fontWeight: 600 }}>{userDepartmentName || userDepartmentId}</span>
+                      </div>
+                    ) : (
+                      <select
+                        className="filter-popover-select"
+                        value={filters.department}
+                        onChange={(e) => {
+                          onFilterChange('department', e.target.value);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <option value="ALL">All Departments ({departments.length || '26+'})</option>
+                        {departments.map((d) => (
+                          <option key={d.code} value={d.code}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  <div className="filter-popover-field">
+                    <label className="filter-popover-label">District</label>
                     <select
                       className="filter-popover-select"
-                      value={filters.department}
+                      value={filters.district}
                       onChange={(e) => {
-                        onFilterChange('department', e.target.value);
+                        onFilterChange('district', e.target.value);
                         setCurrentPage(1);
                       }}
                     >
-                      <option value="ALL">All Departments ({departments.length || '26+'})</option>
-                      {departments.map((d) => (
-                        <option key={d.code} value={d.code}>
-                          {d.name}
+                      <option value="ALL">All Districts</option>
+                      {[
+                        'Ahmedabad', 'Amreli', 'Anand', 'Aravalli', 'Banaskantha', 'Bharuch',
+                        'Bhavnagar', 'Botad', 'Chhota Udaipur', 'Dahod', 'Dang', 'Devbhoomi Dwarka',
+                        'Gandhinagar', 'Gir Somnath', 'Jamnagar', 'Junagadh', 'Kheda', 'Kutch',
+                        'Mahisagar', 'Mehsana', 'Morbi', 'Narmada', 'Navsari', 'Panchmahal',
+                        'Patan', 'Porbandar', 'Rajkot', 'Sabarkantha', 'Surat', 'Surendranagar',
+                        'Tapi', 'Vadodara', 'Valsad'
+                      ].map(dist => (
+                        <option key={dist} value={dist}>
+                          {dist}
                         </option>
                       ))}
                     </select>
-                  )}
-                </div>
+                  </div>
 
-                <div className="filter-popover-field">
-                  <label className="filter-popover-label">District</label>
-                  <select
-                    className="filter-popover-select"
-                    value={filters.district}
-                    onChange={(e) => {
-                      onFilterChange('district', e.target.value);
-                      setCurrentPage(1);
-                    }}
+                  <div className="filter-popover-field">
+                    <label className="filter-popover-label">AI Detection & Analytics Mode</label>
+                    <select
+                      className="filter-popover-select"
+                      value={filters.detection_mode || 'ALL'}
+                      onChange={(e) => {
+                        onFilterChange('detection_mode', e.target.value);
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <option value="ALL">All AI Modes</option>
+                      <option value="ANPR_DETECTION">ANPR (Automatic License Plate Recognition)</option>
+                      <option value="GENERAL_SURVEILLANCE">No ANPR (Standard Video Surveillance)</option>
+                    </select>
+                  </div>
+
+                  <div className="filter-popover-field">
+                    <label className="filter-popover-label">Status SLA</label>
+                    <select
+                      className="filter-popover-select"
+                      value={filters.status}
+                      onChange={(e) => {
+                        onFilterChange('status', e.target.value);
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <option value="ALL">All Statuses</option>
+                      <option value="ACTIVE">ACTIVE / Online</option>
+                      <option value="MAINTENANCE">MAINTENANCE</option>
+                      <option value="OFFLINE">OFFLINE</option>
+                    </select>
+                  </div>
+
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={() => setShowFilterMenu(false)}
+                    style={{ marginTop: '4px', width: '100%', justifyContent: 'center' }}
                   >
-                    <option value="ALL">All Districts ({[
-                      'Ahmedabad', 'Amreli', 'Anand', 'Aravalli', 'Banaskantha', 'Bharuch',
-                      'Bhavnagar', 'Botad', 'Chhota Udaipur', 'Dahod', 'Dang', 'Devbhoomi Dwarka',
-                      'Gandhinagar', 'Gir Somnath', 'Jamnagar', 'Junagadh', 'Kheda', 'Kutch',
-                      'Mahisagar', 'Mehsana', 'Morbi', 'Narmada', 'Navsari', 'Panchmahal',
-                      'Patan', 'Porbandar', 'Rajkot', 'Sabarkantha', 'Surat', 'Surendranagar',
-                      'Tapi', 'Vadodara', 'Valsad'
-                    ].length})</option>
-                    {[
-                      'Ahmedabad', 'Amreli', 'Anand', 'Aravalli', 'Banaskantha', 'Bharuch',
-                      'Bhavnagar', 'Botad', 'Chhota Udaipur', 'Dahod', 'Dang', 'Devbhoomi Dwarka',
-                      'Gandhinagar', 'Gir Somnath', 'Jamnagar', 'Junagadh', 'Kheda', 'Kutch',
-                      'Mahisagar', 'Mehsana', 'Morbi', 'Narmada', 'Navsari', 'Panchmahal',
-                      'Patan', 'Porbandar', 'Rajkot', 'Sabarkantha', 'Surat', 'Surendranagar',
-                      'Tapi', 'Vadodara', 'Valsad'
-                    ].map(dist => (
-                      <option key={dist} value={dist}>
-                        {dist}
-                      </option>
-                    ))}
-                  </select>
+                    Apply Filters
+                  </button>
                 </div>
-
-                <div className="filter-popover-field">
-                  <label className="filter-popover-label">AI Detection & Analytics Mode</label>
-                  <select
-                    className="filter-popover-select"
-                    value={filters.detection_mode || 'ALL'}
-                    onChange={(e) => {
-                      onFilterChange('detection_mode', e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value="ALL">All Cameras</option>
-                    <option value="ANPR_DETECTION">ANPR Cameras</option>
-                    <option value="GENERAL_SURVEILLANCE">No ANPR</option>
-                  </select>
-
-
-                </div>
-
-                <div className="filter-popover-field">
-                  <label className="filter-popover-label">Status</label>
-                  <select
-                    className="filter-popover-select"
-                    value={filters.status}
-                    onChange={(e) => {
-                      onFilterChange('status', e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value="ALL">All Statuses</option>
-                    <option value="ACTIVE">ACTIVE / Online</option>
-                    <option value="MAINTENANCE">MAINTENANCE</option>
-                    <option value="OFFLINE">OFFLINE</option>
-                  </select>
-                </div>
-
-                <button
-                  className="btn btn-sm btn-primary"
-                  onClick={() => setShowFilterMenu(false)}
-                  style={{ marginTop: '4px', width: '100%', justifyContent: 'center' }}
-                >
-                  Apply Filters
-                </button>
-              </div>
               </>
             )}
           </div>
-        </div>
 
-        {/* Right Side: Export & Add Camera Button in the same line */}
-        <div className="toolbar-actions-group">
-          <button className="btn" onClick={onExportCsv} title="Export CSV, JSON, GeoJSON Reports" style={{ padding: '7px 12px', gap: '5px' }}>
-            <FileSpreadsheet size={14} strokeWidth={2.2} /> Export Report
+          {onSyncFeeds && (
+            <button
+              className="btn"
+              onClick={handleSyncClick}
+              disabled={isSyncing}
+              title="Sync & verify live camera stream feeds"
+              style={{ height: '36px', padding: '0 11px', gap: '5px', fontSize: '12px' }}
+            >
+              <RefreshCw
+                size={13}
+                strokeWidth={2.2}
+                style={{ animation: isSyncing ? 'radarSpin 1s linear infinite' : 'none' }}
+              />
+              <span>{isSyncing ? 'Syncing...' : 'Sync Feeds'}</span>
+            </button>
+          )}
+
+          <button className="btn" onClick={onExportCsv} title="Export CSV, JSON, GeoJSON Reports" style={{ height: '36px', padding: '0 11px', gap: '5px', fontSize: '12px' }}>
+            <FileSpreadsheet size={13} strokeWidth={2.2} /> <span>Export</span>
           </button>
           
           {canManageCameras && (
-            <button className="btn btn-primary" onClick={onAddCamera} title="Onboard New Camera Node" style={{ padding: '7px 14px', gap: '6px' }}>
-              <Plus size={15} strokeWidth={2.4} /> Add Camera
+            <button className="btn btn-primary" onClick={onAddCamera} title="Onboard New Camera Node" style={{ height: '36px', padding: '0 13px', gap: '5px', fontSize: '12px' }}>
+              <Plus size={14} strokeWidth={2.4} /> <span>Add Camera</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Floating / Sticky Bulk Action Bar */}
+
+      {/* Active Filter Chips Bar */}
+      {(activeFilterCount > 0 || (filters.search && filters.search.trim())) && (
+        <div className="active-filters-strip">
+          <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+            Active:
+          </span>
+
+          {filters.search && filters.search.trim() && (
+            <div className="active-filter-chip">
+              <span>Query: "{filters.search}"</span>
+              <span className="active-filter-chip-remove" onClick={() => onFilterChange('search', '')}>
+                <X size={11} />
+              </span>
+            </div>
+          )}
+
+          {filters.department && filters.department !== 'ALL' && (
+            <div className="active-filter-chip">
+              <span>Dept: {filters.department}</span>
+              <span className="active-filter-chip-remove" onClick={() => onFilterChange('department', 'ALL')}>
+                <X size={11} />
+              </span>
+            </div>
+          )}
+
+          {filters.district && filters.district !== 'ALL' && (
+            <div className="active-filter-chip">
+              <span>District: {filters.district}</span>
+              <span className="active-filter-chip-remove" onClick={() => onFilterChange('district', 'ALL')}>
+                <X size={11} />
+              </span>
+            </div>
+          )}
+
+          {filters.detection_mode && filters.detection_mode !== 'ALL' && (
+            <div className="active-filter-chip">
+              <span>Mode: {filters.detection_mode === 'ANPR_DETECTION' ? 'ANPR' : 'Standard'}</span>
+              <span className="active-filter-chip-remove" onClick={() => onFilterChange('detection_mode', 'ALL')}>
+                <X size={11} />
+              </span>
+            </div>
+          )}
+
+          {filters.status && filters.status !== 'ALL' && (
+            <div className="active-filter-chip">
+              <span>Status: {filters.status}</span>
+              <span className="active-filter-chip-remove" onClick={() => onFilterChange('status', 'ALL')}>
+                <X size={11} />
+              </span>
+            </div>
+          )}
+
+          <button
+            className="filter-popover-reset"
+            onClick={handleResetFilters}
+            style={{ marginLeft: 'auto', fontSize: '11px' }}
+          >
+            Reset All
+          </button>
+        </div>
+      )}
+
       {selectedCameraIds.size > 0 && (
+
         <div
           style={{
             display: 'flex',
@@ -420,7 +571,6 @@ export const CameraRegistryPage = ({
         </div>
       )}
 
-      {/* Clean High-Density Data Table */}
       <div className="table-wrap">
         <table>
           <thead>
@@ -435,219 +585,150 @@ export const CameraRegistryPage = ({
                   style={{ cursor: 'pointer', accentColor: 'var(--accent)', width: '15px', height: '15px' }}
                 />
               </th>
-              <th>Camera</th>
+              <th>Camera Node</th>
               <th>Department</th>
               <th>District</th>
-              <th>Type</th>
-              <th>AI Detection & Analytics</th>
-              <th>GPS Coordinates</th>
-              <th>Status</th>
+              <th>AI Intelligence Mode</th>
               <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {currentCameras.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>
+                <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>
                   <FolderOpen size={36} strokeWidth={1.5} style={{ color: 'var(--accent)', marginBottom: '8px' }} />
                   <div>No camera assets match the search criteria.</div>
                 </td>
               </tr>
             ) : (
               currentCameras.map(cam => {
-                const isExpanded = expandedCameraId === cam.id;
                 const isSelected = selectedCameraIds.has(cam.id);
                 const isActive = cam.status === 'ACTIVE';
                 const isMaint = cam.status === 'MAINTENANCE';
-                let statusClass = isActive ? 'active' : 'offline';
-                if (isMaint) statusClass = 'maintenance';
 
                 return (
-                  <React.Fragment key={cam.id}>
-                    <tr
-                      style={{
-                        background: isSelected
-                          ? 'rgba(6, 182, 212, 0.12)'
-                          : isExpanded
-                          ? 'var(--hover-bg)'
-                          : 'transparent',
-                        cursor: 'pointer',
-                        transition: 'background 0.15s ease'
-                      }}
-                      onClick={() => toggleExpand(cam.id)}
-                    >
-                      <td style={{ textAlign: 'center', padding: '10px 8px' }} onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleToggleSelectRow(cam.id)}
-                          style={{ cursor: 'pointer', accentColor: 'var(--accent)', width: '15px', height: '15px' }}
-                        />
-                      </td>
+                  <tr
+                    key={cam.id}
+                    style={{
+                      background: isSelected
+                        ? 'rgba(6, 182, 212, 0.12)'
+                        : 'transparent',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s ease'
+                    }}
+                    onClick={() => setSelectedCameraForDetails(cam)}
+                  >
+                    <td style={{ textAlign: 'center', padding: '10px 8px' }} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSelectRow(cam.id)}
+                        style={{ cursor: 'pointer', accentColor: 'var(--accent)', width: '15px', height: '15px' }}
+                      />
+                    </td>
 
-                      <td>
-                        <div className="cell-name">{cam.name}</div>
-                        <div className="cell-id">{cam.camera_code || cam.id}</div>
-                      </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div
+                          style={{
+                            position: 'relative',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            background: 'rgba(34, 211, 238, 0.1)',
+                            border: '1px solid rgba(34, 211, 238, 0.25)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--accent)',
+                            flexShrink: 0
+                          }}
+                          title={`${cam.camera_type || 'PTZ'} Camera · Status: ${cam.status || 'ACTIVE'}`}
+                        >
+                          {renderCameraTypeIcon(cam.camera_type, 16)}
+                          <span
 
-                      <td>
-                        <span className="dept-tag">{cam.department_name || cam.department_id}</span>
-                      </td>
-
-                      <td style={{ color: 'var(--text-secondary)' }}>
-                        {cam.district}
-                      </td>
-
-                      <td style={{ color: 'var(--text-dim)', fontSize: '12px' }}>
-                        {cam.camera_type || 'ANPR_SPECIAL'}
-                      </td>
-
-                      <td>
-                        {renderDetectionModeBadge(cam.detection_mode)}
-                      </td>
-
-                      <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', fontSize: '11.5px' }}>
-                        {cam.latitude}, {cam.longitude}
-                      </td>
-
-                      <td>
-                        <span className={`badge ${statusClass}`}>{cam.status}</span>
-                      </td>
-
-                      <td style={{ textAlign: 'right' }}>
-                        <div className="row-actions" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            title="Expand Details"
-                            onClick={() => toggleExpand(cam.id)}
-                          >
-                            {isExpanded ? <ChevronUp size={14} strokeWidth={2} /> : <ChevronDown size={14} strokeWidth={2} />}
-                          </button>
-
-                          <button
-                            title="Watch Stream"
-                            onClick={() => onCameraSelect(cam)}
-                          >
-                            <Play size={13} strokeWidth={2} />
-                          </button>
-
-                          {canManageCameras && (
-                            <>
-                              <button
-                                title="Edit Details"
-                                onClick={() => onEditCamera(cam)}
-                              >
-                                <SquarePen size={13} strokeWidth={2} />
-                              </button>
-
-                              {onDeleteCamera && (
-                                <button
-                                  title="Delete Camera Asset"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDeleteCamera(cam);
-                                  }}
-                                  style={{ color: 'var(--danger)' }}
-                                >
-                                  <Trash2 size={13} strokeWidth={2} />
-                                </button>
-                              )}
-                            </>
-                          )}
+                            style={{
+                              position: 'absolute',
+                              bottom: '-2px',
+                              right: '-2px',
+                              width: '9px',
+                              height: '9px',
+                              borderRadius: '50%',
+                              background: isActive ? '#10b981' : isMaint ? '#f59e0b' : '#ef4444',
+                              boxShadow: isActive ? '0 0 8px #10b981' : isMaint ? '0 0 8px #f59e0b' : '0 0 8px #ef4444',
+                              border: '2px solid #0f172a'
+                            }}
+                            title={`Status: ${cam.status || 'ACTIVE'}`}
+                          />
                         </div>
-                      </td>
-                    </tr>
 
-                    {/* Expandable Table Sub-Row Details */}
-                    {isExpanded && (
-                      <tr>
-                        <td colSpan={9} style={{ padding: '16px 20px', background: 'var(--input-bg)' }}>
-
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(4, 1fr)',
-                            gap: '12px'
-                          }}>
-                            <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
-                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Ownership Type</div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                {cam.ownership_type || 'GOVERNMENT'}
-                              </div>
-                            </div>
-
-                            <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
-                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>VMS Feeder / Platform</div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                {cam.vms_vendor || 'Live Sentinel Feeder'}
-                              </div>
-                            </div>
-
-                            <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
-                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Codec & Resolution</div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent)', marginTop: '2px' }}>
-                                {cam.codec || cam.stream_properties?.codec || 'H.264'} · {cam.stream_properties?.resolution || '1080p'} ({cam.stream_properties?.fps || 30}fps)
-                              </div>
-                            </div>
-
-                            <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
-                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Retention SLA</div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
-                                {cam.retention_days || 15} Days
-                              </div>
-                            </div>
-
-                            <div style={{ background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: (cam.detection_mode === 'ANPR_DETECTION' || cam.detection_mode === 'ANPR') ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid var(--panel-border)' }}>
-                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>ANPR Intelligence Mode</div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: (cam.detection_mode === 'ANPR_DETECTION' || cam.detection_mode === 'ANPR') ? '#4ade80' : 'var(--text-primary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                {(cam.detection_mode === 'ANPR_DETECTION' || cam.detection_mode === 'ANPR') && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#4ade80', display: 'inline-block' }}></span>}
-                                {(cam.detection_mode === 'ANPR_DETECTION' || cam.detection_mode === 'ANPR') ? 'ANPR Enabled (License Plate OCR)' : 'No ANPR (Standard Video)'}
-                              </div>
-                            </div>
-
-
-
-                            {/* WHEP Stream URL */}
-                            <div style={{ gridColumn: 'span 2', background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(34, 211, 238, 0.25)' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ fontSize: '10px', color: 'var(--success)', textTransform: 'uppercase', fontWeight: 800 }}>
-                                  WHEP WebRTC Playback Endpoint
-                                </div>
-                                <button
-                                  className="btn btn-sm btn-primary"
-                                  style={{ padding: '2px 8px', fontSize: '10.5px', gap: '4px' }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onCameraSelect(cam);
-                                  }}
-                                >
-                                  <Play size={11} /> Play WHEP Feed
-                                </button>
-                              </div>
-                                <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginTop: '4px', wordBreak: 'break-all' }}>
-                                  {(() => {
-                                    const currentHost = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
-                                    let raw = cam.whep_url || (cam.urls && cam.urls.whep) || (cam.stream_url && cam.stream_url.includes(':8889/') ? cam.stream_url : `http://${currentHost}:8889/stream/${String(cam.number || (cam.id || '').replace('gov-feed-', '').replace('cam-', '') || '1')}/whep`);
-                                    if (currentHost && currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
-                                      raw = raw.replace('localhost', currentHost).replace('127.0.0.1', currentHost);
-                                    }
-                                    return raw;
-                                  })()}
-                                </div>
-                            </div>
-
-                            {/* RTSP / Ingest URL */}
-                            <div style={{ gridColumn: 'span 2', background: 'var(--panel-bg-solid)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
-                              <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>
-                                Primary RTSP Stream URL
-                              </div>
-                              <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', marginTop: '4px', wordBreak: 'break-all' }}>
-                                {cam.rtsp_url || (cam.urls && cam.urls.rtsp) || cam.stream_url || 'N/A'}
-                              </div>
-                            </div>
+                        <div>
+                          <div className="cell-name" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {cam.name}
                           </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
+                          <div className="cell-id" style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+                            {cam.camera_code || cam.id} · <span style={{ color: 'var(--text-secondary)' }}>{cam.camera_type || 'PTZ'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td>
+                      <span className="dept-tag">{cam.department_name || cam.department_id}</span>
+                    </td>
+
+                    <td style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
+                      {cam.district}
+                    </td>
+
+                    <td>
+                      {renderDetectionModeBadge(cam.detection_mode)}
+                    </td>
+
+                    <td style={{ textAlign: 'right' }}>
+                      <div className="row-actions" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          title="View Full Camera Asset Details"
+                          onClick={() => setSelectedCameraForDetails(cam)}
+                          style={{ color: 'var(--accent)' }}
+                        >
+                          <Info size={14} strokeWidth={2.2} />
+                        </button>
+
+                        <button
+                          title="Watch Live Stream"
+                          onClick={() => onCameraSelect(cam)}
+                        >
+                          <Play size={13} strokeWidth={2} />
+                        </button>
+
+                        {canManageCameras && (
+                          <>
+                            <button
+                              title="Edit Camera Details"
+                              onClick={() => onEditCamera(cam)}
+                            >
+                              <SquarePen size={13} strokeWidth={2} />
+                            </button>
+
+                            {onDeleteCamera && (
+                              <button
+                                title="Delete Camera Asset"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteCamera(cam);
+                                }}
+                                style={{ color: 'var(--danger)' }}
+                              >
+                                <Trash2 size={13} strokeWidth={2} />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
                 );
               })
             )}
@@ -655,7 +736,6 @@ export const CameraRegistryPage = ({
         </table>
       </div>
 
-      {/* Pagination & Rows-Per-Page Footer */}
       <div className="table-pagination-footer">
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
           <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
@@ -687,6 +767,221 @@ export const CameraRegistryPage = ({
           />
         )}
       </div>
+
+      {selectedCameraForDetails && (
+        <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="modal modal-md" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div className="modal-head" style={{ flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  background: 'rgba(34, 211, 238, 0.12)',
+                  border: '1px solid rgba(34, 211, 238, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--accent)'
+                }}>
+                  {renderCameraTypeIcon(selectedCameraForDetails.camera_type, 18)}
+                </div>
+
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>{selectedCameraForDetails.name}</span>
+                    <span style={{
+                      fontSize: '10.5px',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      fontWeight: 700,
+                      background: selectedCameraForDetails.status === 'ACTIVE' ? 'rgba(16, 185, 129, 0.15)' : selectedCameraForDetails.status === 'MAINTENANCE' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                      color: selectedCameraForDetails.status === 'ACTIVE' ? '#10b981' : selectedCameraForDetails.status === 'MAINTENANCE' ? '#f59e0b' : '#ef4444',
+                      border: `1px solid ${selectedCameraForDetails.status === 'ACTIVE' ? 'rgba(16, 185, 129, 0.3)' : selectedCameraForDetails.status === 'MAINTENANCE' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                    }}>
+                      {selectedCameraForDetails.status || 'ACTIVE'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
+                    {selectedCameraForDetails.camera_code || selectedCameraForDetails.id} · {selectedCameraForDetails.camera_type || 'PTZ Dome Camera'}
+                  </div>
+                </div>
+              </div>
+              <button className="modal-close" onClick={() => setSelectedCameraForDetails(null)}>
+                <X size={16} strokeWidth={2.2} />
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+              <div style={{
+                background: (selectedCameraForDetails.detection_mode === 'ANPR_DETECTION' || selectedCameraForDetails.detection_mode === 'ANPR') ? 'rgba(34, 211, 238, 0.1)' : 'rgba(100, 116, 139, 0.08)',
+                border: (selectedCameraForDetails.detection_mode === 'ANPR_DETECTION' || selectedCameraForDetails.detection_mode === 'ANPR') ? '1.5px solid rgba(34, 211, 238, 0.45)' : '1px solid var(--panel-border)',
+                borderRadius: '10px',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '10px'
+              }}>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>
+                    AI Intelligence & Computer Vision
+                  </div>
+                  <div style={{ fontSize: '13.5px', fontWeight: 700, color: (selectedCameraForDetails.detection_mode === 'ANPR_DETECTION' || selectedCameraForDetails.detection_mode === 'ANPR') ? '#38bdf8' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                    <Zap size={14} strokeWidth={2.4} />
+                    <span>{(selectedCameraForDetails.detection_mode === 'ANPR_DETECTION' || selectedCameraForDetails.detection_mode === 'ANPR') ? 'ANPR Enabled (Automatic License Plate Recognition & Watchlist AI)' : 'No ANPR (General Surveillance Only)'}</span>
+                  </div>
+                </div>
+                {renderDetectionModeBadge(selectedCameraForDetails.detection_mode)}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                <div style={{ background: 'var(--input-bg)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Department</div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                    {selectedCameraForDetails.department_name || selectedCameraForDetails.department_id || 'Gujarat Police'}
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--input-bg)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>District</div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                    {selectedCameraForDetails.district || 'Ahmedabad'}
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--input-bg)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Taluka / Area</div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                    {selectedCameraForDetails.taluka || 'Urban Core'}
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--input-bg)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--panel-border)', gridColumn: 'span 2' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Location Address / Landmark</div>
+                  <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    {selectedCameraForDetails.address || selectedCameraForDetails.location_name || 'Gujarat Strategic Junction Point'}
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--input-bg)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>GPS Coordinates</div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)', marginTop: '2px', fontFamily: 'var(--font-mono)' }}>
+                    {selectedCameraForDetails.latitude}, {selectedCameraForDetails.longitude}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+                <div style={{ background: 'var(--input-bg)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Hardware Type</div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                    {selectedCameraForDetails.camera_type || 'PTZ Speed Dome'}
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--input-bg)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Ownership</div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                    {selectedCameraForDetails.ownership_type || 'GOVERNMENT'}
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--input-bg)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Codec & Resolution</div>
+                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--accent)', marginTop: '2px' }}>
+                    {selectedCameraForDetails.codec || selectedCameraForDetails.stream_properties?.codec || 'H.264'} · {selectedCameraForDetails.stream_properties?.resolution || '1080p'}
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--input-bg)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700 }}>Retention SLA</div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                    {selectedCameraForDetails.retention_days || 15} Days
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ background: 'var(--input-bg)', padding: '12px 14px', borderRadius: '8px', border: '1px solid rgba(34, 211, 238, 0.3)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--success)', textTransform: 'uppercase', fontWeight: 800 }}>
+                      WHEP WebRTC Live Stream URL (Zero Latency)
+                    </span>
+                    <button
+                      className="btn btn-sm btn-primary"
+                      style={{ padding: '2px 8px', fontSize: '11px', gap: '4px' }}
+                      onClick={() => {
+                        const targetCam = selectedCameraForDetails;
+                        setSelectedCameraForDetails(null);
+                        onCameraSelect(targetCam);
+                      }}
+                    >
+                      <Play size={11} strokeWidth={2.5} /> Open Live Feed
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '11.5px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', wordBreak: 'break-all' }}>
+                    {(() => {
+                      const currentHost = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+                      let raw = selectedCameraForDetails.whep_url || (selectedCameraForDetails.urls && selectedCameraForDetails.urls.whep) || (selectedCameraForDetails.stream_url && selectedCameraForDetails.stream_url.includes(':8889/') ? selectedCameraForDetails.stream_url : `http://${currentHost}:8889/stream/${String(selectedCameraForDetails.number || (selectedCameraForDetails.id || '').replace('gov-feed-', '').replace('cam-', '') || '1')}/whep`);
+                      if (currentHost && currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+                        raw = raw.replace('localhost', currentHost).replace('127.0.0.1', currentHost);
+                      }
+                      return raw;
+                    })()}
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--input-bg)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--panel-border)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 700, marginBottom: '4px' }}>
+                    Primary RTSP Backend Stream URL
+                  </div>
+                  <div style={{ fontSize: '11.5px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>
+                    {selectedCameraForDetails.rtsp_url || (selectedCameraForDetails.urls && selectedCameraForDetails.urls.rtsp) || selectedCameraForDetails.stream_url || 'N/A'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+            <div className="modal-foot" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                {canManageCameras && onEditCamera && (
+                  <button
+                    className="btn"
+                    onClick={() => {
+                      const targetCam = selectedCameraForDetails;
+                      setSelectedCameraForDetails(null);
+                      onEditCamera(targetCam);
+                    }}
+                    style={{ gap: '6px' }}
+                  >
+                    <SquarePen size={14} strokeWidth={2} /> Edit Asset Details
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const targetCam = selectedCameraForDetails;
+                    setSelectedCameraForDetails(null);
+                    onCameraSelect(targetCam);
+                  }}
+                  style={{ gap: '6px' }}
+                >
+                  <Play size={14} strokeWidth={2.4} /> Watch Stream
+                </button>
+                <button className="btn" onClick={() => setSelectedCameraForDetails(null)}>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

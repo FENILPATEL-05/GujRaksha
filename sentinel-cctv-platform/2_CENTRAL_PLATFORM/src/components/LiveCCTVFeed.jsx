@@ -10,7 +10,11 @@ export const LiveCCTVFeed = ({
   isDetailed = false,
   showAiVision = false,
   defaultAiStream = false,
-  allowAiStreamControls = false
+  allowAiStreamControls = false,
+  preferAiStream: preferAiStreamProp,
+  enableObjDetection: enableObjDetectionProp,
+  enablePlateDetection: enablePlateDetectionProp,
+  selectedClasses: selectedClassesProp
 }) => {
   const videoRef = useRef(null);
   const imgRef = useRef(null);
@@ -23,18 +27,50 @@ export const LiveCCTVFeed = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
   const [activeProtocol, setActiveProtocol] = useState("WHEP WebRTC");
-  const [preferAiStream, setPreferAiStream] = useState(allowAiStreamControls && defaultAiStream);
+  const [preferAiStream, setPreferAiStream] = useState(
+    preferAiStreamProp !== undefined ? preferAiStreamProp : (allowAiStreamControls && defaultAiStream)
+  );
 
+  const [enableObjDetection, setEnableObjDetection] = useState(
+    enableObjDetectionProp !== undefined ? enableObjDetectionProp : true
+  );
+  const [enablePlateDetection, setEnablePlateDetection] = useState(
+    enablePlateDetectionProp !== undefined ? enablePlateDetectionProp : true
+  );
+  const [selectedClasses, setSelectedClasses] = useState(
+    selectedClassesProp !== undefined ? selectedClassesProp : {
+      person: true,
+      car: true,
+      bike: true,
+      truck_bus: true,
+      other: true
+    }
+  );
 
-  const [enableObjDetection, setEnableObjDetection] = useState(true);
-  const [enablePlateDetection, setEnablePlateDetection] = useState(true);
-  const [selectedClasses, setSelectedClasses] = useState({
-    person: true,
-    car: true,
-    bike: true,
-    truck_bus: true,
-    other: true
-  });
+  useEffect(() => {
+    if (preferAiStreamProp !== undefined) {
+      setPreferAiStream(preferAiStreamProp);
+    }
+  }, [preferAiStreamProp]);
+
+  useEffect(() => {
+    if (enableObjDetectionProp !== undefined) {
+      setEnableObjDetection(enableObjDetectionProp);
+    }
+  }, [enableObjDetectionProp]);
+
+  useEffect(() => {
+    if (enablePlateDetectionProp !== undefined) {
+      setEnablePlateDetection(enablePlateDetectionProp);
+    }
+  }, [enablePlateDetectionProp]);
+
+  useEffect(() => {
+    if (selectedClassesProp !== undefined) {
+      setSelectedClasses(selectedClassesProp);
+    }
+  }, [selectedClassesProp]);
+
 
 
 
@@ -405,8 +441,7 @@ export const LiveCCTVFeed = ({
         badgeBg: '#dc2626',
         textColor: '#ffffff',
         shadow: '0 0 12px rgba(239, 68, 68, 0.6)',
-        bg: 'rgba(239, 68, 68, 0.12)',
-        icon: '🚨'
+        bg: 'rgba(239, 68, 68, 0.12)'
       };
     }
     if (isPlate) {
@@ -415,8 +450,7 @@ export const LiveCCTVFeed = ({
         badgeBg: '#059669',
         textColor: '#ffffff',
         shadow: '0 0 10px rgba(168, 185, 129, 0.5)',
-        bg: 'rgba(16, 185, 129, 0.12)',
-        icon: '🎯'
+        bg: 'rgba(16, 185, 129, 0.12)'
       };
     }
     if (isPerson) {
@@ -425,8 +459,7 @@ export const LiveCCTVFeed = ({
         badgeBg: '#d97706',
         textColor: '#ffffff',
         shadow: '0 0 10px rgba(245, 158, 11, 0.5)',
-        bg: 'rgba(245, 158, 11, 0.10)',
-        icon: '👤'
+        bg: 'rgba(245, 158, 11, 0.10)'
       };
     }
     if (isTwoWheeler) {
@@ -435,8 +468,7 @@ export const LiveCCTVFeed = ({
         badgeBg: '#9333ea',
         textColor: '#ffffff',
         shadow: '0 0 10px rgba(168, 85, 247, 0.5)',
-        bg: 'rgba(168, 85, 247, 0.10)',
-        icon: '🏍️'
+        bg: 'rgba(168, 85, 247, 0.10)'
       };
     }
     // Default Vehicles (Car, Bus, Truck)
@@ -445,10 +477,10 @@ export const LiveCCTVFeed = ({
       badgeBg: '#0891b2',
       textColor: '#ffffff',
       shadow: '0 0 10px rgba(6, 182, 212, 0.5)',
-      bg: 'rgba(6, 182, 212, 0.10)',
-      icon: lbl.includes('TRUCK') ? '🚚' : (lbl.includes('BUS') ? '🚌' : '🚗')
+      bg: 'rgba(6, 182, 212, 0.10)'
     };
   };
+
 
   const handleMetadata = (e) => {
     if (e.target && e.target.videoWidth && e.target.videoHeight) {
@@ -716,15 +748,14 @@ export const LiveCCTVFeed = ({
                       border: `1px solid ${style.borderColor}`
                     }}
                   >
-                    <span>{style.icon}</span>
-                    <span>{det.plate ? `🚘 ${det.plate}` : (det.label || 'OBJECT')}</span>
+                    <span>{det.plate ? String(det.plate) : (det.label || 'OBJECT')}</span>
                     {det.confidence && (
                       <span style={{ opacity: 0.9, fontSize: '9px', fontWeight: 600 }}>
                         {Math.round(det.confidence)}%
                       </span>
                     )}
-
                   </div>
+
                 </div>
               );
             })}

@@ -6,17 +6,14 @@
 CREATE TABLE IF NOT EXISTS departments (
     code VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    category VARCHAR(100) DEFAULT 'State Administration & Services',
     nodal_officer VARCHAR(150),
     contact_email VARCHAR(150),
     contact_phone VARCHAR(50),
-    status VARCHAR(20) DEFAULT 'ACTIVE',
-    icon VARCHAR(50) DEFAULT 'Building2',
     color VARCHAR(20) DEFAULT '#22d3ee',
-    description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
 
 -- 2. Cameras Master Table
 CREATE TABLE IF NOT EXISTS cameras (
@@ -61,7 +58,6 @@ CREATE INDEX IF NOT EXISTS idx_cameras_created ON cameras(created_at DESC);
 CREATE TABLE IF NOT EXISTS watchlist (
     id VARCHAR(100) PRIMARY KEY,
     vehicle_plate VARCHAR(50) UNIQUE NOT NULL,
-    vehicle_type VARCHAR(100) DEFAULT 'Vehicle',
     category VARCHAR(100) DEFAULT 'STOLEN_VEHICLE',
     fir_number VARCHAR(100),
     police_station VARCHAR(150),
@@ -71,6 +67,7 @@ CREATE TABLE IF NOT EXISTS watchlist (
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
 
 CREATE INDEX IF NOT EXISTS idx_watchlist_plate ON watchlist(vehicle_plate);
 CREATE INDEX IF NOT EXISTS idx_watchlist_category ON watchlist(category);

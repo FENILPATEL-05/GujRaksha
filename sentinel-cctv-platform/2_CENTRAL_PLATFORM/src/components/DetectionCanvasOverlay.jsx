@@ -197,8 +197,9 @@ export const DetectionCanvasOverlay = ({ camera, isPlaying = true }) => {
       // If plate OCR string is present
       if (box.plate_text || box.plate) {
         const pText = box.plate_text || box.plate;
-        const plateText = `🚘 ${pText}`;
+        const plateText = String(pText);
         const plateMetrics = ctx.measureText(plateText);
+
         const pBgW = plateMetrics.width + 12;
         const pY = y + h + 2;
 

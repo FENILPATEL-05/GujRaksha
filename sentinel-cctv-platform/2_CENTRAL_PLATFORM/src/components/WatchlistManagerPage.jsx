@@ -15,8 +15,10 @@ import {
   SlidersHorizontal,
   X,
   Edit2,
-  Check
+  Check,
+  RefreshCw
 } from "lucide-react";
+
 import { Pagination } from "./Pagination";
 
 export const WatchlistManagerPage = ({
@@ -31,7 +33,8 @@ export const WatchlistManagerPage = ({
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+
   const [showFilterMenu, setShowFilterMenu] = useState(false);
 
   const [editingItem, setEditingItem] = useState(null);
@@ -155,17 +158,25 @@ export const WatchlistManagerPage = ({
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       {/* Toolbar */}
       <div className="table-unified-toolbar" style={{ marginBottom: "14px", flexShrink: 0 }}>
-        <div className="toolbar-filters-group" style={{ flex: 1 }}>
-          <div className="search-box" style={{ flex: "1 1 260px" }}>
+        <div className="toolbar-filters-group" style={{ flex: 1, minWidth: "auto" }}>
+          <button className="btn btn-primary" onClick={onOpenAddWatchlist} style={{ background: "var(--danger)", padding: "7px 14px", gap: "6px", flexShrink: 0 }}>
+            <Plus size={15} strokeWidth={2.4} /> Add Target Vehicle
+          </button>
+        </div>
+
+        <div className="toolbar-actions-group" style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+          {/* Compact Search Box on Right */}
+          <div className="search-box" style={{ width: "200px", height: "36px", flexShrink: 0 }}>
             <Search size={14} strokeWidth={2.2} style={{ color: "var(--text-dim)", flexShrink: 0 }} />
             <input
               type="text"
-              placeholder="Search Target Plate Number, FIR #, Police Station..."
+              placeholder="Search plate, FIR..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setCurrentPage(1);
               }}
+              style={{ fontSize: "12px" }}
             />
             {search && (
               <X
@@ -179,14 +190,14 @@ export const WatchlistManagerPage = ({
             )}
           </div>
 
-          {/* Filter Popover Button */}
+          {/* Filter Popover Button (Right-Anchored) */}
           <div style={{ position: "relative", zIndex: 1000 }}>
             <button
               className="btn"
               onClick={() => setShowFilterMenu(!showFilterMenu)}
               style={{
                 height: "36px",
-                padding: "0 13px",
+                padding: "0 12px",
                 gap: "6px",
                 fontSize: "12px",
                 background: activeFilterCount > 0 ? "rgba(34, 211, 238, 0.15)" : "rgba(30, 41, 59, 0.55)",
@@ -217,7 +228,7 @@ export const WatchlistManagerPage = ({
                   style={{ position: "fixed", inset: 0, zIndex: 999 }}
                   onClick={() => setShowFilterMenu(false)}
                 />
-                <div className="filter-popover-dropdown">
+                <div className="filter-popover-dropdown" style={{ right: 0, left: "auto", minWidth: "260px" }}>
                   <div className="filter-popover-header">
                     <div style={{ fontWeight: 700, fontSize: "12px", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px" }}>
                       <SlidersHorizontal size={12} style={{ color: "var(--accent)" }} /> Filter Options
@@ -276,18 +287,13 @@ export const WatchlistManagerPage = ({
               </>
             )}
           </div>
-        </div>
 
-        <div className="toolbar-actions-group" style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <button className="btn" onClick={fetchWatchlist} style={{ padding: "7px 12px" }}>
-            Refresh
-          </button>
-
-          <button className="btn btn-primary" onClick={onOpenAddWatchlist} style={{ background: "var(--danger)", padding: "7px 14px", gap: "6px" }}>
-            <Plus size={15} strokeWidth={2.4} /> Add Target Vehicle
+          <button className="btn" onClick={fetchWatchlist} style={{ height: "36px", padding: "0 12px", gap: "6px" }}>
+            <RefreshCw size={13} /> Refresh
           </button>
         </div>
       </div>
+
 
       {/* Watchlist Table */}
       <div className="table-wrap">
@@ -336,9 +342,9 @@ export const WatchlistManagerPage = ({
                         </div>
                       </div>
                       <div style={{ fontSize: "11px", color: "var(--text-dim)", marginTop: "2px" }}>
-
-                        {item.vehicle_type || "Vehicle"} · Owner: {item.owner_name || "Under Investigation"}
+                        Owner: {item.owner_name || "Under Investigation"}
                       </div>
+
                       <div style={{ display: "flex", gap: "4px", marginTop: "4px", flexWrap: "wrap" }}>
                         <span style={{ fontSize: "9.5px", padding: "1px 5px", borderRadius: "3px", background: "rgba(56, 189, 248, 0.12)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.25)", fontWeight: 600 }}>
                           VAHAN 4.0
@@ -455,12 +461,11 @@ export const WatchlistManagerPage = ({
                   cursor: "pointer"
                 }}
               >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
                 <option value={20}>20</option>
                 <option value={50}>50</option>
                 <option value={100}>100</option>
               </select>
+
             </div>
           </div>
 

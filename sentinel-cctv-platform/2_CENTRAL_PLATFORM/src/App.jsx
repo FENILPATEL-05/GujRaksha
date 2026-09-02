@@ -24,8 +24,9 @@ import { AddDepartmentModal } from './components/AddDepartmentModal';
 import { AddWatchlistModal } from './components/AddWatchlistModal';
 import { GapAnalysisModal } from './components/GapAnalysisModal';
 import { ExportModal } from './components/ExportModal';
-import { UserManagementModal } from './components/UserManagementModal';
+import { UserManagementPage } from './components/UserManagementModal';
 import { ToastContainer } from './components/Toast';
+
 
 export function AppContent() {
   const {
@@ -306,11 +307,11 @@ export function AppContent() {
       <Header
         activeView={activeView}
         onViewChange={(view) => setActiveView(view)}
-        onSyncFeeds={handleSyncGovFeeds}
         onOpenGap={() => setIsGapOpen(true)}
         onOpenUserMgmt={() => setIsUserMgmtOpen(true)}
         departmentCount={departments.length || 26}
       />
+
 
       {activeView === 'map' ? (
         <div className="map-hero-workspace">
@@ -347,9 +348,11 @@ export function AppContent() {
           onBulkDeleteCameras={handleBulkDeleteCameras}
           onExportCsv={() => setIsExportOpen(true)}
           onAddCamera={() => setIsOnboardOpen(true)}
+          onSyncFeeds={handleSyncGovFeeds}
           departments={departments}
           isLoading={isLoadingCameras}
         />
+
       ) : activeView === 'departments' && canManageDepartments ? (
         <DepartmentDirectoryPage
           departments={departments}
@@ -384,7 +387,13 @@ export function AppContent() {
           cameras={cameras}
           addToast={addToast}
         />
+      ) : activeView === 'users' && canManageUsers ? (
+        <UserManagementPage
+          departments={departments}
+          addToast={addToast}
+        />
       ) : null}
+
 
       <StreamModal
         camera={selectedCameraForStream}
@@ -453,14 +462,8 @@ export function AppContent() {
         addToast={addToast}
       />
 
-      <UserManagementModal
-        isOpen={isUserMgmtOpen}
-        onClose={() => setIsUserMgmtOpen(false)}
-        departments={departments}
-        addToast={addToast}
-      />
-
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
+
     </>
   );
 }

@@ -1,43 +1,32 @@
 import React, { useState, useEffect } from "react";
-import { Building2, X, Check, Shield, Palette, Phone, Mail, User, Tag, Layers } from "lucide-react";
+import { Building2, X, Check, RefreshCw } from "lucide-react";
 
 export const AddDepartmentModal = ({ isOpen, onClose, onSaveSuccess, addToast, editingDept = null }) => {
   const [form, setForm] = useState({
-    code: "",
     name: "",
-    category: "Public Domain Infrastructure",
     nodal_officer: "",
     contact_email: "",
     contact_phone: "",
-    status: "ACTIVE",
-    color: "#22d3ee",
-    description: ""
+    color: "#22d3ee"
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (editingDept) {
       setForm({
-        code: editingDept.code || "",
         name: editingDept.name || "",
-        category: editingDept.category || "Public Domain Infrastructure",
         nodal_officer: editingDept.nodal_officer || "",
         contact_email: editingDept.contact_email || "",
         contact_phone: editingDept.contact_phone || "",
-        status: editingDept.status || "ACTIVE",
-        color: editingDept.color || "#22d3ee",
-        description: editingDept.description || ""
+        color: editingDept.color || "#22d3ee"
       });
     } else {
       setForm({
-        code: "",
         name: "",
-        category: "Public Domain Infrastructure",
         nodal_officer: "",
         contact_email: "",
         contact_phone: "",
-        status: "ACTIVE",
-        color: "#22d3ee",
-        description: ""
+        color: "#22d3ee"
       });
     }
   }, [editingDept, isOpen]);
@@ -46,11 +35,12 @@ export const AddDepartmentModal = ({ isOpen, onClose, onSaveSuccess, addToast, e
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || (!editingDept && !form.code)) {
-      addToast("Department Code and Department Name are required.", "error", "Validation Error");
+    if (!form.name.trim()) {
+      addToast("Department Name is required.", "error", "Validation Error");
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const url = editingDept ? `/api/v1/departments/${editingDept.code}` : "/api/v1/departments";
       const method = editingDept ? "PUT" : "POST";
@@ -75,67 +65,48 @@ export const AddDepartmentModal = ({ isOpen, onClose, onSaveSuccess, addToast, e
       }
     } catch (err) {
       addToast(err.message, "error", "Network Error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal modal-md">
-        <div className="modal-head">
+    <div className="modal-overlay" style={{ zIndex: 9999 }}>
+      <div className="modal modal-md" style={{ maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {/* Fixed Modal Header */}
+        <div className="modal-head" style={{ flexShrink: 0 }}>
           <h3>
             <Building2 size={16} strokeWidth={2.2} style={{ color: "var(--accent)" }} />
-            {editingDept ? `Edit Department — ${editingDept.code}` : "Register New Department"}
+            {editingDept ? `Edit Department — ${editingDept.name}` : "Register New Department"}
           </h3>
           <button className="modal-close" onClick={onClose}><X size={16} strokeWidth={2.2} /></button>
         </div>
 
-        <div className="modal-body">
-          <form onSubmit={handleSubmit}>
+        {/* Form Container */}
+        <form onSubmit={handleSubmit} noValidate style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
+          {/* Scrollable Modal Body */}
+          <div className="modal-body" style={{ overflowY: "auto", flex: 1, minHeight: 0, padding: "20px 24px" }}>
             <div className="form-grid">
-              <div className="form-field">
-                <label>Department Code / Key *</label>
-                <input
-                  type="text"
-                  required
-                  disabled={!!editingDept}
-                  placeholder="e.g. FOREST, HEALTH, GIDC"
-                  value={form.code}
-                  onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-                  style={{ textTransform: "uppercase", fontFamily: "var(--font-mono)" }}
-                />
-                <small style={{ color: "var(--text-dim)", fontSize: "10.5px" }}>Unique identifier across 26 departments</small>
-              </div>
-
-              <div className="form-field">
-                <label>Status</label>
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value })}
-                >
-                  <option value="ACTIVE">ACTIVE / Live Surveillance</option>
-                  <option value="ONBOARDING">ONBOARDING / Phase 1 Testing</option>
-                  <option value="PENDING_INTEGRATION">PENDING_INTEGRATION</option>
-                </select>
-              </div>
-
+              {/* Row 1: Department Full Name (Span 2) */}
               <div className="form-field span-2">
-                <label>Department Full Name *</label>
+                <label>Department Name *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Forests & Environment Department / Sanctuaries"
+                  placeholder="Enter department name"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                 />
               </div>
 
+              {/* Row 2: Nodal Officer & Color */}
               <div className="form-field">
-                <label>Category / Functional Sector</label>
+                <label>Nodal CCTV Officer</label>
                 <input
                   type="text"
-                  placeholder="e.g. Wildlife, Public Health, Smart City"
-                  value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  placeholder="Enter nodal officer name"
+                  value={form.nodal_officer}
+                  onChange={(e) => setForm({ ...form, nodal_officer: e.target.value })}
                 />
               </div>
 
@@ -152,27 +123,18 @@ export const AddDepartmentModal = ({ isOpen, onClose, onSaveSuccess, addToast, e
                     type="text"
                     value={form.color}
                     onChange={(e) => setForm({ ...form, color: e.target.value })}
-                    placeholder="#22d3ee"
+                    placeholder="Enter color hex code"
                     style={{ flex: 1, fontFamily: "var(--font-mono)" }}
                   />
                 </div>
               </div>
 
-              <div className="form-field">
-                <label>Nodal CCTV Officer</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Joint Director (Tech / CCTV Ops)"
-                  value={form.nodal_officer}
-                  onChange={(e) => setForm({ ...form, nodal_officer: e.target.value })}
-                />
-              </div>
-
+              {/* Row 3: Contact Email & Phone */}
               <div className="form-field">
                 <label>Nodal Contact Email</label>
                 <input
                   type="email"
-                  placeholder="e.g. cctv.nodal@gujarat.gov.in"
+                  placeholder="Enter nodal contact email"
                   value={form.contact_email}
                   onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
                 />
@@ -182,42 +144,46 @@ export const AddDepartmentModal = ({ isOpen, onClose, onSaveSuccess, addToast, e
                 <label>Contact Helpline / Phone</label>
                 <input
                   type="text"
-                  placeholder="e.g. +91 79 2325 0000"
+                  placeholder="Enter contact helpline / phone number"
                   value={form.contact_phone}
                   onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
                 />
               </div>
 
-              <div className="form-field full">
-                <label>Mandate & Deployment Scope Description</label>
-                <textarea
-                  rows={2}
-                  placeholder="Describe camera types, locations, and purpose of surveillance under this department..."
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    borderRadius: "8px",
-                    background: "var(--input-bg)",
-                    border: "1px solid var(--panel-border)",
-                    color: "var(--text-primary)",
-                    fontFamily: "inherit",
-                    fontSize: "12.5px"
-                  }}
-                />
-              </div>
             </div>
+          </div>
 
-            <div className="modal-foot" style={{ padding: "12px 0 0 0", marginTop: "12px" }}>
-              <button type="button" className="btn" onClick={onClose}>Cancel</button>
-              <button type="submit" className="btn btn-primary">
-                <Check size={14} strokeWidth={2.4} /> {editingDept ? "Save Changes" : "Register Department"}
-              </button>
-            </div>
-          </form>
-        </div>
+          {/* Fixed Modal Footer */}
+          <div
+            className="modal-foot"
+            style={{
+              flexShrink: 0,
+              padding: "14px 24px",
+              borderTop: "1px solid var(--panel-border)",
+              background: "var(--panel-bg-solid)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center"
+            }}
+          >
+            <button type="button" className="btn" onClick={onClose} disabled={isSubmitting}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting} style={{ gap: "6px" }}>
+              {isSubmitting ? (
+                <>
+                  <RefreshCw size={14} className="spin-animation" /> Saving...
+                </>
+              ) : (
+                <>
+                  <Check size={14} strokeWidth={2.4} /> {editingDept ? "Save Changes" : "Register Department"}
+                </>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
 };
+

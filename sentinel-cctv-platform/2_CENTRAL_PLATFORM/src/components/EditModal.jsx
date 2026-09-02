@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { SquarePen, X, Trash2, Save, RefreshCw, AlertCircle, Sliders, Radio } from 'lucide-react';
+import { SquarePen, X, Trash2, Save, RefreshCw, AlertCircle, Sliders, Radio, Zap } from 'lucide-react';
+
 
 const GUJARAT_DISTRICTS = [
   'Ahmedabad', 'Amreli', 'Anand', 'Aravalli', 'Banaskantha', 'Bharuch',
@@ -233,18 +234,21 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
 
   return (
     <div className="modal-overlay" style={{ zIndex: 9999 }}>
-      <div className="modal modal-md" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-        <div className="modal-head">
+      <div className="modal modal-md" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="modal-head" style={{ flexShrink: 0 }}>
           <h3>
             <SquarePen size={16} strokeWidth={2.2} style={{ color: 'var(--accent)' }} /> Edit Camera Asset Details
           </h3>
           <button className="modal-close" onClick={onClose}><X size={16} strokeWidth={2.2} /></button>
         </div>
-        <div className="modal-body" style={{ overflowY: 'auto', flex: 1, padding: '18px 24px' }}>
-          <form onSubmit={handleSubmit} noValidate>
+
+        <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <div className="modal-body" style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '18px 24px' }}>
             <div className="form-grid">
               {/* Section 1: Basic Information */}
-              <div className="form-field span-2">
+              {/* Row 1: Camera Name + Camera Asset Code */}
+              <div className="form-field">
+
                 <label>Camera Name / Location *</label>
                 <input
                   type="text"
@@ -252,7 +256,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                   className={errors.name ? 'input-error' : ''}
                   value={form.name}
                   onChange={(e) => updateField('name', e.target.value)}
-                  placeholder="e.g. SG Highway Junction PTZ"
+                  placeholder="Enter camera name or location"
                 />
                 {errors.name && (
                   <span className="field-error-msg">
@@ -267,10 +271,52 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                   type="text"
                   value={form.camera_code}
                   onChange={(e) => updateField('camera_code', e.target.value)}
-                  placeholder="e.g. GJ-GOV-045"
+                  placeholder="Enter camera asset code"
                 />
               </div>
 
+
+              {/* Row 2: Highlighted ANPR Intelligence Mode Field */}
+              <div
+                className="form-field span-2"
+                style={{
+                  background: 'rgba(34, 211, 238, 0.08)',
+                  border: '1.5px solid rgba(34, 211, 238, 0.45)',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  boxShadow: '0 0 16px -3px rgba(34, 211, 238, 0.25)'
+                }}
+              >
+                <label style={{ color: '#38bdf8', fontWeight: 800, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                  <Zap size={14} strokeWidth={2.4} style={{ color: '#38bdf8' }} />
+                  <span>ANPR Intelligence Mode *</span>
+                  <span style={{ fontSize: '10px', background: 'rgba(34, 211, 238, 0.2)', color: '#38bdf8', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 800 }}>Core AI Feature</span>
+                </label>
+                <select
+                  value={form.detection_mode === 'ANPR_DETECTION' || form.detection_mode === 'ANPR' ? 'ANPR_DETECTION' : 'GENERAL_SURVEILLANCE'}
+                  onChange={(e) => updateField('detection_mode', e.target.value)}
+                  style={{
+                    background: 'rgba(15, 23, 42, 0.85)',
+                    borderColor: 'rgba(34, 211, 238, 0.5)',
+                    color: '#fff',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    padding: '8px 12px',
+                    borderRadius: '6px'
+                  }}
+                >
+                  <option value="ANPR_DETECTION">ANPR (Automatic License Plate Recognition & Live AI Search)</option>
+                  <option value="GENERAL_SURVEILLANCE">No ANPR (Standard Video Surveillance Only)</option>
+                </select>
+                <small style={{ color: 'var(--text-dim)', fontSize: '11.5px', marginTop: '4px', display: 'block' }}>
+                  {form.detection_mode === 'ANPR_DETECTION' || form.detection_mode === 'ANPR'
+                    ? 'ANPR Enabled: Python AI workers will scan number plates, log detections to DB, and match suspect watchlists.'
+                    : 'Standard Mode: Camera will be used for general live surveillance without automatic plate recognition.'}
+                </small>
+              </div>
+
+
+              {/* Row 3: Department Ownership + Camera Hardware Type */}
               <div className="form-field">
                 <label>Department Ownership *</label>
                 <select
@@ -291,7 +337,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                 )}
               </div>
 
-              <div className="form-field span-2">
+              <div className="form-field">
                 <label>Camera Hardware Type</label>
                 <select
                   value={form.camera_type}
@@ -303,6 +349,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                   <option value="ANPR_SPECIAL">ANPR Special Camera</option>
                 </select>
               </div>
+
 
               {/* Section 2: Location & Coordinates */}
               <div className="form-field">
@@ -331,7 +378,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                   type="text"
                   value={form.taluka}
                   onChange={(e) => updateField('taluka', e.target.value)}
-                  placeholder="e.g. Bodakdev / Daskroi"
+                  placeholder="Enter taluka or area"
                 />
               </div>
 
@@ -341,7 +388,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                   type="text"
                   value={form.address}
                   onChange={(e) => updateField('address', e.target.value)}
-                  placeholder="e.g. Near Pakwan Cross Road, SG Highway"
+                  placeholder="Enter address or landmark"
                 />
               </div>
 
@@ -353,7 +400,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                   className={errors.latitude ? 'input-error' : ''}
                   value={form.latitude}
                   onChange={(e) => updateField('latitude', e.target.value)}
-                  placeholder="e.g. 23.0338"
+                  placeholder="Enter GPS latitude"
                 />
                 {errors.latitude && (
                   <span className="field-error-msg">
@@ -370,7 +417,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                   className={errors.longitude ? 'input-error' : ''}
                   value={form.longitude}
                   onChange={(e) => updateField('longitude', e.target.value)}
-                  placeholder="e.g. 72.5850"
+                  placeholder="Enter GPS longitude"
                 />
                 {errors.longitude && (
                   <span className="field-error-msg">
@@ -379,22 +426,10 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                 )}
               </div>
 
-              {/* Section 3: ANPR Intelligence & Stream URL */}
-              <div className="form-field span-2">
-                <label>ANPR Intelligence Mode *</label>
-                <select
-                  value={form.detection_mode === 'ANPR_DETECTION' || form.detection_mode === 'ANPR' ? 'ANPR_DETECTION' : 'GENERAL_SURVEILLANCE'}
-                  onChange={(e) => updateField('detection_mode', e.target.value)}
-                >
-                  <option value="GENERAL_SURVEILLANCE">No ANPR (Standard Video Surveillance)</option>
-                  <option value="ANPR_DETECTION">ANPR (Automatic License Plate Recognition)</option>
-                </select>
-              </div>
-
-
-
+              {/* Section 3: Camera Status & Stream URLs */}
               <div className="form-field span-2">
                 <label>Status SLA</label>
+
                 <select
                   value={form.status}
                   onChange={(e) => updateField('status', e.target.value)}
@@ -413,7 +448,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                 <input
                   type="text"
                   className={errors.stream_url ? 'input-error' : ''}
-                  placeholder="rtsp://127.0.0.1:8554/stream/1"
+                  placeholder="Enter RTSP stream URL"
                   value={form.rtsp_url || form.stream_url}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -437,7 +472,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                 </label>
                 <input
                   type="text"
-                  placeholder="http://localhost:8889/stream/1/whep"
+                  placeholder="Enter WHEP WebRTC playback URL"
                   value={form.whep_url}
                   onChange={(e) => updateField('whep_url', e.target.value)}
                 />
@@ -453,63 +488,65 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
                 </label>
                 <input
                   type="text"
-                  placeholder="http://localhost:8888/stream/1/index.m3u8"
+                  placeholder="Enter HLS stream playback URL"
                   value={form.hls_url}
                   onChange={(e) => updateField('hls_url', e.target.value)}
                 />
               </div>
 
 
-            </div>
 
-            <div
-              className="modal-foot"
-              style={{
-                padding: '16px 0 0 0',
-                marginTop: '16px',
-                borderTop: '1px solid var(--panel-border)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
+            </div>
+          </div>
+
+          <div
+            className="modal-foot"
+            style={{
+              flexShrink: 0,
+              padding: '14px 24px',
+              borderTop: '1px solid var(--panel-border)',
+              background: 'var(--panel-bg-solid)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-danger-outline"
+              onClick={handleDelete}
+              disabled={isSubmitting}
+              style={{ gap: '6px' }}
             >
+              <Trash2 size={14} strokeWidth={2} /> Delete Camera
+            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button type="button" className="btn" onClick={onClose} disabled={isSubmitting}>
+                Cancel
+              </button>
               <button
-                type="button"
-                className="btn btn-danger-outline"
-                onClick={handleDelete}
+                type="submit"
+                className="btn btn-primary"
                 disabled={isSubmitting}
                 style={{ gap: '6px' }}
               >
-                <Trash2 size={14} strokeWidth={2} /> Delete Camera
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw size={14} className="spin-animation" /> Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save size={14} strokeWidth={2.4} /> Save Changes
+                  </>
+                )}
               </button>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="button" className="btn" onClick={onClose} disabled={isSubmitting}>
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  style={{ gap: '6px' }}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RefreshCw size={14} className="spin-animation" /> Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={14} strokeWidth={2.4} /> Save Changes
-                    </>
-                  )}
-                </button>
-              </div>
             </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </div>
   );
 };
+
 
 

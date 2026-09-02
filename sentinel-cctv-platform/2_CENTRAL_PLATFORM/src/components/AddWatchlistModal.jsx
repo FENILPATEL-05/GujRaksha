@@ -4,7 +4,6 @@ import { ShieldAlert, X, Check, Car, AlertTriangle } from "lucide-react";
 export const AddWatchlistModal = ({ isOpen, onClose, onSaveSuccess, addToast }) => {
   const [form, setForm] = useState({
     vehicle_plate: "",
-    vehicle_type: "SUV / Sedan",
     category: "STOLEN_VEHICLE",
     fir_number: "",
     police_station: "",
@@ -36,7 +35,6 @@ export const AddWatchlistModal = ({ isOpen, onClose, onSaveSuccess, addToast }) 
         onClose();
         setForm({
           vehicle_plate: "",
-          vehicle_type: "SUV / Sedan",
           category: "STOLEN_VEHICLE",
           fir_number: "",
           police_station: "",
@@ -71,7 +69,7 @@ export const AddWatchlistModal = ({ isOpen, onClose, onSaveSuccess, addToast }) 
                 <input
                   type="text"
                   required
-                  placeholder="e.g. GJ-01-ER-9821"
+                  placeholder="Enter vehicle plate number"
                   value={form.vehicle_plate}
                   onChange={(e) => setForm({ ...form, vehicle_plate: e.target.value.toUpperCase() })}
                   style={{ textTransform: "uppercase", fontFamily: "var(--font-mono)", fontWeight: 700, letterSpacing: "1px" }}
@@ -94,16 +92,6 @@ export const AddWatchlistModal = ({ isOpen, onClose, onSaveSuccess, addToast }) 
               </div>
 
               <div className="form-field">
-                <label>Vehicle Model & Color</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Black Mahindra Scorpio"
-                  value={form.vehicle_type}
-                  onChange={(e) => setForm({ ...form, vehicle_type: e.target.value })}
-                />
-              </div>
-
-              <div className="form-field">
                 <label>Alert Priority Level</label>
                 <select
                   value={form.priority}
@@ -115,11 +103,12 @@ export const AddWatchlistModal = ({ isOpen, onClose, onSaveSuccess, addToast }) 
                 </select>
               </div>
 
+
               <div className="form-field">
                 <label>FIR / Challan Reference #</label>
                 <input
                   type="text"
-                  placeholder="e.g. FIR #284/2026"
+                  placeholder="Enter FIR or challan reference number"
                   value={form.fir_number}
                   onChange={(e) => setForm({ ...form, fir_number: e.target.value })}
                 />
@@ -129,7 +118,7 @@ export const AddWatchlistModal = ({ isOpen, onClose, onSaveSuccess, addToast }) 
                 <label>Jurisdiction Police Station</label>
                 <input
                   type="text"
-                  placeholder="e.g. Vastrapur PS, Ahmedabad"
+                  placeholder="Enter jurisdiction police station"
                   value={form.police_station}
                   onChange={(e) => setForm({ ...form, police_station: e.target.value })}
                 />
@@ -139,7 +128,7 @@ export const AddWatchlistModal = ({ isOpen, onClose, onSaveSuccess, addToast }) 
                 <label>Incident Details & Investigation Notes</label>
                 <textarea
                   rows={2}
-                  placeholder="Provide investigation details, suspect identity, last known sightings..."
+                  placeholder="Enter incident details and investigation notes"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   style={{
@@ -153,6 +142,7 @@ export const AddWatchlistModal = ({ isOpen, onClose, onSaveSuccess, addToast }) 
                     fontSize: "12.5px"
                   }}
                 />
+
               </div>
             </div>
 

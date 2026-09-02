@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Camera, X, Check, FileSpreadsheet, CheckCircle2, ChevronRight, ChevronLeft, RefreshCw, AlertCircle, Sliders, Radio } from 'lucide-react';
+import { Camera, X, Check, FileSpreadsheet, CheckCircle2, ChevronRight, ChevronLeft, RefreshCw, AlertCircle, Sliders, Radio, Zap } from 'lucide-react';
+
 
 const GUJARAT_DISTRICTS = [
   'Ahmedabad', 'Amreli', 'Anand', 'Aravalli', 'Banaskantha', 'Bharuch',
@@ -331,14 +332,15 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
               {/* Step 1: Basic Information */}
               {currentStep === 1 && (
                 <div className="form-grid" style={{ animation: 'modalFadeIn 0.2s ease' }}>
-                  <div className="form-field span-2">
+                  {/* Row 1: Camera Name + Asset Code */}
+                  <div className="form-field">
                     <label>Camera Name / Location *</label>
                     <input
                       type="text"
                       autoFocus
                       required
                       className={errors.name ? 'input-error' : ''}
-                      placeholder="e.g. SG Highway Junction PTZ"
+                      placeholder="Enter camera name or location"
                       value={form.name}
                       onChange={(e) => updateField('name', e.target.value)}
                     />
@@ -353,12 +355,54 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                     <label>Asset Code (Optional Auto-Assigned)</label>
                     <input
                       type="text"
-                      placeholder="e.g. GJ-GOV-045"
+                      placeholder="Enter camera asset code"
                       value={form.camera_code}
                       onChange={(e) => updateField('camera_code', e.target.value)}
                     />
                   </div>
 
+
+                  {/* Row 2: Highlighted ANPR Intelligence Mode Field */}
+                  <div
+                    className="form-field span-2"
+                    style={{
+                      background: 'rgba(34, 211, 238, 0.08)',
+                      border: '1.5px solid rgba(34, 211, 238, 0.45)',
+                      borderRadius: '10px',
+                      padding: '12px 14px',
+                      boxShadow: '0 0 16px -3px rgba(34, 211, 238, 0.25)'
+                    }}
+                  >
+                    <label style={{ color: '#38bdf8', fontWeight: 800, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                      <Zap size={14} strokeWidth={2.4} style={{ color: '#38bdf8' }} />
+                      <span>ANPR Intelligence Mode *</span>
+                      <span style={{ fontSize: '10px', background: 'rgba(34, 211, 238, 0.2)', color: '#38bdf8', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', fontWeight: 800 }}>Core AI Feature</span>
+                    </label>
+                    <select
+                      value={form.detection_mode === 'ANPR_DETECTION' || form.detection_mode === 'ANPR' ? 'ANPR_DETECTION' : 'GENERAL_SURVEILLANCE'}
+                      onChange={(e) => updateField('detection_mode', e.target.value)}
+                      style={{
+                        background: 'rgba(15, 23, 42, 0.85)',
+                        borderColor: 'rgba(34, 211, 238, 0.5)',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: '13px',
+                        padding: '8px 12px',
+                        borderRadius: '6px'
+                      }}
+                    >
+                      <option value="ANPR_DETECTION">ANPR (Automatic License Plate Recognition & Live AI Search)</option>
+                      <option value="GENERAL_SURVEILLANCE">No ANPR (Standard Video Surveillance Only)</option>
+                    </select>
+                    <small style={{ color: 'var(--text-dim)', fontSize: '11.5px', marginTop: '4px', display: 'block' }}>
+                      {form.detection_mode === 'ANPR_DETECTION' || form.detection_mode === 'ANPR'
+                        ? 'ANPR Enabled: Python AI workers will scan number plates, log detections to DB, and match suspect watchlists.'
+                        : 'Standard Mode: Camera will be used for general live surveillance without automatic plate recognition.'}
+                    </small>
+                  </div>
+
+
+                  {/* Row 3: Department Ownership + Camera Hardware Type */}
                   <div className="form-field">
                     <label>Department Ownership *</label>
                     <select
@@ -379,7 +423,7 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                     )}
                   </div>
 
-                  <div className="form-field span-2">
+                  <div className="form-field">
                     <label>Camera Hardware Type</label>
                     <select
                       value={form.camera_type}
@@ -393,6 +437,7 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                   </div>
                 </div>
               )}
+
 
               {/* Step 2: Location & Geographic Coordinates */}
               {currentStep === 2 && (
@@ -421,7 +466,7 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                     <label>Taluka / Area</label>
                     <input
                       type="text"
-                      placeholder="e.g. Bodakdev / Daskroi"
+                      placeholder="Enter taluka or area"
                       value={form.taluka}
                       onChange={(e) => updateField('taluka', e.target.value)}
                     />
@@ -431,7 +476,7 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                     <label>Address / Landmark</label>
                     <input
                       type="text"
-                      placeholder="e.g. Near Pakwan Cross Road, SG Highway"
+                      placeholder="Enter address or landmark"
                       value={form.address}
                       onChange={(e) => updateField('address', e.target.value)}
                     />
@@ -443,7 +488,7 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                       type="text"
                       required
                       className={errors.latitude ? 'input-error' : ''}
-                      placeholder="e.g. 23.0338"
+                      placeholder="Enter GPS latitude"
                       value={form.latitude}
                       onChange={(e) => updateField('latitude', e.target.value)}
                     />
@@ -460,7 +505,7 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                       type="text"
                       required
                       className={errors.longitude ? 'input-error' : ''}
-                      placeholder="e.g. 72.5850"
+                      placeholder="Enter GPS longitude"
                       value={form.longitude}
                       onChange={(e) => updateField('longitude', e.target.value)}
                     />
@@ -473,19 +518,10 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                 </div>
               )}
 
-              {/* Step 3: Stream & AI Mode Setup */}
+              {/* Step 3: Stream & Live Feed Setup */}
               {currentStep === 3 && (
                 <div className="form-grid" style={{ animation: 'modalFadeIn 0.2s ease' }}>
-                  <div className="form-field span-2">
-                    <label>ANPR Intelligence Mode *</label>
-                    <select
-                      value={form.detection_mode === 'ANPR_DETECTION' || form.detection_mode === 'ANPR' ? 'ANPR_DETECTION' : 'GENERAL_SURVEILLANCE'}
-                      onChange={(e) => updateField('detection_mode', e.target.value)}
-                    >
-                      <option value="GENERAL_SURVEILLANCE">No ANPR (Standard Video Surveillance)</option>
-                      <option value="ANPR_DETECTION">ANPR (Automatic License Plate Recognition)</option>
-                    </select>
-                  </div>
+
 
 
 
@@ -509,7 +545,7 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                     <input
                       type="text"
                       className={errors.rtsp_url || errors.stream_url ? 'input-error' : ''}
-                      placeholder="rtsp://127.0.0.1:8554/stream/1"
+                      placeholder="Enter RTSP stream URL"
                       value={form.rtsp_url || form.stream_url}
                       onChange={(e) => {
                         const val = e.target.value;
@@ -533,7 +569,7 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                     </label>
                     <input
                       type="text"
-                      placeholder="http://localhost:8889/stream/1/whep"
+                      placeholder="Enter WHEP WebRTC playback URL"
                       value={form.whep_url}
                       onChange={(e) => updateField('whep_url', e.target.value)}
                     />
@@ -549,75 +585,17 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                     </label>
                     <input
                       type="text"
-                      placeholder="http://localhost:8888/stream/1/index.m3u8"
+                      placeholder="Enter HLS stream playback URL"
                       value={form.hls_url}
                       onChange={(e) => updateField('hls_url', e.target.value)}
                     />
                   </div>
+
                 </div>
               )}
 
 
 
-              {/* Wizard Footer Controls */}
-              <div
-                className="modal-foot"
-                style={{
-                  padding: '16px 0 0 0',
-                  marginTop: '20px',
-                  borderTop: '1px solid var(--panel-border)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}
-              >
-                <button type="button" className="btn" onClick={onClose} disabled={isSubmitting}>
-                  Cancel
-                </button>
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {currentStep > 1 && (
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={handlePrev}
-                      disabled={isSubmitting}
-                      style={{ gap: '6px' }}
-                    >
-                      <ChevronLeft size={14} strokeWidth={2} /> Previous
-                    </button>
-                  )}
-
-                  {currentStep < 3 ? (
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={handleNext}
-                      style={{ gap: '6px' }}
-                    >
-                      Next Step <ChevronRight size={14} strokeWidth={2} />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={handleManualSubmit}
-                      disabled={isSubmitting}
-                      style={{ gap: '6px' }}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <RefreshCw size={14} className="spin-animation" /> Registering...
-                        </>
-                      ) : (
-                        <>
-                          <Check size={14} strokeWidth={2.4} /> Save & Register Camera
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-              </div>
             </div>
           )}
 
@@ -649,16 +627,80 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                   <CheckCircle2 size={16} strokeWidth={2.2} /> Successfully onboarded {bulkResult.successCount} cameras!
                 </div>
               )}
-
-              <div className="modal-foot" style={{ padding: '16px 0 0 0', marginTop: '16px', borderTop: '1px solid var(--panel-border)' }}>
-                <button type="button" className="btn" onClick={onClose}>Close</button>
-              </div>
             </div>
+          )}
+        </div>
+
+        {/* Fixed Modal Footer */}
+        <div
+          className="modal-foot"
+          style={{
+            flexShrink: 0,
+            padding: '14px 24px',
+            borderTop: '1px solid var(--panel-border)',
+            background: 'var(--panel-bg-solid)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}
+        >
+          {activeTab === 'manual' ? (
+            <>
+              <button type="button" className="btn" onClick={onClose} disabled={isSubmitting}>
+                Cancel
+              </button>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {currentStep > 1 && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={handlePrev}
+                    disabled={isSubmitting}
+                    style={{ gap: '6px' }}
+                  >
+                    <ChevronLeft size={14} strokeWidth={2} /> Previous
+                  </button>
+                )}
+
+                {currentStep < 3 ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleNext}
+                    style={{ gap: '6px' }}
+                  >
+                    Next Step <ChevronRight size={14} strokeWidth={2} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleManualSubmit}
+                    disabled={isSubmitting}
+                    style={{ gap: '6px' }}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw size={14} className="spin-animation" /> Registering...
+                      </>
+                    ) : (
+                      <>
+                        <Check size={14} strokeWidth={2.4} /> Save & Register Camera
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
+            <button type="button" className="btn" onClick={onClose} style={{ marginLeft: 'auto' }}>Close</button>
           )}
         </div>
       </div>
     </div>
   );
 };
+
 
 

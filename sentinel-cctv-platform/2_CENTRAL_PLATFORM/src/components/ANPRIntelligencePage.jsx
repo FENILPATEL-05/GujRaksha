@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
+
   Car,
   Search,
   ShieldAlert,
@@ -62,6 +63,23 @@ export const ANPRIntelligencePage = ({
 }) => {
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem("gujraksha_anpr_tab") || "ai_vision"); // "ai_vision", "detections", "watchlist", or "edge_nodes"
   const [selectedVisionCamId, setSelectedVisionCamId] = useState(null);
+  const [camSearchQuery, setCamSearchQuery] = useState("");
+  const [isCamDropdownOpen, setIsCamDropdownOpen] = useState(false);
+  const camDropdownRef = useRef(null);
+
+  // Stream mode and filter controls for Live AI Vision tab
+  const [isAiStreamActive, setIsAiStreamActive] = useState(false);
+  const [enableObjDetection, setEnableObjDetection] = useState(true);
+  const [enablePlateDetection, setEnablePlateDetection] = useState(true);
+  const [selectedClasses, setSelectedClasses] = useState({
+    person: true,
+    car: true,
+    bike: true,
+    truck_bus: true,
+    other: true
+  });
+
+
   const [detections, setDetections] = useState([]);
   const [edgeNodes, setEdgeNodes] = useState([]);
   const [selectedWorkerModal, setSelectedWorkerModal] = useState(null);
@@ -70,14 +88,19 @@ export const ANPRIntelligencePage = ({
   const [watchlistCount, setWatchlistCount] = useState(0);
 
   const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchPlate, setSearchPlate] = useState("");
-  const [watchlistOnly, setWatchlistOnly] = useState(false);
+  const [watchlistOnly, setWatchlistOnly] = useState(true);
   const [selectedDistrict, setSelectedDistrict] = useState("ALL");
+
+
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [edgePage, setEdgePage] = useState(1);
-  const [edgePerPage, setEdgePerPage] = useState(10);
+  const [edgePerPage, setEdgePerPage] = useState(20);
+
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+
 
 
 
@@ -219,6 +242,16 @@ export const ANPRIntelligencePage = ({
     }
   };
 
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchDetections();
+    setTimeout(() => {
+      setIsRefreshing(false);
+      if (addToast) addToast("Vehicle passage logs refreshed.", "info", "Logs Refreshed");
+    }, 600);
+  };
+
+
 
   useEffect(() => {
     fetchDetections();
@@ -265,6 +298,42 @@ export const ANPRIntelligencePage = ({
 
   const activeVisionCam = selectableCams.find(c => String(c.id) === String(selectedVisionCamId)) || selectableCams[0] || null;
 
+  // Filtered cameras for live AI selection (Max 50 items)
+  const filteredVisionCams = useMemo(() => {
+    const q = camSearchQuery.toLowerCase().trim();
+    if (!q) {
+      return selectableCams.slice(0, 50);
+    }
+    return selectableCams
+      .filter((c) => {
+        const name = (c.name || "").toLowerCase();
+        const code = (c.camera_code || c.id || "").toLowerCase();
+        const district = (c.district || "").toLowerCase();
+        const dept = (c.department_name || c.department_id || "").toLowerCase();
+        const taluka = (c.taluka || "").toLowerCase();
+        return (
+          name.includes(q) ||
+          code.includes(q) ||
+          district.includes(q) ||
+          dept.includes(q) ||
+          taluka.includes(q)
+        );
+      })
+      .slice(0, 50);
+  }, [selectableCams, camSearchQuery]);
+
+  // Click outside to close camera dropdown
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (camDropdownRef.current && !camDropdownRef.current.contains(e.target)) {
+        setIsCamDropdownOpen(false);
+      }
+    };
+    if (isCamDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isCamDropdownOpen]);
 
   const handleSelectVisionCam = (camId) => {
     setSelectedVisionCamId(camId);
@@ -297,158 +366,481 @@ export const ANPRIntelligencePage = ({
   }, [activeTab, activeVisionCam?.camera_code, activeVisionCam?.id]);
 
   return (
-    <div className="table-view">
-      {/* Sub-Header Tabs - ALWAYS VISIBLE */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-        <div>
-          <h2 style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
-            <Car size={20} strokeWidth={2.2} style={{ color: "var(--accent)" }} />
-            AI Vision & ANPR Hub
-          </h2>
-        </div>
+    <div className="table-view hub-table-view">
+      <div className="hub-layout-wrapper">
 
-        <div className="view-switcher" style={{ background: "var(--input-bg)", padding: "4px", borderRadius: "10px" }}>
-          <button
-            className={activeTab === "ai_vision" ? "active" : ""}
-            onClick={() => setActiveTab("ai_vision")}
-            style={{ gap: "6px", fontWeight: 700 }}
-          >
-            <Eye size={14} strokeWidth={2.4} style={{ color: "var(--accent)" }} /> 🎯 Live AI Detection
-          </button>
+        {/* Left Hub Module Sidebar */}
+        <aside className="hub-module-sidebar">
+          {/* Sidebar Brand Header */}
+          <div className="hub-sidebar-header">
+            <div className="hub-sidebar-title">
+              <Car size={17} strokeWidth={2.2} style={{ color: "var(--accent)" }} />
+              <span>AI Vision & ANPR</span>
+            </div>
+            <div className="hub-sidebar-subtitle">
+              Statewide Intelligence Hub
+            </div>
+          </div>
 
+          {/* Sidebar Nav Items */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1, marginTop: "4px" }}>
 
-          <button
-            className={activeTab === "detections" ? "active" : ""}
-            onClick={() => setActiveTab("detections")}
-          >
-            <Radio size={14} strokeWidth={2} /> Active Suspect Intercepts ({totalDetections})
-          </button>
+            <button
+              type="button"
+              className={`hub-nav-item ${activeTab === "ai_vision" ? "active" : ""}`}
+              onClick={() => setActiveTab("ai_vision")}
+            >
+              <div className="nav-item-left">
+                <Eye size={15} strokeWidth={2.2} />
+                <span>Live AI Detection</span>
+              </div>
+            </button>
 
-          <button
-            className={activeTab === "watchlist" ? "active" : ""}
-            onClick={() => setActiveTab("watchlist")}
-          >
-            <ShieldAlert size={14} strokeWidth={2} style={{ color: "var(--danger)" }} /> Watchlist Database ({watchlistCount})
-          </button>
-
-          <button
-            className={activeTab === "edge_nodes" ? "active" : ""}
-            onClick={() => setActiveTab("edge_nodes")}
-          >
-            <Server size={14} strokeWidth={2} style={{ color: "var(--accent)" }} /> District Edge Gateway ({edgeNodes.length})
-          </button>
-
-          <button
-            className={activeTab === "gov_gateways" ? "active" : ""}
-            onClick={() => setActiveTab("gov_gateways")}
-            style={{ gap: "6px", fontWeight: 700 }}
-          >
-            <Building2 size={14} strokeWidth={2.2} style={{ color: "#38bdf8" }} /> 🏛️ Gov Gateways (VAHAN • eGujCop • NAFIS)
-          </button>
-        </div>
-      </div>
+            <button
+              type="button"
+              className={`hub-nav-item ${activeTab === "detections" ? "active" : ""}`}
+              onClick={() => setActiveTab("detections")}
+            >
+              <div className="nav-item-left">
+                <Radio size={15} strokeWidth={2.2} />
+                <span>Vehicle Intercepts</span>
+              </div>
+              <span className="hub-nav-badge">{totalDetections}</span>
+            </button>
 
 
-      {activeTab === "ai_vision" ? (
-        selectableCams.length === 0 ? (
+
+            <button
+              type="button"
+              className={`hub-nav-item ${activeTab === "watchlist" ? "active" : ""}`}
+              onClick={() => setActiveTab("watchlist")}
+            >
+              <div className="nav-item-left">
+                <ShieldAlert size={15} strokeWidth={2.2} />
+                <span>Watchlist Database</span>
+              </div>
+              <span className="hub-nav-badge">{watchlistCount}</span>
+            </button>
+
+            <button
+              type="button"
+              className={`hub-nav-item ${activeTab === "edge_nodes" ? "active" : ""}`}
+              onClick={() => setActiveTab("edge_nodes")}
+            >
+              <div className="nav-item-left">
+                <Server size={15} strokeWidth={2.2} />
+                <span>Edge Gateways</span>
+              </div>
+              <span className="hub-nav-badge">{edgeNodes.length}</span>
+            </button>
+
+            <button
+              type="button"
+              className={`hub-nav-item ${activeTab === "gov_gateways" ? "active" : ""}`}
+              onClick={() => setActiveTab("gov_gateways")}
+            >
+              <div className="nav-item-left">
+                <Building2 size={15} strokeWidth={2.2} />
+                <span>Gov Gateways</span>
+              </div>
+              <span className="hub-nav-badge" style={{ fontSize: "9px" }}>API</span>
+            </button>
+          </div>
+
+          {/* Sidebar Footer System Status */}
+          <div style={{ padding: "10px 8px 4px", borderTop: "1px solid var(--panel-border)", marginTop: "auto", fontSize: "11px", color: "var(--text-dim)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span>AI Engine</span>
+            <span style={{ color: "#10b981", fontWeight: 700, display: "flex", alignItems: "center", gap: "5px" }}>
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#10b981", display: "inline-block" }} />
+              Active
+            </span>
+          </div>
+        </aside>
+
+        {/* Right Side: Tab View Content */}
+        <main className="hub-content-area">
+        {activeTab === "ai_vision" ? (
+          selectableCams.length === 0 ? (
+            <div style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "14px",
+              background: "var(--panel-bg)",
+              padding: "48px 24px",
+              borderRadius: "10px",
+              border: "1px solid var(--panel-border)",
+              height: "100%",
+              minHeight: "400px",
+              textAlign: "center"
+            }}>
+              <div style={{ width: "56px", height: "56px", borderRadius: "50%", background: "rgba(34, 211, 238, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Eye size={28} style={{ color: "var(--accent)" }} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: "16px", color: "var(--text-primary)" }}>No Cameras Configured for Live AI Object Detection</h3>
+              <p style={{ margin: 0, fontSize: "13px", color: "var(--text-dim)", maxWidth: "480px", lineHeight: "1.6" }}>
+                Live Object Detection is currently not enabled on any camera. Go to <strong>Camera Registry</strong> or edit a camera and select <strong>"AI Object Detection & Classification"</strong> or check <strong>"Enable Live AI Object Detection"</strong>.
+              </p>
+            </div>
+          ) : (
           <div style={{
             display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "14px",
-            background: "var(--panel-bg)",
-            padding: "48px 24px",
-            borderRadius: "10px",
-            border: "1px solid var(--panel-border)",
-            height: "calc(100vh - 150px)",
-            minHeight: "520px",
-            textAlign: "center"
+            gap: "8px",
+            height: "100%",
+            minHeight: 0,
+            alignItems: "stretch"
           }}>
-            <div style={{ width: "56px", height: "56px", borderRadius: "50%", background: "rgba(34, 211, 238, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Eye size={28} style={{ color: "var(--accent)" }} />
-            </div>
-            <h3 style={{ margin: 0, fontSize: "16px", color: "var(--text-primary)" }}>No Cameras Configured for Live AI Object Detection</h3>
-            <p style={{ margin: 0, fontSize: "13px", color: "var(--text-dim)", maxWidth: "480px", lineHeight: "1.6" }}>
-              Live Object Detection is currently not enabled on any camera. Go to <strong>Camera Registry</strong> or edit a camera and select <strong>"AI Object Detection & Classification"</strong> or check <strong>"🎯 Enable Live AI Object Detection"</strong>.
-            </p>
-          </div>
-        ) : (
-        <div style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "10px",
-          background: "var(--panel-bg)",
-          padding: "14px",
-          borderRadius: "10px",
-          border: "1px solid var(--panel-border)",
-          height: "calc(100vh - 150px)",
-          minHeight: "520px"
-        }}>
-          {/* Simple Top Bar: Camera Selector */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", boxShadow: "0 0 8px #10b981" }} />
-              <h3 style={{ margin: 0, fontSize: "14.5px", color: "var(--text-primary)" }}>
-                Live Stream: {activeVisionCam?.name} ({activeVisionCam?.camera_code || activeVisionCam?.id})
-              </h3>
-            </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "12px", color: "var(--text-dim)", fontWeight: 600 }}>Select Camera ({selectableCams.length} Available):</span>
-              <select
-                className="input-select"
-                value={activeVisionCam?.id || ""}
-                onChange={(e) => handleSelectVisionCam(e.target.value)}
-                style={{
-                  minWidth: "280px",
-                  fontSize: "12px",
-                  padding: "5px 10px",
-                  background: "var(--input-bg)",
-                  color: "var(--text-primary)",
-                  border: "1px solid var(--panel-border)",
-                  borderRadius: "6px",
-                  outline: "none"
-                }}
-              >
-                {selectableCams.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.camera_code || c.id}) - {c.district || "Gujarat"}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Clean Full-Height Live Video Player with Real-Time Bounding Boxes */}
+          {/* Left Side: Live CCTV Stream Visualizer (Takes all available main space) */}
           <div style={{
             flex: 1,
-            width: "100%",
-            height: "100%",
-            minHeight: "450px",
-            background: "#000",
-            borderRadius: "8px",
-            overflow: "hidden",
+            minWidth: 0,
             position: "relative",
+            background: "#000",
+            borderRadius: "10px",
+            overflow: "hidden",
             border: "1px solid var(--panel-border)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center"
           }}>
-            <LiveCCTVFeed
-              key={activeVisionCam?.id || activeVisionCam?.camera_code}
-              camera={activeVisionCam}
-              isMuted={true}
-              isDetailed={false}
-              showAiVision={false}
-              defaultAiStream={false}
-              allowAiStreamControls={true}
-            />
+            {activeVisionCam ? (
+              <LiveCCTVFeed
+                key={activeVisionCam.id}
+                camera={activeVisionCam}
+                isMuted={true}
+                isDetailed={false}
+                showAiVision={isAiStreamActive}
+                defaultAiStream={isAiStreamActive}
+                allowAiStreamControls={false}
+                preferAiStream={isAiStreamActive}
+                enableObjDetection={enableObjDetection}
+                enablePlateDetection={enablePlateDetection}
+                selectedClasses={selectedClasses}
+              />
+            ) : (
+              <div style={{ color: "var(--text-dim)", fontSize: "13px" }}>
+                Select a camera from the panel on the right to start live surveillance.
+              </div>
+            )}
+          </div>
 
+
+          {/* Right Side: Dedicated Control & Filter Sidebar Panel */}
+          <div style={{
+            width: "320px",
+            flexShrink: 0,
+            background: "var(--panel-bg)",
+            borderRadius: "10px",
+            border: "1px solid var(--panel-border)",
+            padding: "12px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+            overflowY: "auto"
+          }}>
+            {/* 1. Camera Stream Selector Section */}
+            <div>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <Video size={13} style={{ color: "var(--accent)" }} /> Select Camera Stream
+              </div>
+
+              {/* Searchable Combobox (Max 50 items) */}
+              <div ref={camDropdownRef} style={{ position: "relative", width: "100%" }}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setIsCamDropdownOpen(!isCamDropdownOpen)}
+                  style={{
+                    height: "36px",
+                    width: "100%",
+                    padding: "0 12px",
+                    gap: "8px",
+                    fontSize: "12.5px",
+                    justifyContent: "space-between",
+                    background: "var(--input-bg)",
+                    border: isCamDropdownOpen ? "1px solid var(--accent)" : "1px solid var(--panel-border)",
+                    color: "var(--text-primary)"
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: activeVisionCam?.status === "OFFLINE" ? "var(--danger)" : "#10b981", flexShrink: 0 }}></span>
+                    <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {activeVisionCam ? `${activeVisionCam.name}` : "Select Camera..."}
+                    </span>
+                  </div>
+                  <ChevronDown size={14} style={{ color: "var(--text-dim)", flexShrink: 0, transform: isCamDropdownOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
+                </button>
+
+                {isCamDropdownOpen && (
+                  <div style={{
+                    position: "absolute",
+                    top: "calc(100% + 4px)",
+                    left: 0,
+                    right: 0,
+                    maxHeight: "340px",
+                    background: "var(--panel-bg-solid, #0f172a)",
+                    border: "1px solid var(--panel-border-strong, rgba(255, 255, 255, 0.15))",
+                    borderRadius: "10px",
+                    boxShadow: "0 12px 30px rgba(0, 0, 0, 0.45)",
+                    zIndex: 9999,
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden"
+                  }}>
+                    {/* Search Input Box */}
+                    <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--panel-border)", background: "var(--input-bg)", display: "flex", alignItems: "center", gap: "8px" }}>
+                      <Search size={13} style={{ color: "var(--text-dim)", flexShrink: 0 }} />
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="Search camera, code, district..."
+                        value={camSearchQuery}
+                        onChange={(e) => setCamSearchQuery(e.target.value)}
+                        style={{
+                          border: "none",
+                          outline: "none",
+                          background: "transparent",
+                          color: "var(--text-primary)",
+                          fontSize: "12px",
+                          width: "100%",
+                          padding: 0
+                        }}
+                      />
+                      {camSearchQuery && (
+                        <X
+                          size={13}
+                          style={{ cursor: "pointer", color: "var(--text-dim)", flexShrink: 0 }}
+                          onClick={() => setCamSearchQuery("")}
+                        />
+                      )}
+                    </div>
+
+                    {/* Meta info strip */}
+                    <div style={{ padding: "4px 10px", fontSize: "10.5px", color: "var(--text-dim)", background: "var(--panel-bg)", borderBottom: "1px solid var(--panel-border)", display: "flex", justifyContent: "space-between" }}>
+                      <span>Max 50 cameras {camSearchQuery ? `(Filtered)` : `(Default)`}</span>
+                      <span>Total: {selectableCams.length}</span>
+                    </div>
+
+                    {/* Scrollable Camera List */}
+                    <div style={{ overflowY: "auto", maxHeight: "250px", padding: "4px" }}>
+                      {filteredVisionCams.length === 0 ? (
+                        <div style={{ padding: "20px 10px", textAlign: "center", color: "var(--text-dim)", fontSize: "12px" }}>
+                          No cameras found matching "{camSearchQuery}"
+                        </div>
+                      ) : (
+                        filteredVisionCams.map((cam) => {
+                          const isSelected = activeVisionCam?.id === cam.id;
+                          return (
+                            <div
+                              key={cam.id}
+                              onClick={() => {
+                                handleSelectVisionCam(cam.id);
+                                setIsCamDropdownOpen(false);
+                              }}
+                              style={{
+                                padding: "7px 10px",
+                                borderRadius: "6px",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: "8px",
+                                background: isSelected ? "rgba(34, 211, 238, 0.12)" : "transparent",
+                                border: isSelected ? "1px solid rgba(34, 211, 238, 0.3)" : "1px solid transparent",
+                                marginBottom: "2px",
+                                transition: "all 0.15s ease"
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isSelected) e.currentTarget.style.background = "var(--input-bg)";
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isSelected) e.currentTarget.style.background = "transparent";
+                              }}
+                            >
+                              <div style={{ overflow: "hidden" }}>
+                                <div style={{ fontWeight: 700, fontSize: "12px", color: isSelected ? "var(--accent)" : "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                  {cam.name}
+                                </div>
+                                <div style={{ fontSize: "10px", color: "var(--text-dim)", display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
+                                  <span style={{ fontFamily: "var(--font-mono)" }}>{cam.camera_code || cam.id}</span>
+                                  <span>·</span>
+                                  <span>{cam.district || "Gujarat"}</span>
+                                </div>
+                              </div>
+
+                              <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+                                {(cam.detection_mode === "ANPR_DETECTION" || cam.detection_mode === "ANPR") && (
+                                  <span style={{ fontSize: "9px", fontWeight: 800, padding: "1px 4px", borderRadius: "3px", background: "rgba(34, 211, 238, 0.2)", color: "var(--accent)" }}>
+                                    ANPR
+                                  </span>
+                                )}
+                                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: cam.status === "OFFLINE" ? "var(--danger)" : "#10b981" }}></span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+
+            {/* 2. Stream Processing Mode (Raw vs AI Stream Toggle) */}
+            <div>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "7px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <Layers size={13} style={{ color: "var(--accent)" }} /> Stream Processing Mode
+              </div>
+
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "6px",
+                background: "var(--input-bg)",
+                padding: "4px",
+                borderRadius: "8px",
+                border: "1px solid var(--panel-border)"
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setIsAiStreamActive(false)}
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: "6px",
+                    border: !isAiStreamActive ? "1px solid #3b82f6" : "1px solid transparent",
+                    background: !isAiStreamActive ? "rgba(59, 130, 246, 0.2)" : "transparent",
+                    color: !isAiStreamActive ? "#38bdf8" : "var(--text-dim)",
+                    fontWeight: !isAiStreamActive ? 800 : 500,
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    transition: "all 0.15s ease"
+                  }}
+                >
+                  <Video size={13} /> Raw Stream
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAiStreamActive(true)}
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: "6px",
+                    border: isAiStreamActive ? "1px solid #10b981" : "1px solid transparent",
+                    background: isAiStreamActive ? "rgba(16, 185, 129, 0.2)" : "transparent",
+                    color: isAiStreamActive ? "#10b981" : "var(--text-dim)",
+                    fontWeight: isAiStreamActive ? 800 : 500,
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    transition: "all 0.15s ease"
+                  }}
+                >
+                  <Eye size={13} /> AI Stream
+                </button>
+              </div>
+            </div>
+
+            {/* 3. AI Detection Filters Panel (Only visible when AI Stream is active) */}
+            {isAiStreamActive && (
+              <div style={{
+                background: "var(--input-bg)",
+                border: "1px solid var(--panel-border)",
+                borderRadius: "10px",
+                padding: "10px 12px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px"
+              }}>
+                <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.5px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <SlidersHorizontal size={13} style={{ color: "var(--accent)" }} /> AI Detection Filters
+                </div>
+
+                {/* Master Object Detection Toggle */}
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: 700, fontSize: "12.5px", color: "var(--text-primary)", margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={enableObjDetection}
+                    onChange={(e) => setEnableObjDetection(e.target.checked)}
+                    style={{ accentColor: "#3b82f6", cursor: "pointer", width: "14px", height: "14px" }}
+                  />
+                  <span>Object Detection</span>
+                </label>
+
+                {/* Specific Classes Sub-Filters */}
+                {enableObjDetection && (
+                  <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "5px",
+                    paddingLeft: "16px",
+                    borderLeft: "2px solid rgba(59, 130, 246, 0.4)"
+                  }}>
+                    {[
+                      { id: "person", label: "Persons / Pedestrians" },
+                      { id: "car", label: "Cars & Light Vehicles" },
+                      { id: "bike", label: "Bikes & Motorcycles" },
+                      { id: "truck_bus", label: "Trucks & Buses" },
+                      { id: "other", label: "Other Tracked Objects" }
+                    ].map(item => (
+                      <label
+                        key={item.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          cursor: "pointer",
+                          fontSize: "11.5px",
+                          color: selectedClasses[item.id] ? "var(--text-primary)" : "var(--text-dim)",
+                          margin: 0
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!selectedClasses[item.id]}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setSelectedClasses(prev => ({ ...prev, [item.id]: checked }));
+                          }}
+                          style={{ accentColor: "#3b82f6", cursor: "pointer", width: "13px", height: "13px" }}
+                        />
+                        <span>{item.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ height: "1px", background: "var(--panel-border)", margin: "2px 0" }} />
+
+                {/* ANPR Master Toggle */}
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: 700, fontSize: "12.5px", color: "var(--text-primary)", margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={enablePlateDetection}
+                    onChange={(e) => setEnablePlateDetection(e.target.checked)}
+                    style={{ accentColor: "#eab308", cursor: "pointer", width: "14px", height: "14px" }}
+                  />
+                  <span style={{ color: "#eab308" }}>ANPR Plate Recognition</span>
+                </label>
+              </div>
+            )}
 
           </div>
         </div>
+
+
         )
+
+
 
 
       ) : activeTab === "watchlist" ? (
@@ -459,18 +851,20 @@ export const ANPRIntelligencePage = ({
           addToast={addToast}
         />
       ) : activeTab === "edge_nodes" ? (
-        <div className="table-wrap" style={{ padding: "20px" }}>
-          {/* Header & Global Auto-Distribute Bar */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-            <div>
-              <h3 style={{ margin: 0, fontSize: "16px", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
-                <Server size={18} style={{ color: "var(--accent)" }} /> Distributed Python AI ANPR Nodes & Camera Dispatcher
-              </h3>
-              <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "var(--text-dim)" }}>
-                Central On-Demand Camera Dispatch across 80,000 CCTV network. Workers register in Standby, receive up to 100 cameras & Watchlist targets.
-              </p>
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+          {/* Header & Auto-Distribute Bar */}
+          <div className="table-unified-toolbar" style={{ marginBottom: "12px", flexShrink: 0 }}>
+            <div className="toolbar-filters-group" style={{ flex: 1, minWidth: "auto" }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "14px", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Server size={16} style={{ color: "var(--accent)" }} /> AI ANPR Edge Nodes
+                </h3>
+                <p style={{ margin: "2px 0 0 0", fontSize: "11.5px", color: "var(--text-dim)" }}>
+                  Distributed worker nodes auto-assigned with cameras & watchlist targets.
+                </p>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div className="toolbar-actions-group" style={{ display: "flex", gap: "8px", alignItems: "center" }}>
               <button
                 className="btn btn-sm btn-primary"
                 onClick={async () => {
@@ -489,14 +883,17 @@ export const ANPRIntelligencePage = ({
                 }}
                 style={{ gap: "6px", background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)", borderColor: "#38bdf8" }}
               >
-                <Zap size={14} /> ⚡ Auto-Distribute All Cameras
+                <Zap size={14} /> Auto-Distribute
               </button>
               <button className="btn btn-sm btn-secondary" onClick={fetchEdgeNodes} style={{ gap: "5px" }}>
-                <RefreshCw size={13} /> Refresh Nodes
+                <RefreshCw size={13} /> Refresh
               </button>
             </div>
           </div>
 
+
+          {/* Scrollable Table */}
+          <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
@@ -522,7 +919,6 @@ export const ANPRIntelligencePage = ({
               ) : (
                 edgeNodes.slice((edgePage - 1) * edgePerPage, edgePage * edgePerPage).map((node) => {
                   const isOnline = node.status === "ONLINE";
-                  const isScanning = node.state === "SCANNING";
                   const assignedCount = node.assigned_cameras?.length || node.active_cameras || 0;
                   const maxCap = node.max_capacity || 100;
 
@@ -556,7 +952,7 @@ export const ANPRIntelligencePage = ({
                             fontWeight: 700
                           }}
                         >
-                          📹 {assignedCount} / {maxCap} Cameras
+                          {assignedCount} / {maxCap} Cameras
                         </span>
                       </td>
                       <td>
@@ -574,7 +970,7 @@ export const ANPRIntelligencePage = ({
                               border: "1px solid rgba(16, 185, 129, 0.3)"
                             }}
                           >
-                            ● SCANNING (ACTIVE)
+                            SCANNING (ACTIVE)
                           </span>
                         ) : (
                           <span
@@ -585,7 +981,7 @@ export const ANPRIntelligencePage = ({
                               border: "1px solid rgba(239, 68, 68, 0.3)"
                             }}
                           >
-                            ● OFFLINE (WATCHDOG)
+                            OFFLINE (WATCHDOG)
                           </span>
                         )}
                       </td>
@@ -618,8 +1014,9 @@ export const ANPRIntelligencePage = ({
               )}
             </tbody>
           </table>
+          </div>
 
-          {/* Enhanced Responsive Pagination Footer for Edge Nodes */}
+          {/* Pagination Footer — Outside table-wrap so it sticks to bottom */}
           {edgeNodes.length > 0 && (
             <div className="table-pagination-footer" style={{
               padding: "12px 16px",
@@ -631,7 +1028,8 @@ export const ANPRIntelligencePage = ({
               flexWrap: "wrap",
               gap: "12px",
               background: "rgba(15, 23, 42, 0.4)",
-              borderRadius: "0 0 8px 8px"
+              borderRadius: "0 0 8px 8px",
+              flexShrink: 0
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
                 <div style={{ fontSize: "12.5px", color: "var(--text-secondary)" }}>
@@ -657,10 +1055,9 @@ export const ANPRIntelligencePage = ({
                       cursor: "pointer"
                     }}
                   >
-                    <option value={5}>5</option>
-                    <option value={10}>10</option>
                     <option value={20}>20</option>
                     <option value={50}>50</option>
+                    <option value={100}>100</option>
                   </select>
                 </div>
               </div>
@@ -673,34 +1070,30 @@ export const ANPRIntelligencePage = ({
             </div>
           )}
         </div>
+
       ) : activeTab === "gov_gateways" ? (
 
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           {/* Header Banner */}
-          <div style={{
-            background: "var(--panel-bg)",
-            border: "1px solid rgba(56, 189, 248, 0.25)",
-            borderRadius: "10px",
-            padding: "16px 20px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "12px"
-          }}>
-            <div>
-              <h3 style={{ margin: "0 0 4px 0", fontSize: "16px", color: "var(--text-primary)", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
-                <Building2 size={18} style={{ color: "#38bdf8" }} />
-                Government Law Enforcement & Registry Integration Templates
-              </h3>
-              <p style={{ margin: 0, fontSize: "12px", color: "var(--text-dim)" }}>
-                Pre-configured adapter forms for <strong>VAHAN, eGujCop (CCTNS), SARATHI, and NAFIS/AFIS</strong> for upcoming production integration.
-              </p>
+          <div className="table-unified-toolbar" style={{ marginBottom: "12px" }}>
+            <div className="toolbar-filters-group" style={{ flex: 1, minWidth: "auto" }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "14px", color: "var(--text-primary)", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Building2 size={16} style={{ color: "#38bdf8" }} />
+                  Gov Registry Integrations
+                </h3>
+                <p style={{ margin: "2px 0 0 0", fontSize: "11.5px", color: "var(--text-dim)" }}>
+                  VAHAN, eGujCop (CCTNS), SARATHI & NAFIS adapter configurations.
+                </p>
+              </div>
             </div>
-            <span className="badge badge-success" style={{ background: "rgba(34, 197, 94, 0.15)", color: "#4ade80", padding: "5px 10px" }}>
-              ● 4/4 Adapters Ready
-            </span>
+            <div className="toolbar-actions-group" style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <span className="badge badge-success" style={{ background: "rgba(34, 197, 94, 0.15)", color: "#4ade80", padding: "5px 10px" }}>
+                4/4 Adapters Ready
+              </span>
+            </div>
           </div>
+
 
           {/* 4 Clean Gateway Cards in a 2x2 Grid */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "14px" }}>
@@ -725,7 +1118,7 @@ export const ANPRIntelligencePage = ({
                     <div style={{ fontSize: "11.5px", color: "var(--text-dim)" }}>{gw.type}</div>
                   </div>
                   <span className="badge badge-success" style={{ fontSize: "10px", padding: "2px 6px" }}>
-                    ● {gw.status}
+                    {gw.status}
                   </span>
                 </div>
 
@@ -754,19 +1147,19 @@ export const ANPRIntelligencePage = ({
 
                   <div>
                     <label style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "3px", display: "block" }}>
-                      Agency Client Code / Auth Key
+                      API Authentication Token / Key
                     </label>
                     <input
-                      type="text"
+                      type="password"
                       className="form-control"
-                      value={gw.clientCode}
-                      onChange={(e) => handleUpdateGateway(gw.id, "clientCode", e.target.value)}
+                      value={gw.apiKey}
+                      onChange={(e) => handleUpdateGateway(gw.id, "apiKey", e.target.value)}
                       style={{
                         background: "var(--input-bg)",
                         border: "1px solid var(--panel-border)",
                         padding: "6px 10px",
                         borderRadius: "6px",
-                        color: "#38bdf8",
+                        color: "var(--text-primary)",
                         fontSize: "12px",
                         width: "100%",
                         fontFamily: "var(--font-mono)"
@@ -775,83 +1168,73 @@ export const ANPRIntelligencePage = ({
                   </div>
                 </div>
 
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "4px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", borderTop: "1px solid var(--panel-border)", paddingTop: "10px" }}>
+                  <span style={{ fontSize: "11.5px", color: "var(--text-dim)" }}>
+                    Timeout: <strong>{gw.timeout}</strong>
+                  </span>
                   <button
-                    className="btn btn-xs btn-outline"
-                    onClick={() => handleTestPing(gw.name)}
-                    style={{ fontSize: "11px", padding: "4px 10px", gap: "4px" }}
+                    className="btn btn-sm btn-primary"
+                    onClick={() => handleSaveGateway(gw)}
+                    style={{ padding: "3px 10px", fontSize: "11.5px" }}
                   >
-                    <RefreshCw size={12} /> Test Ping
-                  </button>
-                  <button
-                    className="btn btn-xs btn-primary"
-                    onClick={() => handleSaveGw(gw.name)}
-                    style={{ fontSize: "11px", padding: "4px 10px", gap: "4px" }}
-                  >
-                    <Save size={12} /> Save
+                    Save Config
                   </button>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Simple Live Test Query Sandbox */}
+          {/* Test Inter-Agency Lookup Tool */}
           <div style={{
             background: "var(--panel-bg)",
             border: "1px solid var(--panel-border)",
             borderRadius: "10px",
-            padding: "16px 20px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px"
+            padding: "16px 20px"
           }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
-              <div>
-                <h4 style={{ margin: "0 0 2px 0", fontSize: "14px", color: "var(--text-primary)", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
-                  <Terminal size={15} style={{ color: "var(--accent)" }} />
-                  Live Interop Test Simulator
-                </h4>
-                <div style={{ fontSize: "11.5px", color: "var(--text-dim)" }}>
-                  Test instant cross-query against VAHAN & eGujCop mock endpoints
-                </div>
-              </div>
+            <h4 style={{ margin: "0 0 4px 0", fontSize: "14px", color: "var(--text-primary)", fontWeight: 700 }}>
+              Test Inter-Agency Registry Lookups
+            </h4>
+            <p style={{ margin: "0 0 12px 0", fontSize: "12px", color: "var(--text-dim)" }}>
+              Simulate high-speed API payload query against VAHAN & eGujCop mock service endpoints.
+            </p>
 
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                <input
-                  type="text"
-                  value={testPlateInput}
-                  onChange={(e) => setTestPlateInput(e.target.value)}
-                  placeholder="Enter Plate (e.g. GJ-01-ER-9821)"
-                  style={{
-                    background: "var(--input-bg)",
-                    border: "1px solid var(--panel-border)",
-                    padding: "6px 12px",
-                    borderRadius: "6px",
-                    color: "var(--text-primary)",
-                    fontSize: "12.5px",
-                    fontFamily: "var(--font-mono)",
-                    fontWeight: 700,
-                    width: "180px"
-                  }}
-                />
-                <button
-                  className="btn btn-xs btn-primary"
-                  onClick={handleRunSimpleTest}
-                  disabled={isQuerying}
-                  style={{ padding: "7px 14px", fontSize: "12px", gap: "6px" }}
-                >
-                  {isQuerying ? <RefreshCw size={13} className="spin" /> : <Send size={13} />}
-                  {isQuerying ? "Querying..." : "Test Lookup"}
-                </button>
-              </div>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <input
+                type="text"
+                placeholder="Enter vehicle plate number"
+                value={testPlateInput}
+                onChange={(e) => setTestPlateInput(e.target.value.toUpperCase())}
+                style={{
+                  background: "var(--input-bg)",
+                  border: "1px solid var(--panel-border)",
+                  padding: "7px 12px",
+                  borderRadius: "6px",
+                  color: "var(--text-primary)",
+                  fontSize: "13px",
+                  fontFamily: "var(--font-mono)",
+                  fontWeight: 700,
+                  flex: "1 1 240px",
+                  maxWidth: "320px"
+                }}
+              />
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={handleRunSimpleTest}
+                disabled={isQuerying}
+                style={{ gap: "6px" }}
+              >
+                <Search size={14} /> {isQuerying ? "Querying..." : "Simulate Query"}
+              </button>
             </div>
+
 
             {testQueryOutput && (
               <div style={{
-                background: "var(--input-bg)",
-                border: "1px solid rgba(56, 189, 248, 0.25)",
-                borderRadius: "8px",
+                marginTop: "14px",
                 padding: "12px 14px",
+                background: "rgba(15, 23, 42, 0.6)",
+                border: "1px solid rgba(56, 189, 248, 0.3)",
+                borderRadius: "8px",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
@@ -864,10 +1247,10 @@ export const ANPRIntelligencePage = ({
                     {testQueryOutput.plate}
                   </span>
                   <span style={{ color: "var(--text-secondary)" }}>
-                    🚗 <strong>VAHAN:</strong> {testQueryOutput.vahan}
+                    <strong>VAHAN:</strong> {testQueryOutput.vahan}
                   </span>
                   <span style={{ color: "#4ade80", fontWeight: 600 }}>
-                    🚔 <strong>eGujCop:</strong> {testQueryOutput.egujcop}
+                    <strong>eGujCop:</strong> {testQueryOutput.egujcop}
                   </span>
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--text-dim)" }}>
@@ -883,20 +1266,88 @@ export const ANPRIntelligencePage = ({
         <>
           {/* Search & Modern Filter Toolbar */}
           <div className="table-unified-toolbar" style={{ marginBottom: "12px" }}>
+            <div className="toolbar-filters-group" style={{ flex: 1, minWidth: "auto" }}>
+              {/* Left Side: Prominent Suspects vs All Scans Mode Switcher */}
+              <div style={{
+                display: "inline-flex",
+                alignItems: "center",
+                background: "var(--input-bg)",
+                border: "1px solid var(--panel-border)",
+                borderRadius: "8px",
+                padding: "3px",
+                gap: "3px",
+                flexShrink: 0
+              }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWatchlistOnly(true);
+                    setCurrentPage(1);
+                  }}
+                  style={{
+                    border: watchlistOnly ? "1px solid rgba(244, 63, 94, 0.45)" : "1px solid transparent",
+                    background: watchlistOnly ? "rgba(244, 63, 94, 0.18)" : "transparent",
+                    color: watchlistOnly ? "#fb7185" : "var(--text-secondary)",
+                    fontWeight: watchlistOnly ? 700 : 500,
+                    fontSize: "12px",
+                    padding: "6px 12px",
+                    borderRadius: "6px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                    boxShadow: watchlistOnly ? "0 0 12px rgba(244, 63, 94, 0.25)" : "none"
+                  }}
+                  title="Show only hotlist/wanted suspect vehicles (Default)"
+                >
+                  <ShieldAlert size={14} style={{ color: watchlistOnly ? "#fb7185" : "var(--text-dim)" }} />
+                  <span>Suspects Only</span>
+                </button>
 
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWatchlistOnly(false);
+                    setCurrentPage(1);
+                  }}
+                  style={{
+                    border: !watchlistOnly ? "1px solid var(--accent)" : "1px solid transparent",
+                    background: !watchlistOnly ? "rgba(34, 211, 238, 0.15)" : "transparent",
+                    color: !watchlistOnly ? "var(--accent)" : "var(--text-secondary)",
+                    fontWeight: !watchlistOnly ? 700 : 500,
+                    fontSize: "12px",
+                    padding: "6px 12px",
+                    borderRadius: "6px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                    boxShadow: !watchlistOnly ? "0 0 12px rgba(34, 211, 238, 0.2)" : "none"
+                  }}
+                  title="Show all passing vehicle scans"
+                >
+                  <Car size={14} />
+                  <span>All Scans</span>
+                </button>
+              </div>
+            </div>
 
-
-            <div className="toolbar-filters-group" style={{ flex: 1 }}>
-              <div className="search-box" style={{ flex: "1 1 280px" }}>
+            {/* Right Side: Small Search Box + Filter Dropdown + Refresh */}
+            <div className="toolbar-actions-group" style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+              {/* Compact Search Box on Right */}
+              <div className="search-box" style={{ width: "200px", height: "36px", flexShrink: 0 }}>
                 <Search size={14} strokeWidth={2.2} style={{ color: "var(--text-dim)", flexShrink: 0 }} />
                 <input
                   type="text"
-                  placeholder="Search Suspect Plate (e.g. GJ-01-ER-9821), Camera, Location..."
+                  placeholder="Search plate, camera..."
                   value={searchPlate}
                   onChange={(e) => {
                     setSearchPlate(e.target.value);
                     setCurrentPage(1);
                   }}
+                  style={{ fontSize: "12px" }}
                 />
                 {searchPlate && (
                   <X
@@ -910,14 +1361,14 @@ export const ANPRIntelligencePage = ({
                 )}
               </div>
 
-              {/* Single Filter Popover Button */}
+              {/* District Filter Popover (Right-Anchored so it never overflows content) */}
               <div style={{ position: "relative", zIndex: 1000 }}>
                 <button
                   className="btn"
                   onClick={() => setShowFilterMenu(!showFilterMenu)}
                   style={{
                     height: "36px",
-                    padding: "0 13px",
+                    padding: "0 12px",
                     gap: "6px",
                     fontSize: "12px",
                     background: activeFilterCount > 0 ? "rgba(34, 211, 238, 0.15)" : "rgba(30, 41, 59, 0.55)",
@@ -948,7 +1399,7 @@ export const ANPRIntelligencePage = ({
                       style={{ position: "fixed", inset: 0, zIndex: 999 }}
                       onClick={() => setShowFilterMenu(false)}
                     />
-                    <div className="filter-popover-dropdown">
+                    <div className="filter-popover-dropdown" style={{ right: 0, left: "auto", minWidth: "260px" }}>
                       <div className="filter-popover-header">
                         <div style={{ fontWeight: 700, fontSize: "12px", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px" }}>
                           <SlidersHorizontal size={12} style={{ color: "var(--accent)" }} /> Filter Options
@@ -996,32 +1447,23 @@ export const ANPRIntelligencePage = ({
                   </>
                 )}
               </div>
-            </div>
 
-            <div className="toolbar-actions-group" style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-              <div
-                style={{
-                  display: "flex",
-                  gap: "6px",
-                  alignItems: "center",
-                  background: "rgba(15, 23, 42, 0.6)",
-                  padding: "6px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--panel-border)",
-                  fontSize: "11.5px"
-                }}
+              <button
+                className="btn"
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
+                style={{ height: "36px", padding: "0 12px", gap: "6px" }}
+                title="Refresh vehicle passage logs"
               >
-                <Radio size={12} style={{ color: anprCamerasCount > 0 ? "#4ade80" : "var(--text-dim)" }} className={anprCamerasCount > 0 ? "animate-pulse" : ""} />
-                <span style={{ fontWeight: 700, color: anprCamerasCount > 0 ? "#4ade80" : "var(--text-dim)" }}>
-                  {anprCamerasCount > 0 ? `ANPR Engine Scanning (${anprCamerasCount} Active Feed${anprCamerasCount === 1 ? '' : 's'})` : "ANPR Engine Standby (No ANPR Feeds)"}
-                </span>
-              </div>
-
-              <button className="btn" onClick={fetchDetections} style={{ height: "36px", padding: "0 12px", gap: "5px" }}>
-                <RefreshCw size={13} /> Refresh Logs
+                <RefreshCw size={13} className={isRefreshing ? "spin-anim" : ""} />
+                <span>{isRefreshing ? "Refreshing..." : "Refresh Logs"}</span>
               </button>
+
             </div>
           </div>
+
+
+
 
           {/* Detections Data Table */}
           <div className="table-wrap">
@@ -1040,8 +1482,8 @@ export const ANPRIntelligencePage = ({
                   <tr>
                     <td colSpan={5} style={{ padding: "50px 20px", textAlign: "center", color: "var(--text-dim)" }}>
                       <FolderOpen size={38} strokeWidth={1.5} style={{ color: "var(--accent)", marginBottom: "8px" }} />
-                      <div style={{ fontWeight: 600, fontSize: "14px", color: "var(--text-primary)" }}>No suspect vehicles spotted yet.</div>
-                      <div style={{ fontSize: "12px", marginTop: "4px" }}>When a watchlist target passes through any Gujarat CCTV camera, it will automatically appear here with real-time alerts.</div>
+                      <div style={{ fontWeight: 600, fontSize: "14px", color: "var(--text-primary)" }}>No vehicle passages detected yet.</div>
+                      <div style={{ fontSize: "12px", marginTop: "4px" }}>When vehicles pass through any Gujarat ANPR-enabled CCTV camera, their logs and suspect alerts will appear here in real-time.</div>
                     </td>
                   </tr>
                 ) : (
@@ -1051,8 +1493,8 @@ export const ANPRIntelligencePage = ({
                     return (
                       <tr key={det.id} style={{ background: isHit ? "rgba(244,63,94,0.06)" : "transparent" }}>
                         <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                            <div className="vehicle-plate-box" style={{ margin: "2px 0" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                            <div className={`vehicle-plate-box ${isHit ? "hit" : ""}`}>
                               <span className="plate-flag">IND</span>
                               <span className="plate-number">{det.vehicle_plate}</span>
                             </div>
@@ -1061,8 +1503,8 @@ export const ANPRIntelligencePage = ({
                                 className="btn btn-sm"
                                 onClick={() => setSelectedSnapshotDet(det)}
                                 style={{
-                                  padding: "2px 7px",
-                                  fontSize: "10.5px",
+                                  padding: "3px 8px",
+                                  fontSize: "11px",
                                   gap: "4px",
                                   background: "rgba(56, 189, 248, 0.12)",
                                   borderColor: "rgba(56, 189, 248, 0.3)",
@@ -1070,21 +1512,24 @@ export const ANPRIntelligencePage = ({
                                 }}
                                 title="View Captured Vehicle Crop Snapshot"
                               >
-                                <Camera size={11} />
+                                <Camera size={12} />
                                 <span>Photo</span>
                               </button>
                             )}
                             {isHit ? (
-                              <span className="threat-severity-badge critical" style={{ fontSize: "10.5px", padding: "3px 8px", display: "inline-flex" }}>
-                                🚨 {det.watchlist_category ? det.watchlist_category.replace(/_/g, " ") : "WATCHLIST HIT"} ({det.watchlist_fir || "Active FIR"})
+                              <span className="threat-severity-badge critical" style={{ fontSize: "11px", padding: "3px 8px", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                                <ShieldAlert size={12} />
+                                <span>SUSPECT INTERCEPT · {det.watchlist_category ? det.watchlist_category.replace(/_/g, " ") : "WATCHLIST"} ({det.watchlist_fir || "Active FIR"})</span>
                               </span>
                             ) : (
-                              <span className="badge badge-success" style={{ fontSize: "10px", padding: "2px 7px" }}>
-                                ✓ SCAN PASS
+                              <span className="badge" style={{ fontSize: "10.5px", padding: "3px 8px", display: "inline-flex", alignItems: "center", gap: "4px", background: "rgba(16, 185, 129, 0.12)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.25)" }}>
+                                <CheckCircle2 size={12} />
+                                <span>CLEAN VEHICLE PASS</span>
                               </span>
                             )}
                           </div>
                         </td>
+
 
 
                         <td>
@@ -1104,10 +1549,12 @@ export const ANPRIntelligencePage = ({
                         </td>
 
                         <td style={{ color: "var(--text-secondary)", fontWeight: 600 }}>
-                          <span className="badge" style={{ background: "rgba(100, 116, 139, 0.15)", color: "#cbd5e1", fontSize: "11px" }}>
-                            📍 {det.district || "Gujarat"}
+                          <span className="badge" style={{ background: "rgba(100, 116, 139, 0.15)", color: "#cbd5e1", fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                            <MapPin size={11} />
+                            <span>{det.district || "Gujarat"}</span>
                           </span>
                         </td>
+
 
                         <td style={{ fontSize: "12px", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
                           <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>
@@ -1174,12 +1621,11 @@ export const ANPRIntelligencePage = ({
                       cursor: "pointer"
                     }}
                   >
-                    <option value={5}>5</option>
-                    <option value={10}>10</option>
                     <option value={20}>20</option>
                     <option value={50}>50</option>
                     <option value={100}>100</option>
                   </select>
+
                 </div>
               </div>
 
@@ -1192,9 +1638,12 @@ export const ANPRIntelligencePage = ({
           )}
         </>
       )}
-
+        </main>
+      </div>
 
       {/* Clean Minimal Assigned Cameras Modal */}
+
+
       {selectedWorkerModal && (
         <div
           className="modal-overlay"

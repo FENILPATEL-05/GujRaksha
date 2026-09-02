@@ -1010,7 +1010,7 @@ export const VideoWallPage = ({
               pointerEvents: "none"
             }}
           >
-            💡 Double-click or press ESC to return to Grid View (Page {currentPage})
+            Double-click or press ESC to return to Grid View (Page {currentPage})
           </div>
         </div>
       )}
@@ -1060,9 +1060,10 @@ export const VideoWallPage = ({
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 {[
                   { id: "all", label: `All Layouts (${NVR_LAYOUTS.length})` },
-                  { id: "master", label: `⭐ Master / Center Focus (${NVR_LAYOUTS.filter(l => l.category === "master").length})` },
-                  { id: "matrix", label: `🔲 Equal Surveillance Grids (${NVR_LAYOUTS.filter(l => l.category === "matrix").length})` }
+                  { id: "master", label: `Master / Center Focus (${NVR_LAYOUTS.filter(l => l.category === "master").length})` },
+                  { id: "matrix", label: `Equal Surveillance Grids (${NVR_LAYOUTS.filter(l => l.category === "matrix").length})` }
                 ].map(tab => (
+
                   <button
                     key={tab.id}
                     type="button"

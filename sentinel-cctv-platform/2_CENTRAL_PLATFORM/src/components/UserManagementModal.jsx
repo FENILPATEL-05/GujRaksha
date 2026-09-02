@@ -1,27 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import {
-  X,
-  UserPlus,
   Users,
+  UserPlus,
   Shield,
-  ShieldAlert,
-  Building2,
   Trash2,
-  Lock,
-  Mail,
-  User,
-  Key,
-  CheckCircle2,
-  AlertCircle,
+  Crown,
   Eye,
-  Crown
+  Search,
+  Plus,
+  X,
+  Building2,
+  FolderOpen
 } from 'lucide-react';
+import { Pagination } from './Pagination';
 
-export const UserManagementModal = ({ isOpen, onClose, departments = [], addToast }) => {
-  const [activeTab, setActiveTab] = useState('list'); // 'list' | 'create'
+export const UserManagementPage = ({ departments = [], addToast }) => {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
 
   const [form, setForm] = useState({
     name: '',
@@ -48,21 +50,24 @@ export const UserManagementModal = ({ isOpen, onClose, departments = [], addToas
   };
 
   useEffect(() => {
-    if (isOpen) {
-      fetchUsers();
-      setActiveTab('list');
-      setForm({
-        name: '',
-        username: '',
-        email: '',
-        password: '',
-        role: 'DEPT_ADMIN',
-        department_id: departments[0]?.code || 'HOME'
-      });
-    }
-  }, [isOpen]);
+    fetchUsers();
+  }, []);
 
-  if (!isOpen) return null;
+  const handleOpenAddModal = () => {
+    setForm({
+      name: '',
+      username: '',
+      email: '',
+      password: '',
+      role: 'DEPT_ADMIN',
+      department_id: departments[0]?.code || 'HOME'
+    });
+    setIsAddModalOpen(true);
+  };
+
+  const handleCloseAddModal = () => {
+    setIsAddModalOpen(false);
+  };
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
@@ -94,16 +99,8 @@ export const UserManagementModal = ({ isOpen, onClose, departments = [], addToas
 
       const data = await res.json();
       if (data.success) {
-        addToast(`User '${data.data?.name}' (${data.data?.role}) registered successfully!`, 'success', 'User Registered');
-        setForm({
-          name: '',
-          username: '',
-          email: '',
-          password: '',
-          role: 'DEPT_ADMIN',
-          department_id: departments[0]?.code || 'HOME'
-        });
-        setActiveTab('list');
+        addToast(`User '${data.data?.name || form.name}' registered successfully!`, 'success', 'User Registered');
+        setIsAddModalOpen(false);
         fetchUsers();
       } else {
         addToast(data.error?.message || 'Failed to create user.', 'error', 'Registration Error');
@@ -115,21 +112,21 @@ export const UserManagementModal = ({ isOpen, onClose, departments = [], addToas
     }
   };
 
-  const handleDeleteUser = async (user) => {
-    if (user.username === 'superadmin' || user.username === 'admin') {
+  const handleDeleteUser = async (u) => {
+    if (u.username === 'superadmin' || u.username === 'admin') {
       addToast('Primary Superadmin account cannot be deleted.', 'error', 'Protected Account');
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to remove user '${user.name}' (${user.username}) from GujRaksha?`)) {
+    if (!window.confirm(`Are you sure you want to remove user '${u.name}' (${u.username}) from GujRaksha?`)) {
       return;
     }
 
     try {
-      const res = await fetch(`/api/v1/auth/users/${user.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/v1/auth/users/${u.id}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
-        addToast(`User '${user.name}' removed successfully.`, 'success', 'User Deleted');
+        addToast(`User '${u.name}' removed successfully.`, 'success', 'User Deleted');
         fetchUsers();
       } else {
         addToast(data.error?.message || 'Failed to delete user', 'error', 'Error');
@@ -164,197 +161,315 @@ export const UserManagementModal = ({ isOpen, onClose, departments = [], addToas
     }
   };
 
+  // Filtered Users
+  const filteredUsers = users.filter((u) => {
+    const q = search.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (u.name && u.name.toLowerCase().includes(q)) ||
+      (u.username && u.username.toLowerCase().includes(q)) ||
+      (u.email && u.email.toLowerCase().includes(q)) ||
+      (u.role && u.role.toLowerCase().includes(q)) ||
+      (u.department_name && u.department_name.toLowerCase().includes(q))
+    );
+  });
+
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
+
   return (
-    <div className="modal-overlay">
-      <div className="modal modal-lg" style={{ maxWidth: '1200px', width: '92vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-        {/* Modal Head */}
-        <div className="modal-head">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Users size={20} strokeWidth={2.2} style={{ color: 'var(--accent)' }} />
-            <h3 style={{ margin: 0 }}>Statewide User & Department Access Management</h3>
+    <div className="table-view">
+      {/* Unified Single-Row Header, Compact Search & Action Toolbar */}
+      <div className="table-unified-toolbar">
+        {/* Left Side: Title & Count Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 800, whiteSpace: "nowrap" }}>
+            Users & Roles
+          </h2>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: 800,
+            padding: '2px 8px',
+            borderRadius: '6px',
+            background: 'var(--input-bg)',
+            border: '1px solid var(--panel-border)',
+            color: 'var(--text-secondary)'
+          }}>
+            {users.length} Users
+          </span>
+        </div>
+
+        {/* Right Side: Compact Search & Add User Button (No Refresh Button) */}
+        <div className="toolbar-actions-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginLeft: 'auto' }}>
+          <div className="search-box" style={{ width: '230px', minWidth: '180px', flex: 'none', height: '36px' }}>
+            <Search size={13} strokeWidth={2.2} style={{ color: "var(--text-dim)", flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              style={{ fontSize: '12px' }}
+            />
+            {search && (
+              <X
+                size={12}
+                style={{ cursor: "pointer", color: "var(--text-dim)" }}
+                onClick={() => {
+                  setSearch("");
+                  setCurrentPage(1);
+                }}
+              />
+            )}
           </div>
-          <button className="modal-close" onClick={onClose}><X size={16} strokeWidth={2.2} /></button>
-        </div>
 
-        {/* Navigation Switcher Tabs */}
-        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--panel-border)', background: 'var(--input-bg)', display: 'flex', gap: '8px' }}>
           <button
-            className={`btn btn-sm ${activeTab === 'list' ? 'btn-primary' : ''}`}
-            onClick={() => setActiveTab('list')}
-            style={{ gap: '6px' }}
+            className="btn btn-primary"
+            onClick={handleOpenAddModal}
+            title="Register New Officer Account"
+            style={{ height: "36px", padding: "0 13px", gap: "6px", fontSize: "12px" }}
           >
-            <Users size={14} /> Registered Users ({users.length})
-          </button>
-          <button
-            className={`btn btn-sm ${activeTab === 'create' ? 'btn-primary' : ''}`}
-            onClick={() => setActiveTab('create')}
-            style={{ gap: '6px' }}
-          >
-            <UserPlus size={14} /> Register Department User
+            <Plus size={14} strokeWidth={2.4} /> <span>Add User</span>
           </button>
         </div>
+      </div>
 
-        {/* Modal Body */}
-        <div className="modal-body" style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
-          {activeTab === 'list' ? (
-            <div className="table-wrap" style={{ margin: 0, maxHeight: '520px' }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>User & Identity</th>
-                    <th>Role</th>
-                    <th>Assigned Department</th>
-                    <th>Email</th>
-                    <th style={{ textAlign: 'right' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>
-                        {isLoading ? 'Loading system users...' : 'No users registered.'}
-                      </td>
-                    </tr>
-                  ) : (
-                    users.map(u => (
-                      <tr key={u.id}>
-                        <td>
-                          <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '13px' }}>
-                            {u.name}
-                          </div>
-                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent)' }}>
-                            @{u.username}
-                          </div>
-                        </td>
+      {/* Active Filter Chips Bar */}
+      {search && search.trim() && (
+        <div className="active-filters-strip">
+          <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+            Active:
+          </span>
+          <div className="active-filter-chip">
+            <span>Query: "{search}"</span>
+            <span className="active-filter-chip-remove" onClick={() => setSearch("")}>
+              <X size={11} />
+            </span>
+          </div>
+          <button
+            className="filter-popover-reset"
+            onClick={() => setSearch("")}
+            style={{ marginLeft: 'auto', fontSize: '11px' }}
+          >
+            Clear All
+          </button>
+        </div>
+      )}
 
-                        <td>
-                          {renderRoleBadge(u.role)}
-                        </td>
+      {/* Users Table Container */}
+      <div className="table-container">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>User & Identity</th>
+              <th>Role</th>
+              <th>Assigned Department</th>
+              <th>Email</th>
+              <th style={{ textAlign: "right" }}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {currentUsers.length === 0 ? (
+              <tr>
+                <td colSpan={5} style={{ textAlign: "center", padding: "48px 16px", color: "var(--text-dim)" }}>
+                  <FolderOpen size={36} strokeWidth={1.5} style={{ color: "var(--accent)", marginBottom: "8px" }} />
+                  <div>{isLoading ? 'Loading system users...' : 'No users match the search criteria.'}</div>
+                </td>
+              </tr>
+            ) : (
+              currentUsers.map(u => (
+                <tr key={u.id}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--input-bg)', border: '1px solid var(--panel-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '13px', color: 'var(--accent)' }}>
+                        {u.name?.charAt(0)?.toUpperCase() || 'U'}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>{u.name}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>@{u.username}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>{renderRoleBadge(u.role)}</td>
+                  <td>
+                    <div style={{ fontSize: '12.5px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                      {u.department_name || (u.department_id === 'ALL' ? 'Statewide (All 26+ Departments)' : u.department_id)}
+                    </div>
+                  </td>
+                  <td style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{u.email}</td>
+                  <td style={{ textAlign: "right" }}>
+                    <div className="row-actions" onClick={(e) => e.stopPropagation()}>
+                      {u.username !== 'superadmin' && u.username !== 'admin' && (
+                        <button
+                          title="Delete User"
+                          onClick={() => handleDeleteUser(u)}
+                          style={{ color: "var(--danger)" }}
+                        >
+                          <Trash2 size={13} strokeWidth={2} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
-                        <td>
-                          <span className="dept-tag" style={{ fontSize: '11px' }}>
-                            {u.role === 'SUPERADMIN' ? 'Statewide (All 26+ Depts)' : (u.department_name || u.department_id)}
-                          </span>
-                        </td>
+      {/* Pagination Footer */}
+      <div className="table-pagination-footer" style={{ padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--panel-border)", flexWrap: "wrap", gap: "12px", marginTop: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+          <div style={{ fontSize: "12.5px", color: "var(--text-secondary)" }}>
+            Showing records <b>{filteredUsers.length === 0 ? 0 : startIndex + 1}</b> to <b>{Math.min(startIndex + itemsPerPage, filteredUsers.length)}</b> of <b>{filteredUsers.length}</b> users
+          </div>
 
-                        <td style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
-                          {u.email}
-                        </td>
+          <div className="per-page-wrapper" style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-dim)" }}>
+            <span>Rows per page:</span>
+            <select
+              className="filter-select per-page-select"
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              style={{ height: "30px", padding: "0 8px", fontSize: "12px" }}
+            >
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
 
-                        <td style={{ textAlign: 'right' }}>
-                          {u.username !== 'superadmin' && u.username !== 'admin' ? (
-                            <button
-                              className="btn btn-sm"
-                              onClick={() => handleDeleteUser(u)}
-                              title="Delete User"
-                              style={{ color: 'var(--danger)', borderColor: 'rgba(248, 113, 113, 0.3)', padding: '3px 8px' }}
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          ) : (
-                            <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontStyle: 'italic' }}>Protected</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+          </div>
+        </div>
+
+        {totalPages > 1 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(p) => setCurrentPage(p)}
+          />
+        )}
+      </div>
+
+
+      {/* Add User Modal Dialog */}
+      {isAddModalOpen && (
+        <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="modal modal-md" style={{ maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            {/* Fixed Modal Header */}
+            <div className="modal-head" style={{ flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <UserPlus size={17} strokeWidth={2.2} style={{ color: "var(--accent)" }} />
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800 }}>Register Department Access Account</h3>
+              </div>
+              <button className="modal-close" onClick={handleCloseAddModal}>
+                <X size={16} strokeWidth={2.2} />
+              </button>
             </div>
-          ) : (
-            <form onSubmit={handleCreateUser} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-              <div className="form-field">
-                <label>Full Officer Name *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Inspector K. V. Jadeja"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
-                />
-              </div>
 
-              <div className="form-field">
-                <label>Username / Login ID *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. kv_jadeja_police"
-                  value={form.username}
-                  onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
-                  required
-                />
-              </div>
+            {/* Form Container */}
+            <form onSubmit={handleCreateUser} noValidate style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
+              {/* Scrollable Modal Body */}
+              <div className="modal-body" style={{ overflowY: "auto", flex: 1, minHeight: 0, padding: "20px 24px" }}>
+                <div className="form-grid">
+                  <div className="form-field">
+                    <label>Full Officer Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Enter officer full name"
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    />
+                  </div>
 
-              <div className="form-field">
-                <label>Official Email Address</label>
-                <input
-                  type="email"
-                  placeholder="e.g. kv.jadeja@gujarat.gov.in"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                />
-              </div>
+                  <div className="form-field">
+                    <label>Login Username *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Enter login username"
+                      value={form.username}
+                      onChange={(e) => setForm({ ...form, username: e.target.value })}
+                    />
+                  </div>
 
-              <div className="form-field">
-                <label>Password *</label>
-                <input
-                  type="password"
-                  placeholder="Enter secure password"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  required
-                />
-              </div>
+                  <div className="form-field">
+                    <label>Account Password *</label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="Enter account password"
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    />
+                  </div>
 
-              <div className="form-field">
-                <label>User Role *</label>
-                <select
-                  value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value })}
-                >
-                  <option value="DEPT_ADMIN">🏢 Department Admin (Restricted to Department)</option>
-                  <option value="VIEWER">👁️ Spatial Viewer (Read-Only GIS & Live Streams)</option>
-                  <option value="SUPERADMIN">👑 Superadmin (Full Statewide Command Center)</option>
-                </select>
-              </div>
+                  <div className="form-field">
+                    <label>Official Email Address</label>
+                    <input
+                      type="email"
+                      placeholder="Enter official email address"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    />
+                  </div>
 
-              {form.role !== 'SUPERADMIN' ? (
-                <div className="form-field">
-                  <label>Assign Department *</label>
-                  <select
-                    value={form.department_id}
-                    onChange={(e) => setForm({ ...form, department_id: e.target.value })}
-                  >
-                    {departments.map((d) => (
-                      <option key={d.code} value={d.code}>
-                        {d.name} ({d.code})
-                      </option>
-                    ))}
-                  </select>
+
+                  <div className="form-field">
+                    <label>Role Privilege *</label>
+                    <select
+                      value={form.role}
+                      onChange={(e) => setForm({ ...form, role: e.target.value })}
+                    >
+                      <option value="DEPT_ADMIN">Department Admin</option>
+                      <option value="VIEWER">Surveillance Viewer (Read Only)</option>
+                      <option value="SUPERADMIN">Statewide Superadmin</option>
+                    </select>
+                  </div>
+
+                  {form.role !== 'SUPERADMIN' ? (
+                    <div className="form-field">
+                      <label>Assigned Department *</label>
+                      <select
+                        value={form.department_id}
+                        onChange={(e) => setForm({ ...form, department_id: e.target.value })}
+                      >
+                        {departments.map((d) => (
+                          <option key={d.code} value={d.code}>{d.name} ({d.code})</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="form-field">
+                      <label>Department Scope</label>
+                      <input
+                        type="text"
+                        disabled
+                        value="Statewide All Departments (26+)"
+                        style={{ opacity: 0.7 }}
+                      />
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="form-field">
-                  <label>Department Scope</label>
-                  <input
-                    type="text"
-                    disabled
-                    value="Statewide All Departments (26+)"
-                    style={{ opacity: 0.7 }}
-                  />
-                </div>
-              )}
 
-              <div style={{ gridColumn: '1 / -1', background: 'rgba(34, 211, 238, 0.08)', border: '1px solid rgba(34, 211, 238, 0.2)', padding: '12px 16px', borderRadius: '8px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                <div style={{ fontWeight: 700, color: 'var(--accent)', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Shield size={13} /> Role Permissions Scope:
+                <div style={{ background: 'rgba(34, 211, 238, 0.08)', border: '1px solid rgba(34, 211, 238, 0.2)', padding: '12px 16px', borderRadius: '8px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '16px' }}>
+                  <div style={{ fontWeight: 700, color: 'var(--accent)', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Shield size={13} /> Role Permissions Scope:
+                  </div>
+                  {form.role === 'SUPERADMIN' && 'Superadmin has unrestricted access to all 33 Gujarat districts, all departments, ANPR watchlist, user creation, and feed ingestion.'}
+                  {form.role === 'DEPT_ADMIN' && 'Department Admin can view and manage camera assets, streams, and incident telemetry belonging to their assigned department.'}
+                  {form.role === 'VIEWER' && 'Viewer has read-only live viewing privileges on the Map and Video Wall without editing or onboarding controls.'}
                 </div>
-                {form.role === 'SUPERADMIN' && 'Superadmin has unrestricted access to all 33 Gujarat districts, all departments, ANPR watchlist, user creation, and feed ingestion.'}
-                {form.role === 'DEPT_ADMIN' && 'Department Admin can only view and manage camera assets, streams, and incident telemetry belonging to their assigned department.'}
-                {form.role === 'VIEWER' && 'Viewer has read-only live viewing privileges on the Map and Video Wall without editing or onboarding controls.'}
               </div>
 
-              <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
-                <button type="button" className="btn" onClick={() => setActiveTab('list')}>
+              {/* Fixed Modal Footer */}
+              <div className="modal-foot" style={{ flexShrink: 0 }}>
+                <button type="button" className="btn" onClick={handleCloseAddModal}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={isSubmitting} style={{ gap: '6px' }}>
@@ -362,14 +477,12 @@ export const UserManagementModal = ({ isOpen, onClose, departments = [], addToas
                 </button>
               </div>
             </form>
-          )}
+          </div>
         </div>
-
-        {/* Modal Foot */}
-        <div className="modal-foot">
-          <button className="btn" onClick={onClose}>Close</button>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
+
+export { UserManagementPage as UserManagementModal };
+

@@ -10,29 +10,21 @@ import {
   Car,
   Moon,
   Sun,
-  RefreshCw,
   PieChart,
   User,
   Users,
-  UserPlus,
   LogOut,
   ChevronDown,
   Shield,
-  Eye
+  Eye,
+  Sparkles
 } from 'lucide-react';
 
-export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, onOpenUserMgmt, departmentCount = 26 }) => {
+export const Header = ({ activeView, onViewChange, onOpenGap, onOpenUserMgmt, departmentCount = 26 }) => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout, isAdmin } = useAuth();
-  const [isSyncing, setIsSyncing] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef(null);
-
-  const handleSyncClick = async () => {
-    setIsSyncing(true);
-    await onSyncFeeds();
-    setIsSyncing(false);
-  };
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -47,27 +39,28 @@ export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, onOpe
 
   return (
     <header className="app-header">
-      {/* Left Section: Logo, Title & View Switcher */}
+      {/* Left Section: Brand Logo & Title */}
       <div className="header-left">
-        <div className="brand">
-          <LogoBadge size={38} />
+        <div className="brand" onClick={() => onViewChange('map')} title="GujRaksha Netra GIS Command Platform">
+          <LogoBadge size={34} />
           <div className="brand-text">
             <div className="title">
               GUJRAKSHA <span className="brand-tag">NETRA</span>
             </div>
-            <div className="subtitle">Statewide CCTV Surveillance GIS — Gujarat</div>
+            <div className="subtitle">Statewide CCTV Command GIS</div>
           </div>
         </div>
 
         <div className="header-nav-divider"></div>
 
-        {/* View Switcher Pills - Anchored on Left Beside Brand */}
-        <div className="view-switcher">
+        {/* View Switcher Pills */}
+        <nav className="view-switcher" aria-label="Primary Navigation">
           <button
             className={activeView === 'map' ? 'active' : ''}
             onClick={() => onViewChange('map')}
           >
-            <MapPin size={15} strokeWidth={2} /> GIS Map
+            <MapPin size={14} strokeWidth={2.2} />
+            <span>GIS Map</span>
           </button>
           {isAdmin && (
             <>
@@ -75,103 +68,123 @@ export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, onOpe
                 className={activeView === 'registry' ? 'active' : ''}
                 onClick={() => onViewChange('registry')}
               >
-                <Camera size={15} strokeWidth={2} /> Cameras
+                <Camera size={14} strokeWidth={2.2} />
+                <span>Cameras</span>
               </button>
               <button
                 className={activeView === 'departments' ? 'active' : ''}
                 onClick={() => onViewChange('departments')}
               >
-                <Building2 size={15} strokeWidth={2} /> Departments ({departmentCount})
+                <Building2 size={14} strokeWidth={2.2} />
+                <span>Departments ({departmentCount})</span>
               </button>
               <button
                 className={activeView === 'videowall' ? 'active' : ''}
                 onClick={() => onViewChange('videowall')}
               >
-                <LayoutGrid size={15} strokeWidth={2} /> Video Wall
+                <LayoutGrid size={14} strokeWidth={2.2} />
+                <span>Video Wall</span>
               </button>
               <button
                 className={activeView === 'anpr' ? 'active' : ''}
                 onClick={() => onViewChange('anpr')}
               >
-                <Car size={15} strokeWidth={2} /> AI Vision & ANPR
+                <Car size={14} strokeWidth={2.2} />
+                <span>AI Vision & ANPR</span>
+              </button>
+              <button
+                className={activeView === 'users' ? 'active' : ''}
+                onClick={() => onViewChange('users')}
+              >
+                <Users size={14} strokeWidth={2.2} />
+                <span>Users & Roles</span>
               </button>
             </>
           )}
-        </div>
+        </nav>
       </div>
 
+      {/* Right Section: Command Actions & Profile */}
       <div className="header-actions">
         {isAdmin && (
           <>
-            <button className="btn" onClick={handleSyncClick} disabled={isSyncing}>
-              <RefreshCw size={15} strokeWidth={2} style={{ animation: isSyncing ? 'radarSpin 1s linear infinite' : 'none' }} />
-              {isSyncing ? 'Syncing...' : 'Sync Feeds'}
-            </button>
-
-            <button className="btn" onClick={onOpenGap}>
-              <PieChart size={15} strokeWidth={2} /> Gap Analysis
-            </button>
-
-            <button className="btn" onClick={onOpenUserMgmt} title="Manage System Users & Department Roles">
-              <Users size={15} strokeWidth={2} /> Users & Roles
+            <button
+              className="btn btn-sm"
+              onClick={onOpenGap}
+              title="Statewide CCTV Density & Blind-Spot Coverage Analysis"
+              style={{ gap: '6px', padding: '6px 12px' }}
+            >
+              <PieChart size={14} strokeWidth={2.2} />
+              <span>Gap Analysis</span>
             </button>
           </>
         )}
 
-        {/* Profile Dropdown */}
+
+        {/* Quick 1-Click Theme Toggle Button */}
+        <button
+          className="btn btn-sm btn-icon"
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          style={{
+            width: '34px',
+            height: '34px',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '8px'
+          }}
+        >
+          {theme === 'dark' ? (
+            <Sun size={15} strokeWidth={2.2} style={{ color: '#f59e0b' }} />
+          ) : (
+            <Moon size={15} strokeWidth={2.2} style={{ color: '#6366f1' }} />
+          )}
+        </button>
+
+        {/* User Profile Dropdown */}
         <div className="profile-dropdown-wrap" ref={profileRef}>
           <button
             className="profile-trigger"
             onClick={() => setIsProfileOpen(!isProfileOpen)}
+            title="User Profile & Settings"
           >
             <div className="profile-avatar">
-              <User size={16} strokeWidth={2} />
+              <User size={15} strokeWidth={2.2} />
             </div>
             <div className="profile-info">
-              <span className="profile-name">{user?.name || 'User'}</span>
+              <span className="profile-name">{user?.name || 'Operator'}</span>
               <span className="profile-role-badge">
-                {isAdmin ? <><Shield size={10} strokeWidth={2.5} /> ADMIN</> : <><Eye size={10} strokeWidth={2.5} /> VIEWER</>}
+                {isAdmin ? (
+                  <><Shield size={10} strokeWidth={2.5} /> ADMIN</>
+                ) : (
+                  <><Eye size={10} strokeWidth={2.5} /> VIEWER</>
+                )}
               </span>
             </div>
-            <ChevronDown size={14} strokeWidth={2} className={`profile-chevron ${isProfileOpen ? 'open' : ''}`} />
+            <ChevronDown size={13} strokeWidth={2.2} className={`profile-chevron ${isProfileOpen ? 'open' : ''}`} />
           </button>
 
           {isProfileOpen && (
             <div className="profile-dropdown-menu">
               <div className="profile-dropdown-header">
                 <div className="profile-dropdown-avatar">
-                  <User size={20} strokeWidth={1.8} />
+                  <User size={18} strokeWidth={2} />
                 </div>
                 <div>
                   <div className="profile-dropdown-name">{user?.name}</div>
-                  <div className="profile-dropdown-dept">{user?.department}</div>
+                  <div className="profile-dropdown-dept">{user?.department || 'Gujarat Police'}</div>
                 </div>
               </div>
 
               <div className="profile-dropdown-divider"></div>
 
-              {isAdmin && (
-                <>
-                  <button className="profile-dropdown-item" onClick={() => { if (onOpenUserMgmt) onOpenUserMgmt(); setIsProfileOpen(false); }}>
-                    <Users size={15} strokeWidth={2} />
-                    <span>User & Role Management</span>
-                  </button>
-                  <div className="profile-dropdown-divider"></div>
-                </>
-              )}
-
-              <button className="profile-dropdown-item" onClick={() => { toggleTheme(); setIsProfileOpen(false); }}>
-                {theme === 'dark' ? <Moon size={15} strokeWidth={2} /> : <Sun size={15} strokeWidth={2} />}
-                <span>{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</span>
-                <span className="profile-theme-pill">{theme === 'dark' ? 'ON' : 'OFF'}</span>
-              </button>
-
-              <div className="profile-dropdown-divider"></div>
-
               <button className="profile-dropdown-item logout" onClick={() => { logout(); setIsProfileOpen(false); }}>
-                <LogOut size={15} strokeWidth={2} />
-                <span>Logout</span>
+                <LogOut size={14} strokeWidth={2} />
+                <span>Logout Session</span>
               </button>
+
             </div>
           )}
         </div>
@@ -179,4 +192,5 @@ export const Header = ({ activeView, onViewChange, onSyncFeeds, onOpenGap, onOpe
     </header>
   );
 };
+
 

@@ -7,14 +7,8 @@ import {
   SquarePen,
   Trash2,
   Users,
-  Mail,
-  Phone,
   FolderOpen,
-  ChevronLeft,
-  ChevronRight,
   RefreshCw,
-  ShieldCheck,
-  SlidersHorizontal,
   X
 } from "lucide-react";
 import { Pagination } from "./Pagination";
@@ -29,29 +23,22 @@ export const DepartmentDirectoryPage = ({
   addToast
 }) => {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
+
+
 
   // Filtering
-  const filteredDepartments = departments.filter(d => {
-    const q = search.toLowerCase();
-    const matchQuery =
-      !search ||
-      (d.code && d.code.toLowerCase().includes(q)) ||
+  const filteredDepartments = departments.filter((d) => {
+    const q = search.toLowerCase().trim();
+    if (!q) return true;
+    return (
       (d.name && d.name.toLowerCase().includes(q)) ||
-      (d.category && d.category.toLowerCase().includes(q)) ||
-      (d.nodal_officer && d.nodal_officer.toLowerCase().includes(q));
-
-    const matchStatus = statusFilter === "ALL" || (d.status || "").toUpperCase() === statusFilter;
-    return matchQuery && matchStatus;
+      (d.nodal_officer && d.nodal_officer.toLowerCase().includes(q)) ||
+      (d.contact_email && d.contact_email.toLowerCase().includes(q)) ||
+      (d.contact_phone && d.contact_phone.toLowerCase().includes(q))
+    );
   });
-
-  // Aggregated Stats
-  const totalDepts = departments.length;
-  const activeDepts = departments.filter(d => d.status === "ACTIVE").length;
-  const totalCamerasAcrossDepts = departments.reduce((acc, d) => acc + (d.totalCameras || 0), 0);
 
   // Pagination
   const totalPages = Math.ceil(filteredDepartments.length / itemsPerPage) || 1;
@@ -61,7 +48,7 @@ export const DepartmentDirectoryPage = ({
   const handleDeleteDept = async (dept) => {
     if (dept.totalCameras > 0) {
       addToast(
-        `Cannot delete '${dept.code}' because ${dept.totalCameras} camera assets are currently linked to it.`,
+        `Cannot delete '${dept.name}' because ${dept.totalCameras} camera assets are currently linked to it.`,
         "error",
         "Delete Blocked"
       );
@@ -76,7 +63,7 @@ export const DepartmentDirectoryPage = ({
       const res = await fetch(`/api/v1/departments/${dept.code}`, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
-        addToast(`Department '${dept.code}' removed successfully.`, "success", "Deleted");
+        addToast(`Department '${dept.name}' removed successfully.`, "success", "Deleted");
         onRefresh();
       } else {
         addToast(data.error ? data.error.message : "Failed to delete department", "error", "Error");
@@ -86,34 +73,46 @@ export const DepartmentDirectoryPage = ({
     }
   };
 
-  const activeFilterCount = statusFilter !== "ALL" ? 1 : 0;
-
   return (
     <div className="table-view">
-      {/* Unified Single-Row Header, Filters & Action Toolbar */}
-      <div className="table-header-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
-        {/* Left: Title */}
-        <h2 style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0, whiteSpace: "nowrap" }}>
-          <Building2 size={20} strokeWidth={2.2} style={{ color: "var(--accent)" }} />
-          Departments
-        </h2>
+      {/* Unified Single-Row Header, Compact Search & Action Toolbar */}
+      <div className="table-unified-toolbar">
+        {/* Left Side: Title & Count Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 800, whiteSpace: "nowrap" }}>
+            Departments
+          </h2>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: 800,
+            padding: '2px 8px',
+            borderRadius: '6px',
+            background: 'var(--input-bg)',
+            border: '1px solid var(--panel-border)',
+            color: 'var(--text-secondary)'
+          }}>
+            {departments.length} Entities
+          </span>
+        </div>
 
-        {/* Center: Search Box & Single Filter Popover Button */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: "1 1 300px", maxWidth: "620px" }}>
-          <div className="search-box" style={{ flex: 1 }}>
-            <Search size={14} strokeWidth={2.2} style={{ color: "var(--text-dim)", flexShrink: 0 }} />
+        {/* Right Side: Compact Search & Action Buttons */}
+        <div className="toolbar-actions-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginLeft: 'auto' }}>
+          {/* Compact Search Box */}
+          <div className="search-box" style={{ width: '230px', minWidth: '180px', flex: 'none', height: '36px' }}>
+            <Search size={13} strokeWidth={2.2} style={{ color: "var(--text-dim)", flexShrink: 0 }} />
             <input
               type="text"
-              placeholder="Search Code, Name, Ministry, Nodal Officer..."
+              placeholder="Search departments..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setCurrentPage(1);
               }}
+              style={{ fontSize: '12px' }}
             />
             {search && (
               <X
-                size={13}
+                size={12}
                 style={{ cursor: "pointer", color: "var(--text-dim)" }}
                 onClick={() => {
                   setSearch("");
@@ -123,168 +122,84 @@ export const DepartmentDirectoryPage = ({
             )}
           </div>
 
-          {/* Single Filter Popover Button */}
-          <div style={{ position: "relative", zIndex: 1000 }}>
-            <button
-              className="btn"
-              onClick={() => setShowFilterMenu(!showFilterMenu)}
-              style={{
-                height: "36px",
-                padding: "0 13px",
-                gap: "6px",
-                fontSize: "12px",
-                background: activeFilterCount > 0 ? "rgba(34, 211, 238, 0.15)" : "rgba(30, 41, 59, 0.55)",
-                borderColor: activeFilterCount > 0 ? "var(--accent)" : "rgba(255, 255, 255, 0.1)",
-                color: activeFilterCount > 0 ? "var(--accent)" : "var(--text-primary)"
-              }}
-              title="Open Department Filters"
-            >
-              <SlidersHorizontal size={13} strokeWidth={2.2} />
-              <span>Filter</span>
-              {activeFilterCount > 0 && (
-                <span style={{
-                  background: "var(--accent)",
-                  color: "#000",
-                  fontSize: "10px",
-                  fontWeight: 800,
-                  padding: "1px 5px",
-                  borderRadius: "10px"
-                }}>
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-
-            {showFilterMenu && (
-              <>
-                <div
-                  style={{ position: "fixed", inset: 0, zIndex: 999 }}
-                  onClick={() => setShowFilterMenu(false)}
-                />
-                <div className="filter-popover-dropdown">
-                  <div className="filter-popover-header">
-                    <div style={{ fontWeight: 700, fontSize: "12px", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px" }}>
-                      <SlidersHorizontal size={12} style={{ color: "var(--accent)" }} /> Filter Options
-                    </div>
-                    {activeFilterCount > 0 && (
-                      <button
-                        className="filter-popover-reset"
-                        onClick={() => {
-                          setStatusFilter("ALL");
-                          setCurrentPage(1);
-                        }}
-                      >
-                        Reset All
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="filter-popover-field">
-                    <label className="filter-popover-label">Department Status</label>
-                    <select
-                      className="filter-popover-select"
-                      value={statusFilter}
-                      onChange={(e) => {
-                        setStatusFilter(e.target.value);
-                        setCurrentPage(1);
-                      }}
-                    >
-                      <option value="ALL">All Statuses ({totalDepts})</option>
-                      <option value="ACTIVE">ACTIVE ({activeDepts})</option>
-                      <option value="ONBOARDING">ONBOARDING ({totalDepts - activeDepts})</option>
-                    </select>
-                  </div>
-
-                  <button
-                    className="btn btn-sm btn-primary"
-                    onClick={() => setShowFilterMenu(false)}
-                    style={{ marginTop: "4px", width: "100%", justifyContent: "center" }}
-                  >
-                    Apply Filters
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Right: Refresh & Add Department Action Buttons */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          {onOpenUserMgmt && (
-            <button className="btn" onClick={onOpenUserMgmt} title="Manage Department Users & Role Access" style={{ padding: "7px 12px", gap: "5px" }}>
-              <Users size={14} /> Users & Roles
-            </button>
-          )}
-
-          <button className="btn" onClick={onRefresh} title="Reload Department List" style={{ padding: "7px 12px", gap: "5px" }}>
-            <RefreshCw size={14} /> Refresh
-          </button>
-
-          <button className="btn btn-primary" onClick={onOpenAddDept} title="Register New Department" style={{ padding: "7px 14px", gap: "6px" }}>
-            <Plus size={15} strokeWidth={2.4} /> Add Department
+          <button className="btn btn-primary" onClick={onOpenAddDept} title="Register New Department" style={{ height: "36px", padding: "0 13px", gap: "5px", fontSize: "12px" }}>
+            <Plus size={14} strokeWidth={2.4} /> <span>Add Department</span>
           </button>
         </div>
       </div>
 
+
+
+      {/* Active Filter Chips Bar */}
+      {search && search.trim() && (
+        <div className="active-filters-strip">
+          <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+            Active:
+          </span>
+          <div className="active-filter-chip">
+            <span>Query: "{search}"</span>
+            <span className="active-filter-chip-remove" onClick={() => setSearch("")}>
+              <X size={11} />
+            </span>
+          </div>
+          <button
+            className="filter-popover-reset"
+            onClick={() => setSearch("")}
+            style={{ marginLeft: 'auto', fontSize: '11px' }}
+          >
+            Clear All
+          </button>
+        </div>
+      )}
+
       {/* Table Container */}
       <div className="table-container">
+
         <table className="data-table">
           <thead>
             <tr>
-              <th>Department / Entity</th>
-              <th>Category</th>
+              <th>Department Name</th>
               <th>Nodal In-Charge & Contact</th>
               <th style={{ textAlign: "center" }}>Linked Cameras</th>
-              <th>Status</th>
               <th style={{ textAlign: "right" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {currentDepartments.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: "center", padding: "48px 16px", color: "var(--text-dim)" }}>
+                <td colSpan={4} style={{ textAlign: "center", padding: "48px 16px", color: "var(--text-dim)" }}>
                   <FolderOpen size={36} strokeWidth={1.5} style={{ color: "var(--accent)", marginBottom: "8px" }} />
                   <div>No departments match the search criteria.</div>
                 </td>
               </tr>
             ) : (
               currentDepartments.map((dept) => {
-                const isActive = dept.status === "ACTIVE";
                 const badgeColor = dept.color || "#22d3ee";
 
                 return (
                   <tr key={dept.code}>
-                    {/* 1. Department Name & Code */}
+                    {/* 1. Department Name */}
                     <td>
-                      <div className="cell-name" style={{ fontWeight: 700 }}>
-                        {dept.name}
-                      </div>
-                      <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", marginTop: "3px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                         <span
                           style={{
-                            fontSize: "10.5px",
-                            fontFamily: "var(--font-mono)",
-                            fontWeight: 800,
-                            padding: "1px 6px",
-                            borderRadius: "4px",
-                            background: `${badgeColor}18`,
-                            color: badgeColor,
-                            border: `1px solid ${badgeColor}35`
+                            width: "10px",
+                            height: "10px",
+                            borderRadius: "50%",
+                            background: badgeColor,
+                            boxShadow: `0 0 8px ${badgeColor}60`,
+                            flexShrink: 0
                           }}
-                        >
-                          {dept.code}
-                        </span>
+                        />
+                        <div className="cell-name" style={{ fontWeight: 700, fontSize: "13.5px" }}>
+                          {dept.name}
+                        </div>
                       </div>
                     </td>
 
-                    {/* 2. Category */}
-                    <td style={{ color: "var(--text-secondary)", fontSize: "12px" }}>
-                      {dept.category || "Public Administration"}
-                    </td>
-
-                    {/* 3. Nodal Officer & Contact */}
+                    {/* 2. Nodal Officer & Contact */}
                     <td>
-                      <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "5px" }}>
+                      <div style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px" }}>
                         <Users size={12} strokeWidth={2} style={{ color: "var(--accent)" }} />
                         {dept.nodal_officer || "Nodal In-Charge"}
                       </div>
@@ -294,17 +209,17 @@ export const DepartmentDirectoryPage = ({
                       </div>
                     </td>
 
-                    {/* 4. Linked Cameras Count */}
+                    {/* 3. Linked Cameras Count */}
                     <td style={{ textAlign: "center" }}>
                       <button
                         className="btn btn-sm"
                         onClick={() => onViewCamerasForDept(dept.code)}
                         title={`View ${dept.totalCameras || 0} cameras in Registry`}
                         style={{
-                          fontSize: "11.5px",
+                          fontSize: "12px",
                           fontFamily: "var(--font-mono)",
                           fontWeight: 700,
-                          padding: "2px 8px",
+                          padding: "3px 10px",
                           color: (dept.totalCameras || 0) > 0 ? "var(--accent)" : "var(--text-dim)"
                         }}
                       >
@@ -312,14 +227,7 @@ export const DepartmentDirectoryPage = ({
                       </button>
                     </td>
 
-                    {/* 5. Status Badge */}
-                    <td>
-                      <span className={`badge ${isActive ? "active" : "maintenance"}`}>
-                        {dept.status || "ACTIVE"}
-                      </span>
-                    </td>
-
-                    {/* 6. Action Buttons */}
+                    {/* 4. Action Buttons */}
                     <td style={{ textAlign: "right" }}>
                       <div className="row-actions" onClick={(e) => e.stopPropagation()}>
                         <button
@@ -354,19 +262,41 @@ export const DepartmentDirectoryPage = ({
       </div>
 
       {/* Pagination Footer */}
-      {totalPages > 1 && (
-        <div className="table-pagination-footer" style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--panel-border)", flexWrap: "wrap", gap: "12px" }}>
-          <div style={{ fontSize: "12px", color: "var(--text-dim)" }}>
-            Showing {startIndex + 1}–{Math.min(startIndex + itemsPerPage, filteredDepartments.length)} of {filteredDepartments.length} departments
+      <div className="table-pagination-footer" style={{ padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--panel-border)", flexWrap: "wrap", gap: "12px", marginTop: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+          <div style={{ fontSize: "12.5px", color: "var(--text-secondary)" }}>
+            Showing records <b>{filteredDepartments.length === 0 ? 0 : startIndex + 1}</b> to <b>{Math.min(startIndex + itemsPerPage, filteredDepartments.length)}</b> of <b>{filteredDepartments.length}</b> departments
           </div>
 
+          <div className="per-page-wrapper" style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-dim)" }}>
+            <span>Rows per page:</span>
+            <select
+              className="filter-select per-page-select"
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              style={{ height: "30px", padding: "0 8px", fontSize: "12px" }}
+            >
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+
+          </div>
+        </div>
+
+        {totalPages > 1 && (
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={(p) => setCurrentPage(p)}
           />
-        </div>
-      )}
+        )}
+      </div>
     </div>
+
   );
 };
+

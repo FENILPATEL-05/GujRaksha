@@ -124,7 +124,6 @@ class WatchlistDataStore {
     const newRecord = {
       id: record.id || `wl-${Date.now()}`,
       vehicle_plate: cleanPlate,
-      vehicle_type: record.vehicle_type || "Vehicle",
       category: record.category || "STOLEN_VEHICLE",
       fir_number: record.fir_number || `FIR #${Math.floor(100 + Math.random() * 900)}/2026`,
       police_station: record.police_station || "State Police Surveillance Cell",
@@ -142,14 +141,14 @@ class WatchlistDataStore {
     if (pgClient.isConnected()) {
       try {
         await pgClient.query(
-          `INSERT INTO watchlist (id, vehicle_plate, vehicle_type, category, fir_number, police_station, owner_name, priority, status, description, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          `INSERT INTO watchlist (id, vehicle_plate, category, fir_number, police_station, owner_name, priority, status, description, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
            ON CONFLICT (vehicle_plate) DO UPDATE SET
             category = EXCLUDED.category,
             priority = EXCLUDED.priority,
             status = EXCLUDED.status,
             description = EXCLUDED.description`,
-          [newRecord.id, newRecord.vehicle_plate, newRecord.vehicle_type, newRecord.category, newRecord.fir_number, newRecord.police_station, newRecord.owner_name, newRecord.priority, newRecord.status, newRecord.description, newRecord.created_at]
+          [newRecord.id, newRecord.vehicle_plate, newRecord.category, newRecord.fir_number, newRecord.police_station, newRecord.owner_name, newRecord.priority, newRecord.status, newRecord.description, newRecord.created_at]
         );
       } catch (err) {
         console.warn("PG Watchlist Insert Error:", err.message);
@@ -157,6 +156,7 @@ class WatchlistDataStore {
     }
 
     return newRecord;
+
   }
 
   async update(id, updates) {

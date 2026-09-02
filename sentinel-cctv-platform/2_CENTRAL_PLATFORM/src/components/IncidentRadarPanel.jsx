@@ -9,8 +9,10 @@ import {
   ShieldCheck,
   Trash2,
   Car,
-  AlertTriangle
+  AlertTriangle,
+  MapPin
 } from 'lucide-react';
+
 
 export const IncidentRadarPanel = ({
   incidents = [],
@@ -134,8 +136,12 @@ export const IncidentRadarPanel = ({
 
                   {/* Camera & Location Info */}
                   <div className="card-location-info">
-                    <span>📍 <b>{incident.cameraName || incident.cameraCode}</b></span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <MapPin size={11} strokeWidth={2.4} style={{ color: 'var(--accent)' }} />
+                      <b>{incident.cameraName || incident.cameraCode}</b>
+                    </span>
                     <span>·</span>
+
                     <span>{incident.district || 'Gujarat'}</span>
                     <span>·</span>
                     <span className="card-time-ago">{incident.timeAgo || 'Just now'}</span>
