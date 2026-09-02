@@ -106,13 +106,36 @@ paths:
   all_others:
 EOF
 
+elif [ -f "$INPUT_SRC" ]; then
+  # Option 3: Local Video File (MP4 / MKV / AVI 24/7 Infinite Loop Stream)
+  ABS_FILE="$(realpath "$INPUT_SRC" 2>/dev/null || echo "$INPUT_SRC")"
+  echo -e "📹 ${BOLD}Mode:${NC} ${GREEN}Local Video File 24/7 Infinite Loop Stream${NC}"
+  echo -e "📁 ${BOLD}Video File:${NC} ${YELLOW}$ABS_FILE${NC}"
+  echo -e "🆔 ${BOLD}Stream Channel:${NC} stream/${STREAM_ID}"
+  echo -e ""
+  echo -e "${BOLD}📌 Available Stream Endpoints:${NC}"
+  echo -e "   1️⃣  ${YELLOW}RTSP Stream URL (Python AI):${NC} ${BOLD}rtsp://${LAN_IP}:8554/stream/${STREAM_ID}${NC}"
+  echo -e "   2️⃣  ${PURPLE}WebRTC / WHEP   (Central UI):${NC} ${BOLD}http://${LAN_IP}:8889/stream/${STREAM_ID}/whep${NC}"
+  echo -e "   3️⃣  ${GREEN}HLS Live Stream (Mobile/VLC):${NC} ${BOLD}http://${LAN_IP}:8888/stream/${STREAM_ID}/index.m3u8${NC}"
+  echo -e "${CYAN}----------------------------------------------------------------------${NC}"
+
+  sed '/^paths:/,$d' "$BASE_CFG" > "$ACTIVE_CFG"
+  cat <<EOF >> "$ACTIVE_CFG"
+paths:
+  stream/${STREAM_ID}:
+    runOnInit: ffmpeg -re -stream_loop -1 -i "$ABS_FILE" -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -an -f rtsp -rtsp_transport tcp rtsp://localhost:8554/stream/${STREAM_ID}
+    runOnInitRestart: yes
+  all_others:
+EOF
+
 else
-  # Option 3: Default Pure Gateway Mode
+  # Option 4: Default Pure Gateway Mode
   echo -e "🌐 ${BOLD}Host Machine Network IP:${NC} ${GREEN}${LAN_IP}${NC}"
   echo -e ""
   echo -e "${BOLD}📌 Available Protocol Endpoints (for Stream '1'):${NC}"
   echo -e "   1️⃣  ${YELLOW}RTSP Stream URL   :${NC} ${BOLD}rtsp://${LAN_IP}:8554/stream/1${NC}"
   echo -e "   2️⃣  ${PURPLE}WebRTC / WHEP URL :${NC} ${BOLD}http://${LAN_IP}:8889/stream/1/whep${NC}"
+
   echo -e "   3️⃣  ${GREEN}HLS Live URL      :${NC} ${BOLD}http://${LAN_IP}:8888/stream/1/index.m3u8${NC}"
   echo -e "${CYAN}----------------------------------------------------------------------${NC}"
   cp "$BASE_CFG" "$ACTIVE_CFG"

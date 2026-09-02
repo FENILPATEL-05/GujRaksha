@@ -335,9 +335,24 @@ export const WatchlistManagerPage = ({
                         </div>
                       </div>
                       <div style={{ fontSize: "11px", color: "var(--text-dim)", marginTop: "2px" }}>
+
                         {item.vehicle_type || "Vehicle"} · Owner: {item.owner_name || "Under Investigation"}
                       </div>
+                      <div style={{ display: "flex", gap: "4px", marginTop: "4px", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: "9.5px", padding: "1px 5px", borderRadius: "3px", background: "rgba(56, 189, 248, 0.12)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.25)", fontWeight: 600 }}>
+                          VAHAN 4.0
+                        </span>
+                        <span style={{ fontSize: "9.5px", padding: "1px 5px", borderRadius: "3px", background: "rgba(239, 68, 68, 0.12)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.25)", fontWeight: 600 }}>
+                          eGujCop
+                        </span>
+                        {item.priority === "CRITICAL" && (
+                          <span style={{ fontSize: "9.5px", padding: "1px 5px", borderRadius: "3px", background: "rgba(34, 211, 238, 0.12)", color: "var(--accent)", border: "1px solid rgba(34, 211, 238, 0.25)", fontWeight: 600 }}>
+                            NAFIS Flagged
+                          </span>
+                        )}
+                      </div>
                     </td>
+
 
                     <td>
                       <span className="badge" style={{

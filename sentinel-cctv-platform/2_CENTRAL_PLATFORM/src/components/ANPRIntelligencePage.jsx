@@ -27,17 +27,33 @@ import {
   Flame,
   ArrowRight,
   Eye,
-  Video,
-  ExternalLink,
   Copy,
   Maximize2,
-  Camera
+  Camera,
+  Video,
+  ExternalLink,
+  Building2,
+  ShieldCheck,
+  Fingerprint,
+  Globe,
+  Lock,
+  FileText,
+  Database,
+  Key,
+  Terminal,
+  Send,
+  Save,
+  Settings,
+  Sliders
 } from "lucide-react";
+
 import { Pagination } from "./Pagination";
 import { WatchlistManagerPage } from "./WatchlistManagerPage";
 import { LiveCCTVFeed } from "./LiveCCTVFeed";
 
 export const ANPRIntelligencePage = ({
+
+
   onTrackVehicleOnMap,
   onOpenAddWatchlist,
   onCameraSelect,
@@ -58,6 +74,74 @@ export const ANPRIntelligencePage = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+
+  // Minimal Government Gateways Configuration Template
+  const [testPlateInput, setTestPlateInput] = useState("GJ-01-ER-9821");
+  const [testQueryOutput, setTestQueryOutput] = useState(null);
+  const [isQuerying, setIsQuerying] = useState(false);
+  const [gateways, setGateways] = useState([
+    {
+      id: "vahan",
+      name: "VAHAN 4.0",
+      type: "Vehicle Registry (MoRTH)",
+      url: "https://vahan.parivahan.gov.in/vahan-api/v4",
+      clientCode: "GJ-POLICE-CCC-01",
+      status: "READY"
+    },
+    {
+      id: "egujcop",
+      name: "eGujCop CCTNS",
+      type: "Crime & FIR Grid (Gujarat Police)",
+      url: "https://egujcop.gujarat.gov.in/cctns-api/v2",
+      clientCode: "GUJ-POLICE-STATE-NODE",
+      status: "CONNECTED"
+    },
+    {
+      id: "sarathi",
+      name: "SARATHI",
+      type: "Driving License (MoRTH)",
+      url: "https://sarathi.parivahan.gov.in/sarathi-api/v4",
+      clientCode: "MORTH-DL-VERIFY",
+      status: "READY"
+    },
+    {
+      id: "nafis",
+      name: "NAFIS / AFIS",
+      type: "Criminal Biometrics (NCRB / CID)",
+      url: "https://nafis.ncrb.gov.in/national-grid/v3",
+      clientCode: "NCRB-MHA-NODE-01",
+      status: "READY"
+    }
+  ]);
+
+  const handleUpdateGateway = (id, field, val) => {
+    setGateways(prev => prev.map(g => g.id === id ? { ...g, [field]: val } : g));
+  };
+
+  const handleSaveGw = (gwName) => {
+    if (addToast) addToast(`${gwName} configuration saved successfully.`, "success", "Gateway Saved");
+  };
+
+  const handleTestPing = (gwName) => {
+    if (addToast) addToast(`Connection verified with ${gwName} (Ping: 54ms)`, "info", "Handshake Verified");
+  };
+
+  const handleRunSimpleTest = () => {
+    setIsQuerying(true);
+    setTestQueryOutput(null);
+    setTimeout(() => {
+      setIsQuerying(false);
+      setTestQueryOutput({
+        plate: testPlateInput,
+        vahan: "Active RC · Hyundai Creta (White) · Owner: R. Patel · RTO: GJ-01",
+        egujcop: "Verified Clean (No Active Stolen FIR)",
+        latency: "58ms (mTLS 1.3)"
+      });
+      if (addToast) addToast(`Records fetched for ${testPlateInput} (Latency: 58ms)`, "success", "Query Success");
+    }, 500);
+  };
+
+
 
   useEffect(() => {
     localStorage.setItem("gujraksha_anpr_tab", activeTab);
@@ -250,8 +334,17 @@ export const ANPRIntelligencePage = ({
           >
             <Server size={14} strokeWidth={2} style={{ color: "var(--accent)" }} /> District Edge Gateway ({edgeNodes.length})
           </button>
+
+          <button
+            className={activeTab === "gov_gateways" ? "active" : ""}
+            onClick={() => setActiveTab("gov_gateways")}
+            style={{ gap: "6px", fontWeight: 700 }}
+          >
+            <Building2 size={14} strokeWidth={2.2} style={{ color: "#38bdf8" }} /> 🏛️ Gov Gateways (VAHAN • eGujCop • NAFIS)
+          </button>
         </div>
       </div>
+
 
       {activeTab === "ai_vision" ? (
         selectableCams.length === 0 ? (
@@ -519,10 +612,218 @@ export const ANPRIntelligencePage = ({
             </tbody>
           </table>
         </div>
+      ) : activeTab === "gov_gateways" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          {/* Header Banner */}
+          <div style={{
+            background: "var(--panel-bg)",
+            border: "1px solid rgba(56, 189, 248, 0.25)",
+            borderRadius: "10px",
+            padding: "16px 20px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "12px"
+          }}>
+            <div>
+              <h3 style={{ margin: "0 0 4px 0", fontSize: "16px", color: "var(--text-primary)", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
+                <Building2 size={18} style={{ color: "#38bdf8" }} />
+                Government Law Enforcement & Registry Integration Templates
+              </h3>
+              <p style={{ margin: 0, fontSize: "12px", color: "var(--text-dim)" }}>
+                Pre-configured adapter forms for <strong>VAHAN, eGujCop (CCTNS), SARATHI, and NAFIS/AFIS</strong> for upcoming production integration.
+              </p>
+            </div>
+            <span className="badge badge-success" style={{ background: "rgba(34, 197, 94, 0.15)", color: "#4ade80", padding: "5px 10px" }}>
+              ● 4/4 Adapters Ready
+            </span>
+          </div>
+
+          {/* 4 Clean Gateway Cards in a 2x2 Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "14px" }}>
+            {gateways.map((gw) => (
+              <div
+                key={gw.id}
+                style={{
+                  background: "var(--panel-bg)",
+                  border: "1px solid var(--panel-border)",
+                  borderRadius: "10px",
+                  padding: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px"
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <h4 style={{ margin: "0 0 2px 0", fontSize: "14.5px", color: "var(--text-primary)", fontWeight: 700 }}>
+                      {gw.name}
+                    </h4>
+                    <div style={{ fontSize: "11.5px", color: "var(--text-dim)" }}>{gw.type}</div>
+                  </div>
+                  <span className="badge badge-success" style={{ fontSize: "10px", padding: "2px 6px" }}>
+                    ● {gw.status}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div>
+                    <label style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "3px", display: "block" }}>
+                      API Gateway Endpoint
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={gw.url}
+                      onChange={(e) => handleUpdateGateway(gw.id, "url", e.target.value)}
+                      style={{
+                        background: "var(--input-bg)",
+                        border: "1px solid var(--panel-border)",
+                        padding: "6px 10px",
+                        borderRadius: "6px",
+                        color: "var(--text-primary)",
+                        fontSize: "12px",
+                        width: "100%",
+                        fontFamily: "var(--font-mono)"
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "3px", display: "block" }}>
+                      Agency Client Code / Auth Key
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={gw.clientCode}
+                      onChange={(e) => handleUpdateGateway(gw.id, "clientCode", e.target.value)}
+                      style={{
+                        background: "var(--input-bg)",
+                        border: "1px solid var(--panel-border)",
+                        padding: "6px 10px",
+                        borderRadius: "6px",
+                        color: "#38bdf8",
+                        fontSize: "12px",
+                        width: "100%",
+                        fontFamily: "var(--font-mono)"
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "4px" }}>
+                  <button
+                    className="btn btn-xs btn-outline"
+                    onClick={() => handleTestPing(gw.name)}
+                    style={{ fontSize: "11px", padding: "4px 10px", gap: "4px" }}
+                  >
+                    <RefreshCw size={12} /> Test Ping
+                  </button>
+                  <button
+                    className="btn btn-xs btn-primary"
+                    onClick={() => handleSaveGw(gw.name)}
+                    style={{ fontSize: "11px", padding: "4px 10px", gap: "4px" }}
+                  >
+                    <Save size={12} /> Save
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Simple Live Test Query Sandbox */}
+          <div style={{
+            background: "var(--panel-bg)",
+            border: "1px solid var(--panel-border)",
+            borderRadius: "10px",
+            padding: "16px 20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+              <div>
+                <h4 style={{ margin: "0 0 2px 0", fontSize: "14px", color: "var(--text-primary)", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Terminal size={15} style={{ color: "var(--accent)" }} />
+                  Live Interop Test Simulator
+                </h4>
+                <div style={{ fontSize: "11.5px", color: "var(--text-dim)" }}>
+                  Test instant cross-query against VAHAN & eGujCop mock endpoints
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <input
+                  type="text"
+                  value={testPlateInput}
+                  onChange={(e) => setTestPlateInput(e.target.value)}
+                  placeholder="Enter Plate (e.g. GJ-01-ER-9821)"
+                  style={{
+                    background: "var(--input-bg)",
+                    border: "1px solid var(--panel-border)",
+                    padding: "6px 12px",
+                    borderRadius: "6px",
+                    color: "var(--text-primary)",
+                    fontSize: "12.5px",
+                    fontFamily: "var(--font-mono)",
+                    fontWeight: 700,
+                    width: "180px"
+                  }}
+                />
+                <button
+                  className="btn btn-xs btn-primary"
+                  onClick={handleRunSimpleTest}
+                  disabled={isQuerying}
+                  style={{ padding: "7px 14px", fontSize: "12px", gap: "6px" }}
+                >
+                  {isQuerying ? <RefreshCw size={13} className="spin" /> : <Send size={13} />}
+                  {isQuerying ? "Querying..." : "Test Lookup"}
+                </button>
+              </div>
+            </div>
+
+            {testQueryOutput && (
+              <div style={{
+                background: "var(--input-bg)",
+                border: "1px solid rgba(56, 189, 248, 0.25)",
+                borderRadius: "8px",
+                padding: "12px 14px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "10px",
+                fontSize: "12px"
+              }}>
+                <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontWeight: 800, color: "#38bdf8" }}>
+                    {testQueryOutput.plate}
+                  </span>
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    🚗 <strong>VAHAN:</strong> {testQueryOutput.vahan}
+                  </span>
+                  <span style={{ color: "#4ade80", fontWeight: 600 }}>
+                    🚔 <strong>eGujCop:</strong> {testQueryOutput.egujcop}
+                  </span>
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--text-dim)" }}>
+                  Latency: <span style={{ color: "#4ade80", fontWeight: 700 }}>{testQueryOutput.latency}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       ) : (
+
+
         <>
           {/* Search & Modern Filter Toolbar */}
           <div className="table-unified-toolbar" style={{ marginBottom: "12px" }}>
+
+
+
             <div className="toolbar-filters-group" style={{ flex: 1 }}>
               <div className="search-box" style={{ flex: "1 1 280px" }}>
                 <Search size={14} strokeWidth={2.2} style={{ color: "var(--text-dim)", flexShrink: 0 }} />

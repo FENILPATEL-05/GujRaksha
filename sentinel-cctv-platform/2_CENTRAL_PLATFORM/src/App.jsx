@@ -80,9 +80,17 @@ export function AppContent() {
     }
   }, [isDeptAdmin, userDepartmentId]);
 
-  const addToast = (message, type = 'info', title = '') => {
+  const addToast = (msgOrObj, type = 'info', title = '') => {
+    let message = msgOrObj;
+    let toastType = type;
+    let toastTitle = title;
+    if (typeof msgOrObj === 'object' && msgOrObj !== null) {
+      message = msgOrObj.message || msgOrObj.title || '';
+      toastType = msgOrObj.type || 'info';
+      toastTitle = msgOrObj.title || '';
+    }
     const id = Date.now() + Math.random();
-    setToasts(prev => [...prev, { id, message, type, title }]);
+    setToasts(prev => [...prev, { id, message: String(message), type: toastType, title: String(toastTitle) }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 4000);
@@ -91,6 +99,7 @@ export function AppContent() {
   const removeToast = (id) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
+
 
   const fetchCameras = useCallback(async (signal) => {
     setIsLoadingCameras(true);
