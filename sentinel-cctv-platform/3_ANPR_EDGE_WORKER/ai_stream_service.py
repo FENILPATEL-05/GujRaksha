@@ -685,22 +685,31 @@ def generate_frames(
             current_ai_stats["current_frame_counts"] = frame_counts
             current_ai_stats["active_dwell_alerts"] = dwell_alerts_list
             current_ai_stats["intrusion_alerts"] = intrusion_events
-            current_ai_stats["infer_time_ms"] = infer_time_ms
+            # High-Speed Optimized JPEG Encoding for Butter-Smooth 60 FPS Browser Decoding
+            if w > 1280:
+                scale_f = 1280.0 / w
+                out_frame = cv2.resize(annotated_frame, (1280, int(h * scale_f)), interpolation=cv2.INTER_LINEAR)
+            else:
+                out_frame = annotated_frame
 
-            ret, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            ret, buffer = cv2.imencode('.jpg', out_frame, [
+                cv2.IMWRITE_JPEG_QUALITY, 75,
+                cv2.IMWRITE_JPEG_OPTIMIZE, 0
+            ])
             if not ret:
                 continue
 
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
 
-            # Stream at full camera frame rate (30-60 FPS) with 0 delay
+            # Stream at full camera frame rate (30-60 FPS) with zero CPU lag
             elapsed = time.time() - t_loop_start
-            if elapsed < 0.025:
-                time.sleep(0.025 - elapsed)
+            if elapsed < 0.016:
+                time.sleep(0.016 - elapsed)
     finally:
         engine.release()
         current_ai_stats["is_active"] = False
+
 
 
 
