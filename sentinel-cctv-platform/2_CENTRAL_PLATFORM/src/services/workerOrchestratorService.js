@@ -48,9 +48,8 @@ class WorkerOrchestratorService {
     // Filter cameras with active AI detection
     const aiCams = allCams.filter(c => {
       const mode = String(c.detection_mode || "").toUpperCase();
-      return mode === "ANPR_DETECTION" || mode === "OBJECT_DETECTION";
+      return mode === "ANPR_DETECTION" || mode === "OBJECT_DETECTION" || mode === "TRAFFIC_MONITORING";
     });
-
 
     // Get all online workers in deterministic registration order
     const autoWorkers = Array.from(this.workers.values())
@@ -74,20 +73,25 @@ class WorkerOrchestratorService {
         const assignedSlice = poolForWorker.slice(camCursor, camCursor + takeCount);
         camCursor += assignedSlice.length;
 
-        worker.assigned_cameras = assignedSlice.map(c => ({
-          id: c.id,
-          camera_code: c.camera_code || c.code || `CAM-${c.id}`,
-          name: c.name || `Camera ${c.id}`,
-          district: c.district || worker.district || "All",
-          detection_mode: c.detection_mode || "ANPR_DETECTION",
-          rtsp_url: c.rtsp_url || c.stream_url || c.url || "0",
-          latitude: c.latitude,
-          longitude: c.longitude
-        }));
+        worker.assigned_cameras = assignedSlice.map(c => {
+          let mode = c.detection_mode || "ANPR_DETECTION";
+          if (mode === "TRAFFIC_MONITORING") mode = "ANPR_DETECTION";
+          return {
+            id: c.id,
+            camera_code: c.camera_code || c.code || `CAM-${c.id}`,
+            name: c.name || `Camera ${c.id}`,
+            district: c.district || worker.district || "All",
+            detection_mode: mode,
+            rtsp_url: c.rtsp_url || c.stream_url || c.url || "0",
+            latitude: c.latitude,
+            longitude: c.longitude
+          };
+        });
       } else {
         // Node 1 took all available cameras; this node sits in STANDBY buffer
         worker.assigned_cameras = [];
       }
+
 
       worker.state = worker.assigned_cameras.length > 0 ? "SCANNING" : "STANDBY";
       if (worker.stats) {

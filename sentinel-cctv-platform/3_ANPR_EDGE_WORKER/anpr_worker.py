@@ -1357,16 +1357,24 @@ class DistributedWorkerManager:
             req = urllib.request.Request(reg_url, data=data_bytes, headers={"Content-Type": "application/json"}, method="POST")
             with urllib.request.urlopen(req, timeout=4.0) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
-                watchlist = data.get("data", {}).get("watchlist") or []
+                worker_data = data.get("data", {})
+                watchlist = worker_data.get("watchlist") or []
                 self.watchlist_mgr.update_from_list(watchlist)
+                assigned = worker_data.get("assigned_cameras") or []
+
                 print(f"📡 [Central Orchestrator] Worker \x1b[36m{self.worker_id}\x1b[0m connected to Central CCC", flush=True)
                 print(f"   🧠 AI Vision Engine: \x1b[1m\x1b[32mACTIVE\x1b[0m (YOLOv9 Object Detection & ANPR OCR Pipeline | {self.accel_mode})", flush=True)
                 print(f"   📋 Watchlist Database: \x1b[33m{len(self.watchlist_mgr.watchlist_map)} suspect targets\x1b[0m loaded", flush=True)
-                print(f"   📊 Node Status: \x1b[35mSTANDBY / READY\x1b[0m (Awaiting Central camera dispatch)", flush=True)
+
+                if assigned:
+                    self.sync_camera_workers(assigned)
+                else:
+                    print(f"   📊 Node Status: \x1b[35mSTANDBY / READY\x1b[0m (Awaiting Central camera dispatch)", flush=True)
                 return True
         except Exception as e:
-            print(f"⚠️ [Central Orchestrator] Standby waiting for Central CCC...", flush=True)
+            print(f"⚠️ [Central Orchestrator] Standby waiting for Central CCC ({e})...", flush=True)
             return False
+
 
     def heartbeat(self):
         """Send heartbeat and receive assigned cameras + updated watchlist."""
