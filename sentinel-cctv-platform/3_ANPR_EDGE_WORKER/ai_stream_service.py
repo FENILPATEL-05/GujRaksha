@@ -458,5 +458,14 @@ def start_ai_stream_server(host: str = "0.0.0.0", port: int = 8090):
 
 
 if __name__ == "__main__":
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8090
+    port = 8090
+    for arg in sys.argv[1:]:
+        if arg.isdigit():
+            port = int(arg)
+        elif arg.startswith("--port="):
+            try:
+                port = int(arg.split("=")[1])
+            except ValueError:
+                pass
     start_ai_stream_server(port=port)
+

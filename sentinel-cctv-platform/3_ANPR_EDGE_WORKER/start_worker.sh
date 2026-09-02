@@ -53,10 +53,11 @@ else
   echo " 🆔 Worker Node ID  : $WORKER_ID"
   echo " 🚀 Max Capacity    : $MAX_CAPACITY Cameras"
   echo " 🐍 Python Runtime  : $PY_BIN"
-  echo "======================================================================"
-  echo "Connecting to Central CCC... Node will appear in Central UI in STANDBY."
-  echo "Central Admin can assign up to $MAX_CAPACITY cameras dynamically from web UI."
-  echo "======================================================================"
+  # Launch Sentinel-Compatible AI Video Stream Server (Port 8090) in Background
+  echo "🚀 Launching AI Video Stream Service on port 8090 (/api/v1/ai/video_feed)..."
+  "$PY_BIN" "$SCRIPT_DIR/ai_stream_service.py" 8090 > /tmp/gujraksha_ai_stream.log 2>&1 &
+
   exec "$PY_BIN" "$SCRIPT_DIR/anpr_worker.py" --central-url "$CENTRAL_URL" --worker-id "$WORKER_ID" --max-capacity "$MAX_CAPACITY"
+
 fi
 

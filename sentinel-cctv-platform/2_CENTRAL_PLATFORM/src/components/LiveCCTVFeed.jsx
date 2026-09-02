@@ -15,12 +15,14 @@ export const LiveCCTVFeed = ({
   const iframeRef = useRef(null);
   const containerRef = useRef(null);
 
-  const [streamMode, setStreamMode] = useState("webrtc"); // "webrtc", "video", "mjpeg"
+  const [streamMode, setStreamMode] = useState("webrtc"); // "webrtc", "video", "mjpeg", "ai_stream"
   const [streamError, setStreamError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
   const [activeProtocol, setActiveProtocol] = useState("WHEP WebRTC");
+  const [preferAiStream, setPreferAiStream] = useState(false);
+
 
   // Real-time detections from AI Vision Engine (Drawn directly according to camera configuration)
   const [liveDetections, setLiveDetections] = useState([]);
@@ -225,6 +227,13 @@ export const LiveCCTVFeed = ({
     const hasExplicitWhep = !!(camera?.whep_url || camera?.urls?.whep || (rawStreamUrl && (rawStreamUrl.endsWith('/whep') || rawStreamUrl.includes(':8889/'))));
     const isPhysicalLocalRtsp = !hasExplicitWhep && (rawStreamUrl.includes("192.168.") || rawStreamUrl.includes("10.") || rawStreamUrl.includes("172.") || rawStreamUrl.includes("admin:"));
 
+    if (preferAiStream) {
+      setStreamMode("ai_stream");
+      setActiveProtocol("Live AI Stream (Sentinel Engine)");
+      setIsLoading(false);
+      return;
+    }
+
     if (isCorp8Sandbox) {
       setStreamMode("sandbox_video");
       setActiveProtocol("HTTPS Live Stream");
@@ -246,7 +255,7 @@ export const LiveCCTVFeed = ({
       setActiveProtocol("WHEP WebRTC");
       setIsLoading(false);
     }
-  }, [camera?.id, rawStreamUrl]);
+  }, [camera?.id, rawStreamUrl, preferAiStream]);
 
   const handleIframeLoaded = () => {
     setIsLoading(false);
@@ -290,9 +299,13 @@ export const LiveCCTVFeed = ({
   const apiPrefix = typeof window !== 'undefined' && window.location.pathname.startsWith('/gujraksha') ? '/gujraksha' : '';
   const rtspProxyUrl = `${apiPrefix}/api/v1/proxy-stream?url=${encodeURIComponent(camera?.stream_url || camera?.rtsp_url || '')}`;
 
+  const aiSourceUrl = camera?.rtsp_url || camera?.stream_url || (camera?.urls && (camera.urls.rtsp || camera.urls.hls || camera.urls.whep)) || rawStreamUrl || "0";
+  const aiStreamUrl = `${apiPrefix}/api/v1/ai/video_feed?source=${encodeURIComponent(aiSourceUrl)}&trails=true&dwell=true&zone=true`;
+
   const effectiveFallbackUrl = (rawStreamUrl.startsWith('rtsp://') || isRtspOnly)
     ? rtspProxyUrl
     : (camera.hls_url || rawStreamUrl);
+
 
   // Helper to get color style for detected object classes
   const getBoxStyle = (det) => {
@@ -504,12 +517,32 @@ export const LiveCCTVFeed = ({
           />
         )}
 
-        {/* 5. AI OBJECT DETECTION & BOUNDING BOX HUD OVERLAY (HTML5 Canvas 60FPS + DOM Overlay) */}
-        {isAiActive && (
+        {/* 5. Real-time Baked-in AI Stream (Matching Sentinel CCTV Registry Core Engine) */}
+        {streamMode === "ai_stream" && (
+          <img
+            ref={imgRef}
+            src={aiStreamUrl}
+            alt={camera.name || "Live AI Stream"}
+            onLoad={handleImgLoaded}
+            onError={handleImgError}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "fill",
+              position: "relative",
+              zIndex: 1,
+              display: streamError ? "none" : "block"
+            }}
+          />
+        )}
+
+        {/* 6. AI OBJECT DETECTION & BOUNDING BOX HUD OVERLAY (HTML5 Canvas 60FPS + DOM Overlay) */}
+        {isAiActive && streamMode !== "ai_stream" && (
           <DetectionCanvasOverlay camera={camera} isPlaying={isPlaying} />
         )}
 
-        {isAiActive && displayDetections.length > 0 && (
+        {isAiActive && streamMode !== "ai_stream" && displayDetections.length > 0 && (
+
           <div
             className="ai-hud-overlay"
             style={{
@@ -646,6 +679,46 @@ export const LiveCCTVFeed = ({
           <span>{activeProtocol}</span>
         </div>
       )}
+
+      {/* Stream Switcher Toggle (Raw Feed vs Real-time Baked-in AI Stream) */}
+      {!streamError && (
+        <div style={{
+          position: "absolute",
+          top: "8px",
+          right: "8px",
+          zIndex: 25,
+          display: "flex",
+          alignItems: "center",
+          gap: "4px"
+        }}>
+          <button
+            type="button"
+            className="btn btn-xs"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPreferAiStream(!preferAiStream);
+            }}
+            title={preferAiStream ? "Switch to Normal Raw Video Feed" : "Switch to Real-Time Baked-in AI Stream (Zero-Latency Sync)"}
+            style={{
+              fontSize: "10px",
+              padding: "2px 7px",
+              background: preferAiStream ? "rgba(16, 185, 129, 0.9)" : "rgba(15, 23, 42, 0.8)",
+              border: preferAiStream ? "1px solid #10b981" : "1px solid rgba(255, 255, 255, 0.2)",
+              color: "#fff",
+              borderRadius: "5px",
+              backdropFilter: "blur(6px)",
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px"
+            }}
+          >
+            {preferAiStream ? "🎯 AI Stream (Sync)" : "🎥 Raw Stream"}
+          </button>
+        </div>
+      )}
+
 
       {/* Loading Indicator */}
       {isLoading && !streamError && (
