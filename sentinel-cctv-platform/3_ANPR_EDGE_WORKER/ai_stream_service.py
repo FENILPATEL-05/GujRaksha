@@ -350,10 +350,13 @@ def generate_frames(
             elif is_inside_zone:
                 label += " [INTRUSION]"
 
-            (w_txt, h_txt), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)
-            cv2.rectangle(annotated_frame, (x1, max(y1 - 20, 0)), (x1 + w_txt + 6, max(y1, 20)), box_color, -1)
-            cv2.putText(annotated_frame, label, (x1 + 3, max(y1 - 5, 15)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 1)
+            (w_txt, h_txt), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.52, 2)
+            # Draw Dark Solid Background Badge with Colored Border
+            cv2.rectangle(annotated_frame, (x1, max(y1 - 24, 0)), (x1 + w_txt + 10, max(y1, 24)), (15, 23, 42), -1)
+            cv2.rectangle(annotated_frame, (x1, max(y1 - 24, 0)), (x1 + w_txt + 10, max(y1, 24)), box_color, 1)
+            # Draw Ultra-Clear Pure White Bold Text
+            cv2.putText(annotated_frame, label, (x1 + 5, max(y1 - 7, 18)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 2)
 
         # 3.5. License Plate Detection & High-Contrast ANPR Tag Drawing
         if plate_detector is not None:
@@ -371,12 +374,16 @@ def generate_frames(
                     cv2.rectangle(annotated_frame, (px1, py1), (px2, py2), (0, 230, 255), 2)
 
                     p_label = f"PLATE: {cleaned_p}" if cleaned_p else "LICENSE_PLATE"
-                    (pw, ph), _ = cv2.getTextSize(p_label, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)
-                    cv2.rectangle(annotated_frame, (px1, max(py1 - 20, 0)), (px1 + pw + 8, max(py1, 20)), (0, 230, 255), -1)
-                    cv2.putText(annotated_frame, p_label, (px1 + 4, max(py1 - 5, 15)),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.48, (0, 0, 0), 2)
+                    (pw, ph), _ = cv2.getTextSize(p_label, cv2.FONT_HERSHEY_SIMPLEX, 0.52, 2)
+                    # Draw Dark Solid Badge with Yellow Border
+                    cv2.rectangle(annotated_frame, (px1, max(py1 - 24, 0)), (px1 + pw + 10, max(py1, 24)), (15, 23, 42), -1)
+                    cv2.rectangle(annotated_frame, (px1, max(py1 - 24, 0)), (px1 + pw + 10, max(py1, 24)), (0, 230, 255), 1)
+                    # Draw Crisp Pure White Bold Text
+                    cv2.putText(annotated_frame, p_label, (px1 + 5, max(py1 - 7, 18)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 2)
             except Exception:
                 pass
+
 
         # 4. Draw Intrusion Zone (Virtual Security Fence)
 
