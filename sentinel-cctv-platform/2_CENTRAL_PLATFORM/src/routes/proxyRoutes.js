@@ -140,4 +140,73 @@ router.get(['/proxy-stream', '/mjpeg-feed'], (req, res) => {
   }
 });
 
+// 3. AI Stream Video Feed & Telemetry Proxy (Matching Sentinel CCTV Registry Core Engine)
+router.get('/ai/video_feed', (req, res) => {
+
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const aiServiceHost = process.env.AI_STREAM_HOST || '127.0.0.1';
+  const aiServicePort = process.env.AI_STREAM_PORT || 8090;
+
+  const queryString = new URLSearchParams(req.query).toString();
+  const targetPath = `/api/v1/ai/video_feed?${queryString}`;
+
+  const proxyReq = http.request({
+    hostname: aiServiceHost,
+    port: aiServicePort,
+    path: targetPath,
+    method: 'GET'
+  }, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res);
+  });
+
+  proxyReq.on('error', (err) => {
+    console.warn('AI Stream Service Offline, falling back to RTSP FFmpeg proxy:', err.message);
+    const source = req.query.source;
+    if (source) {
+      return res.redirect(`/api/v1/proxy-stream?url=${encodeURIComponent(source)}`);
+    }
+    if (!res.headersSent) {
+      res.status(502).json({ error: 'AI Video Stream Service Offline', details: err.message });
+    }
+  });
+
+  req.on('close', () => {
+    proxyReq.destroy();
+  });
+
+  proxyReq.end();
+});
+
+router.get('/ai/stats', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const aiServiceHost = process.env.AI_STREAM_HOST || '127.0.0.1';
+  const aiServicePort = process.env.AI_STREAM_PORT || 8090;
+
+  const proxyReq = http.request({
+    hostname: aiServiceHost,
+    port: aiServicePort,
+    path: '/api/v1/ai/stats',
+    method: 'GET'
+  }, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res);
+  });
+
+  proxyReq.on('error', () => {
+    res.json({
+      camera_id: 'local',
+      is_active: false,
+      backend_engine: 'OpenCV DNN (ONNX GPU/CPU)',
+      current_frame_counts: {},
+      active_dwell_alerts: [],
+      intrusion_alerts: [],
+      infer_time_ms: 0.0
+    });
+  });
+
+  proxyReq.end();
+});
+
 export default router;
+
