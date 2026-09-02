@@ -477,17 +477,16 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
               {currentStep === 3 && (
                 <div className="form-grid" style={{ animation: 'modalFadeIn 0.2s ease' }}>
                   <div className="form-field span-2">
-                    <label>AI Detection & Analytics Mode *</label>
+                    <label>ANPR Intelligence Mode *</label>
                     <select
-                      value={form.detection_mode || 'GENERAL_SURVEILLANCE'}
+                      value={form.detection_mode === 'ANPR_DETECTION' || form.detection_mode === 'ANPR' ? 'ANPR_DETECTION' : 'GENERAL_SURVEILLANCE'}
                       onChange={(e) => updateField('detection_mode', e.target.value)}
                     >
-                      <option value="GENERAL_SURVEILLANCE">No AI (Standard Feed)</option>
-                      <option value="ANPR_DETECTION">ANPR (License Plate Recognition)</option>
-                      <option value="OBJECT_DETECTION">Object Detection (Vehicle & Person)</option>
-                      <option value="HYBRID_AI">ANPR + Object Detection (Dual Pipeline)</option>
+                      <option value="GENERAL_SURVEILLANCE">No ANPR (Standard Video Surveillance)</option>
+                      <option value="ANPR_DETECTION">ANPR (Automatic License Plate Recognition)</option>
                     </select>
                   </div>
+
 
 
                   <div className="form-field span-2">

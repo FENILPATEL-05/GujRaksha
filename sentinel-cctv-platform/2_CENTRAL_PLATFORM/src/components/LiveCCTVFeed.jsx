@@ -8,7 +8,8 @@ export const LiveCCTVFeed = ({
   camera,
   isMuted = true,
   isDetailed = false,
-  showAiVision = false
+  showAiVision = false,
+  defaultAiStream = false
 }) => {
   const videoRef = useRef(null);
   const imgRef = useRef(null);
@@ -21,7 +22,8 @@ export const LiveCCTVFeed = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
   const [activeProtocol, setActiveProtocol] = useState("WHEP WebRTC");
-  const [preferAiStream, setPreferAiStream] = useState(false);
+  const [preferAiStream, setPreferAiStream] = useState(defaultAiStream);
+
   const [enableObjDetection, setEnableObjDetection] = useState(true);
   const [enablePlateDetection, setEnablePlateDetection] = useState(true);
 

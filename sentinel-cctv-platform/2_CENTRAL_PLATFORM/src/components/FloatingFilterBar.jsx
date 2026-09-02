@@ -100,12 +100,11 @@ export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv, depart
         onChange={(e) => onFilterChange('detection_mode', e.target.value)}
         title="AI Detection & Analytics Mode"
       >
-        <option value="ALL">All AI Modes</option>
-        <option value="GENERAL_SURVEILLANCE">No AI</option>
-        <option value="ANPR_DETECTION">ANPR</option>
-        <option value="OBJECT_DETECTION">Object Detection</option>
-        <option value="HYBRID_AI">ANPR + Object</option>
+        <option value="ALL">All Cameras</option>
+        <option value="ANPR_DETECTION">ANPR Cameras</option>
+        <option value="GENERAL_SURVEILLANCE">No ANPR</option>
       </select>
+
 
 
       <select

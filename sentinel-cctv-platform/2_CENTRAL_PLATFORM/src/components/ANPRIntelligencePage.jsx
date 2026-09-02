@@ -254,15 +254,11 @@ export const ANPRIntelligencePage = ({
     return mode === 'ANPR_DETECTION' || mode === 'ANPR';
   }).length;
 
-  // Allow explicit AI object detection cameras or fallback to all active system cameras
-  const explicitAiCams = cameras.filter(c => 
-    c.detection_mode === "OBJECT_DETECTION" || 
-    c.detection_mode === "AI_OBJECT_DETECTION" ||
-    !!c.enable_object_detection
-  );
-  const selectableCams = explicitAiCams.length > 0 ? explicitAiCams : cameras;
+  // Live Object Detection is an on-demand real-time AI tool for ALL cameras (not restricted by camera registry AI type)
+  const selectableCams = cameras && cameras.length > 0 ? cameras : [];
 
   const activeVisionCam = selectableCams.find(c => String(c.id) === String(selectedVisionCamId)) || selectableCams[0] || null;
+
 
   const handleSelectVisionCam = (camId) => {
     setSelectedVisionCamId(camId);
@@ -438,7 +434,9 @@ export const ANPRIntelligencePage = ({
               isMuted={true}
               isDetailed={false}
               showAiVision={false}
+              defaultAiStream={true}
             />
+
 
           </div>
         </div>

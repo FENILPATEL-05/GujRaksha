@@ -55,16 +55,12 @@ class WorkerOrchestratorService {
         allCams = allCams.filter(c => String(c.district || "").toLowerCase() === district.toLowerCase());
       }
 
-      // ONLY assign cameras that are explicitly configured for AI detection (OBJECT_DETECTION, ANPR_DETECTION, HYBRID_AI)
+      // ONLY assign cameras that are explicitly configured for ANPR detection
       const aiCams = allCams.filter(c => {
         const mode = String(c.detection_mode || "").toUpperCase();
-        return mode === "OBJECT_DETECTION" || 
-               mode === "AI_OBJECT_DETECTION" ||
-               mode === "ANPR_DETECTION" || 
-               mode === "ANPR" ||
-               mode === "HYBRID_AI" ||
-               mode === "ANPR_AND_OBJECT";
+        return mode.includes("ANPR") && !mode.includes("NO_ANPR") && !mode.includes("GENERAL");
       });
+
 
       const candidates = aiCams;
       const maxToTake = Math.min(capacity, candidates.length);
@@ -158,13 +154,9 @@ class WorkerOrchestratorService {
 
       const aiCams = allCams.filter(c => {
         const mode = String(c.detection_mode || "").toUpperCase();
-        return mode === "OBJECT_DETECTION" || 
-               mode === "AI_OBJECT_DETECTION" ||
-               mode === "ANPR_DETECTION" || 
-               mode === "ANPR" ||
-               mode === "HYBRID_AI" ||
-               mode === "ANPR_AND_OBJECT";
+        return mode.includes("ANPR") && !mode.includes("NO_ANPR") && !mode.includes("GENERAL");
       });
+
 
 
       const maxToTake = Math.min(worker.max_capacity, aiCams.length);
@@ -239,16 +231,12 @@ class WorkerOrchestratorService {
     if (anpr_only !== false) {
       const aiCams = allCams.filter(c => {
         const mode = String(c.detection_mode || "").toUpperCase();
-        return mode === "OBJECT_DETECTION" || 
-               mode === "AI_OBJECT_DETECTION" ||
-               mode === "ANPR_DETECTION" || 
-               mode === "ANPR" ||
-               mode === "HYBRID_AI" ||
-               mode === "ANPR_AND_OBJECT";
+        return mode.includes("ANPR") && !mode.includes("NO_ANPR") && !mode.includes("GENERAL");
       });
 
       candidateCams = aiCams;
     }
+
 
     let selectedCams = [];
     if (camera_ids && camera_ids.length > 0) {
@@ -323,16 +311,12 @@ class WorkerOrchestratorService {
     if (anpr_only !== false) {
       const aiCams = allCams.filter(c => {
         const mode = String(c.detection_mode || "").toUpperCase();
-        return mode === "OBJECT_DETECTION" || 
-               mode === "AI_OBJECT_DETECTION" ||
-               mode === "ANPR_DETECTION" || 
-               mode === "ANPR" ||
-               mode === "HYBRID_AI" ||
-               mode === "ANPR_AND_OBJECT";
+        return mode.includes("ANPR") && !mode.includes("NO_ANPR") && !mode.includes("GENERAL");
       });
 
       allCams = aiCams;
     }
+
 
     onlineWorkers.forEach(w => { 
       w.assigned_cameras = []; 
