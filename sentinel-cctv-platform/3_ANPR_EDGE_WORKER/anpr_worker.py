@@ -1056,8 +1056,10 @@ class CameraWorkerThread(threading.Thread):
                 else:
                     GLOBAL_STATS.set_status(self.camera_code, "ACTIVE")
                     self.is_connected = True
+                    print(f"\x1b[32m[CAMERA ONLINE]\x1b[0m 🎥 \x1b[33m[{self.camera_code}]\x1b[0m Connected to {self.stream_url} — Scanning ANPR Plates & Objects", flush=True)
 
             # 2. Frame Processing Loop (Synchronized Real-Time Capture)
+
             try:
                 # Flush buffer for live network streams so inference is always on the latest frame
                 if str(self.stream_url).startswith("rtsp://") or str(self.stream_url).startswith("rtsps://") or "stream" in str(self.stream_url):
@@ -1223,9 +1225,10 @@ class CameraWorkerThread(threading.Thread):
                                     pass
                             else:
                                 # Clean / normal vehicle scan (Clean, compact log)
-                                print(f"\x1b[36m[ANPR SCAN]\x1b[0m 🚗 \x1b[33m[{self.camera_code}]\x1b[0m Plate: \x1b[1m\x1b[37m{cleaned_text}\x1b[0m | Time: {time_str}", flush=True)
+                                print(f"\x1b[36m[ANPR SCAN]\x1b[0m 🚗 \x1b[33m[{self.camera_code}]\x1b[0m Plate: \x1b[1m\x1b[37m{cleaned_text}\x1b[0m ({v_color} {v_type} | Conf: {ocr_conf * 100:.1f}%) | Time: {time_str}", flush=True)
 
                         plate_detections_for_frame.append({
+
                             "box": [x1, y1, x2, y2],
                             "normalized_box": [round(y1 / h, 4), round(x1 / w, 4), round(y2 / h, 4), round(x2 / w, 4)],
                             "label": f"PLATE: {cleaned_text}" if cleaned_text else "LICENSE_PLATE",
