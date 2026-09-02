@@ -219,6 +219,36 @@ export function AppContent() {
     }
   };
 
+  const handleBulkDeleteCameras = async (cameraIds) => {
+    if (!canManageCameras) {
+      addToast('Only authorized department administrators can delete cameras.', 'error', 'Permission Denied');
+      return;
+    }
+    if (!cameraIds || cameraIds.length === 0) return;
+
+    if (!window.confirm(`Are you sure you want to permanently delete ${cameraIds.length} selected camera asset(s) from the Gujarat CCTV Registry?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/v1/cameras/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: cameraIds })
+      });
+      const data = await res.json();
+      if (data.success) {
+        addToast(`Successfully deleted ${data.count || cameraIds.length} camera assets from statewide registry.`, 'success', 'Bulk Delete Complete');
+        fetchCameras();
+      } else {
+        addToast(data.error ? data.error.message : 'Failed to bulk delete cameras', 'error', 'Delete Error');
+      }
+    } catch (err) {
+      addToast(err.message, 'error', 'Network Error');
+    }
+  };
+
+
   const handleOpenStreamModal = async (cam) => {
     if (!cam) {
       setSelectedCameraForStream(null);
@@ -305,6 +335,7 @@ export function AppContent() {
           onCameraSelect={handleOpenStreamModal}
           onEditCamera={handleOpenEditModal}
           onDeleteCamera={handleDeleteCamera}
+          onBulkDeleteCameras={handleBulkDeleteCameras}
           onExportCsv={() => setIsExportOpen(true)}
           onAddCamera={() => setIsOnboardOpen(true)}
           departments={departments}

@@ -500,78 +500,63 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                     </select>
                   </div>
 
+                  {/* 1. RTSP Stream URL for Backend */}
                   <div className="form-field span-2">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                      <label style={{ margin: 0 }}>Live Stream Feed URL (RTSP / WHEP / HTTP) *</label>
-                      <button
-                        type="button"
-                        className="btn btn-sm"
-                        style={{ fontSize: '11px', padding: '2px 8px', gap: '4px' }}
-                        onClick={() => setShowAdvancedStream(!showAdvancedStream)}
-                      >
-                        <Sliders size={11} /> {showAdvancedStream ? 'Hide Advanced Endpoints' : 'Show Advanced Endpoints (RTSP, WHEP, HLS)'}
-                      </button>
-                    </div>
+                    <label style={{ color: 'var(--accent)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Radio size={13} /> RTSP Stream URL (Backend Ingestion) *
+                    </label>
                     <input
                       type="text"
-                      required
-                      className={errors.stream_url ? 'input-error' : ''}
-                      placeholder="e.g. rtsp://127.0.0.1:8554/stream/1 or http://localhost:8889/stream/1/whep"
-                      value={form.stream_url}
-                      onChange={(e) => handleStreamUrlChange(e.target.value)}
+                      className={errors.rtsp_url || errors.stream_url ? 'input-error' : ''}
+                      placeholder="rtsp://127.0.0.1:8554/stream/1"
+                      value={form.rtsp_url || form.stream_url}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleStreamUrlChange(val);
+                      }}
                     />
-                    {errors.stream_url && (
+                    {(errors.rtsp_url || errors.stream_url) && (
                       <span className="field-error-msg">
-                        <AlertCircle size={11} strokeWidth={2.4} /> {errors.stream_url}
+                        <AlertCircle size={11} strokeWidth={2.4} /> {errors.rtsp_url || errors.stream_url}
                       </span>
                     )}
-                    <small style={{ color: 'var(--text-dim)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
-                      MediaMTX WebRTC & HLS playback endpoints will be automatically synced with this feed.
+                    <small style={{ color: 'var(--text-dim)', fontSize: '11px', marginTop: '2px', display: 'block' }}>
+                      Used by backend AI workers for object detection & license plate recognition.
                     </small>
                   </div>
 
-                  {/* Advanced Stream Endpoints (RTSP, WHEP, HLS) */}
-                  {showAdvancedStream && (
-                    <>
-                      <div className="form-field span-2" style={{ borderTop: '1px dashed var(--panel-border)', paddingTop: '10px', marginTop: '4px' }}>
-                        <label style={{ color: 'var(--accent)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Radio size={13} /> RTSP Stream Ingestion URL
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="rtsp://localhost:8554/stream/1"
-                          value={form.rtsp_url}
-                          onChange={(e) => updateField('rtsp_url', e.target.value)}
-                        />
-                      </div>
+                  {/* 2. WHEP WebRTC Stream URL for Frontend */}
+                  <div className="form-field span-2">
+                    <label style={{ color: '#4ade80', fontWeight: 700 }}>
+                      WHEP WebRTC Playback URL (Frontend Live View)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="http://localhost:8889/stream/1/whep"
+                      value={form.whep_url}
+                      onChange={(e) => updateField('whep_url', e.target.value)}
+                    />
+                    <small style={{ color: 'var(--text-dim)', fontSize: '11px', marginTop: '2px', display: 'block' }}>
+                      Used for zero-latency live streaming directly in web browser & video wall.
+                    </small>
+                  </div>
 
-                      <div className="form-field span-2">
-                        <label style={{ color: 'var(--success)', fontWeight: 700 }}>
-                          WHEP WebRTC Playback URL (Low Latency HTTP POST)
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="http://localhost:8889/stream/1/whep"
-                          value={form.whep_url}
-                          onChange={(e) => updateField('whep_url', e.target.value)}
-                        />
-                      </div>
-
-                      <div className="form-field span-2">
-                        <label style={{ fontWeight: 700 }}>
-                          HLS Stream URL (.m3u8)
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="http://localhost:8888/stream/1/index.m3u8"
-                          value={form.hls_url}
-                          onChange={(e) => updateField('hls_url', e.target.value)}
-                        />
-                      </div>
-                    </>
-                  )}
+                  {/* 3. HTTP / HLS Stream URL */}
+                  <div className="form-field span-2">
+                    <label style={{ fontWeight: 700 }}>
+                      HTTP / HLS Stream URL (.m3u8)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="http://localhost:8888/stream/1/index.m3u8"
+                      value={form.hls_url}
+                      onChange={(e) => updateField('hls_url', e.target.value)}
+                    />
+                  </div>
                 </div>
               )}
+
+
 
               {/* Wizard Footer Controls */}
               <div

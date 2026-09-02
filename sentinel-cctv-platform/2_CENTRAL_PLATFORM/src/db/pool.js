@@ -682,6 +682,35 @@ class CameraDataStore {
     return removed;
   }
 
+  async bulkDelete(ids = []) {
+    if (!Array.isArray(ids) || ids.length === 0) return [];
+    const idSet = new Set(ids.map(String));
+    const removedList = [];
+
+    this.cameras = this.cameras.filter(c => {
+      if (idSet.has(String(c.id)) || idSet.has(String(c.camera_code))) {
+        removedList.push(c);
+        return false;
+      }
+      return true;
+    });
+
+    this.rebuildIndexes();
+    this.saveToFile();
+
+    // Direct Database Persistence (PostgreSQL)
+    if (pgClient.isConnected()) {
+      try {
+        const idArray = Array.from(idSet);
+        await pgClient.query('DELETE FROM cameras WHERE id = ANY($1) OR camera_code = ANY($1)', [idArray]);
+      } catch (err) {
+        console.warn('PG Bulk Camera Delete Error:', err.message);
+      }
+    }
+
+    return removedList;
+  }
+
   async bulkCreate(cameraList) {
     const added = [];
     for (const c of cameraList) {
@@ -692,3 +721,4 @@ class CameraDataStore {
 }
 
 export default new CameraDataStore();
+

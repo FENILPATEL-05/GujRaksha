@@ -57,6 +57,7 @@ export const CameraRegistryPage = ({
   onCameraSelect,
   onEditCamera,
   onDeleteCamera,
+  onBulkDeleteCameras,
   onExportCsv,
   onAddCamera,
   departments = [],
@@ -67,6 +68,8 @@ export const CameraRegistryPage = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [selectedCameraIds, setSelectedCameraIds] = useState(new Set());
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   // Pagination calculation
   const totalItems = cameras.length;
@@ -82,6 +85,47 @@ export const CameraRegistryPage = ({
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
       setExpandedCameraId(null);
+    }
+  };
+
+  // Multi-Selection Handlers
+  const isAllCurrentPageSelected = currentCameras.length > 0 && currentCameras.every(c => selectedCameraIds.has(c.id));
+  const isSomeCurrentPageSelected = currentCameras.some(c => selectedCameraIds.has(c.id)) && !isAllCurrentPageSelected;
+
+  const handleToggleSelectAllPage = () => {
+    const next = new Set(selectedCameraIds);
+    if (isAllCurrentPageSelected) {
+      currentCameras.forEach(c => next.delete(c.id));
+    } else {
+      currentCameras.forEach(c => next.add(c.id));
+    }
+    setSelectedCameraIds(next);
+  };
+
+  const handleSelectAllFiltered = () => {
+    const next = new Set(cameras.map(c => c.id));
+    setSelectedCameraIds(next);
+  };
+
+  const handleToggleSelectRow = (id) => {
+    const next = new Set(selectedCameraIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedCameraIds(next);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedCameraIds(new Set());
+  };
+
+  const handleExecuteBulkDelete = async () => {
+    if (!onBulkDeleteCameras || selectedCameraIds.size === 0) return;
+    setIsDeletingBulk(true);
+    try {
+      await onBulkDeleteCameras(Array.from(selectedCameraIds));
+      setSelectedCameraIds(new Set());
+    } finally {
+      setIsDeletingBulk(false);
     }
   };
 
@@ -318,11 +362,83 @@ export const CameraRegistryPage = ({
         </div>
       </div>
 
+      {/* Floating / Sticky Bulk Action Bar */}
+      {selectedCameraIds.size > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'linear-gradient(90deg, rgba(239, 68, 68, 0.16) 0%, rgba(15, 23, 42, 0.9) 100%)',
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+            padding: '10px 16px',
+            borderRadius: '10px',
+            marginBottom: '14px',
+            flexWrap: 'wrap',
+            gap: '10px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+            animation: 'modalFadeIn 0.2s ease'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ background: 'var(--danger)', color: '#fff', borderRadius: '6px', padding: '2px 8px', fontSize: '12px', fontWeight: 800 }}>
+                {selectedCameraIds.size}
+              </span>
+              Camera{selectedCameraIds.size > 1 ? 's' : ''} Selected
+            </span>
+
+            {totalItems > itemsPerPage && selectedCameraIds.size < totalItems && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={handleSelectAllFiltered}
+                style={{ fontSize: '11px', padding: '3px 10px', background: 'var(--input-bg)' }}
+              >
+                Select all {totalItems} matching cameras
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {canManageCameras && (
+              <button
+                type="button"
+                className="btn btn-sm btn-danger"
+                onClick={handleExecuteBulkDelete}
+                disabled={isDeletingBulk}
+                style={{ fontWeight: 700, gap: '6px', padding: '6px 14px' }}
+              >
+                <Trash2 size={14} strokeWidth={2.4} /> {isDeletingBulk ? 'Deleting...' : `Delete Selected (${selectedCameraIds.size})`}
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={handleClearSelection}
+              style={{ gap: '4px', fontSize: '11px', padding: '6px 10px' }}
+            >
+              <X size={13} /> Deselect All
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Clean High-Density Data Table */}
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
+              <th style={{ width: '42px', textAlign: 'center', padding: '10px 8px' }}>
+                <input
+                  type="checkbox"
+                  checked={isAllCurrentPageSelected}
+                  ref={el => { if (el) el.indeterminate = isSomeCurrentPageSelected; }}
+                  onChange={handleToggleSelectAllPage}
+                  title={isAllCurrentPageSelected ? "Deselect this page" : "Select all on this page"}
+                  style={{ cursor: 'pointer', accentColor: 'var(--accent)', width: '15px', height: '15px' }}
+                />
+              </th>
               <th>Camera</th>
               <th>Department</th>
               <th>District</th>
@@ -336,7 +452,7 @@ export const CameraRegistryPage = ({
           <tbody>
             {currentCameras.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>
+                <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>
                   <FolderOpen size={36} strokeWidth={1.5} style={{ color: 'var(--accent)', marginBottom: '8px' }} />
                   <div>No camera assets match the search criteria.</div>
                 </td>
@@ -344,6 +460,7 @@ export const CameraRegistryPage = ({
             ) : (
               currentCameras.map(cam => {
                 const isExpanded = expandedCameraId === cam.id;
+                const isSelected = selectedCameraIds.has(cam.id);
                 const isActive = cam.status === 'ACTIVE';
                 const isMaint = cam.status === 'MAINTENANCE';
                 let statusClass = isActive ? 'active' : 'offline';
@@ -352,9 +469,26 @@ export const CameraRegistryPage = ({
                 return (
                   <React.Fragment key={cam.id}>
                     <tr
-                      style={{ background: isExpanded ? 'var(--hover-bg)' : 'transparent', cursor: 'pointer' }}
+                      style={{
+                        background: isSelected
+                          ? 'rgba(6, 182, 212, 0.12)'
+                          : isExpanded
+                          ? 'var(--hover-bg)'
+                          : 'transparent',
+                        cursor: 'pointer',
+                        transition: 'background 0.15s ease'
+                      }}
                       onClick={() => toggleExpand(cam.id)}
                     >
+                      <td style={{ textAlign: 'center', padding: '10px 8px' }} onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelectRow(cam.id)}
+                          style={{ cursor: 'pointer', accentColor: 'var(--accent)', width: '15px', height: '15px' }}
+                        />
+                      </td>
+
                       <td>
                         <div className="cell-name">{cam.name}</div>
                         <div className="cell-id">{cam.camera_code || cam.id}</div>
@@ -430,7 +564,8 @@ export const CameraRegistryPage = ({
                     {/* Expandable Table Sub-Row Details */}
                     {isExpanded && (
                       <tr>
-                        <td colSpan={8} style={{ padding: '16px 20px', background: 'var(--input-bg)' }}>
+                        <td colSpan={9} style={{ padding: '16px 20px', background: 'var(--input-bg)' }}>
+
                           <div style={{
                             display: 'grid',
                             gridTemplateColumns: 'repeat(4, 1fr)',

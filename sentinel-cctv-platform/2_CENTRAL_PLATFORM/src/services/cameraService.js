@@ -56,6 +56,11 @@ class CameraService {
     }
     return deleted;
   }
+
+  async bulkDeleteCameras(ids = []) {
+    return await db.bulkDelete(ids);
+  }
 }
 
 export default new CameraService();
+
