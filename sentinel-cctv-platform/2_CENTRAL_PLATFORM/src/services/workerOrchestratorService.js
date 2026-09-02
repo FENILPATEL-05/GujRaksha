@@ -310,6 +310,33 @@ class WorkerOrchestratorService {
   }
 
   /**
+   * Delete / deregister a worker node completely from Central CCC.
+   */
+  deleteWorker(worker_id) {
+    const worker = this.workers.get(worker_id);
+    if (!worker) {
+      return { success: false, message: `Worker ${worker_id} not found.` };
+    }
+    this.workers.delete(worker_id);
+    this.rebalanceClusterAllocation();
+    console.log(`🗑️ [Worker Orchestrator] Worker \x1b[31m${worker_id}\x1b[0m was deleted/deregistered from Central CCC.`);
+    
+    // Broadcast live update to UI
+    try {
+      anprStore.broadcastAlert({
+        type: "WORKER_STATUS_CHANGED",
+        worker_id,
+        status: "DELETED",
+        state: "DELETED",
+        timestamp: new Date().toISOString()
+      });
+    } catch (_) {}
+
+    return { success: true, message: `Worker ${worker_id} deleted successfully.` };
+  }
+
+
+  /**
    * Distribute all AI cameras evenly across all currently ONLINE workers.
    */
   autoDistributeAllWorkers(district = null, anpr_only = true) {

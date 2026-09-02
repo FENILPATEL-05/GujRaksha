@@ -90,4 +90,17 @@ router.post("/auto-distribute", (req, res, next) => {
   }
 });
 
+// DELETE Deregister / Remove Worker Node from Central CCC
+router.delete("/:id", (req, res, next) => {
+  try {
+    const workerId = req.params.id;
+    const result = workerOrchestrator.deleteWorker(workerId);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
+
+
