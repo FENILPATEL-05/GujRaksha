@@ -12,72 +12,12 @@ export const initialUsers = [
   {
     id: "usr-superadmin-01",
     username: "superadmin",
-    email: "admin@gujraksha.gov.in",
+    email: "admin@gujarat.gov.in",
     password: "admin123",
     name: "State Command Superadmin",
     role: "SUPERADMIN",
     department_id: "ALL",
     department_name: "Statewide Command Center",
-    status: "ACTIVE",
-    created_at: "2026-09-01T00:00:00.000Z"
-  },
-  {
-    id: "usr-admin-alias",
-    username: "admin",
-    email: "admin@gujarat.gov.in",
-    password: "admin123",
-    name: "State Command Admin",
-    role: "SUPERADMIN",
-    department_id: "ALL",
-    department_name: "Statewide Command Center",
-    status: "ACTIVE",
-    created_at: "2026-09-01T00:00:00.000Z"
-  },
-  {
-    id: "usr-dept-home-01",
-    username: "police_admin",
-    email: "police@gujraksha.gov.in",
-    password: "police123",
-    name: "Gujarat Police Nodal Officer",
-    role: "DEPT_ADMIN",
-    department_id: "HOME",
-    department_name: "Home Department / Gujarat Police",
-    status: "ACTIVE",
-    created_at: "2026-09-01T00:00:00.000Z"
-  },
-  {
-    id: "usr-dept-transport-01",
-    username: "rto_admin",
-    email: "rto@gujraksha.gov.in",
-    password: "rto123",
-    name: "Transport & RTO Officer",
-    role: "DEPT_ADMIN",
-    department_id: "TRANSPORT",
-    department_name: "Transport & Road Safety",
-    status: "ACTIVE",
-    created_at: "2026-09-01T00:00:00.000Z"
-  },
-  {
-    id: "usr-dept-urban-01",
-    username: "urban_admin",
-    email: "urban@gujraksha.gov.in",
-    password: "urban123",
-    name: "Urban Development & Smart City Lead",
-    role: "DEPT_ADMIN",
-    department_id: "URBAN_DEV",
-    department_name: "Urban Development & Smart Cities",
-    status: "ACTIVE",
-    created_at: "2026-09-01T00:00:00.000Z"
-  },
-  {
-    id: "usr-viewer-01",
-    username: "viewer",
-    email: "viewer@gujraksha.gov.in",
-    password: "viewer123",
-    name: "Statewide GIS Observer",
-    role: "VIEWER",
-    department_id: "ALL",
-    department_name: "Public Safety & Observer",
     status: "ACTIVE",
     created_at: "2026-09-01T00:00:00.000Z"
   }
@@ -182,7 +122,8 @@ class UserDataStore {
     const clean = String(identifier).trim().toLowerCase();
     return this.users.find(u => 
       (u.username && u.username.toLowerCase() === clean) ||
-      (u.email && u.email.toLowerCase() === clean)
+      (u.email && u.email.toLowerCase() === clean) ||
+      (clean === 'admin' && u.username === 'superadmin')
     );
   }
 

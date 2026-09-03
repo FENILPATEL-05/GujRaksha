@@ -10,7 +10,10 @@ CREATE TABLE IF NOT EXISTS departments (
     nodal_officer VARCHAR(150),
     contact_email VARCHAR(150),
     contact_phone VARCHAR(50),
+    status VARCHAR(50) DEFAULT 'ACTIVE',
+    icon VARCHAR(100) DEFAULT 'Building2',
     color VARCHAR(20) DEFAULT '#22d3ee',
+    description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -110,3 +113,22 @@ CREATE TABLE IF NOT EXISTS camera_audit_logs (
     changes_json JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 6. Users & RBAC Master Table
+CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(100) PRIMARY KEY,
+    username VARCHAR(100) UNIQUE NOT NULL,
+    email VARCHAR(150) UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    role VARCHAR(50) DEFAULT 'VIEWER',
+    department_id VARCHAR(50) DEFAULT 'ALL',
+    department_name VARCHAR(150) DEFAULT 'Statewide Command Center',
+    status VARCHAR(50) DEFAULT 'ACTIVE',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+

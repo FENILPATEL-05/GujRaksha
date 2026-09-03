@@ -3,12 +3,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const AuthContext = createContext();
 
 const FALLBACK_USERS = [
-  { username: 'superadmin', password: 'admin123', role: 'SUPERADMIN', name: 'State Command Superadmin', department_id: 'ALL', department_name: 'Statewide Command Center' },
-  { username: 'admin', password: 'admin123', role: 'SUPERADMIN', name: 'State Command Admin', department_id: 'ALL', department_name: 'Statewide Command Center' },
-  { username: 'police_admin', password: 'police123', role: 'DEPT_ADMIN', name: 'Gujarat Police Nodal Officer', department_id: 'HOME', department_name: 'Home Department / Gujarat Police' },
-  { username: 'rto_admin', password: 'rto123', role: 'DEPT_ADMIN', name: 'Transport & RTO Officer', department_id: 'TRANSPORT', department_name: 'Transport & Road Safety' },
-  { username: 'urban_admin', password: 'urban123', role: 'DEPT_ADMIN', name: 'Urban Development Lead', department_id: 'URBAN_DEV', department_name: 'Urban Development & Smart Cities' },
-  { username: 'viewer', password: 'viewer123', role: 'VIEWER', name: 'Statewide GIS Observer', department_id: 'ALL', department_name: 'Public Safety & Observer' }
+  { username: 'superadmin', email: 'admin@gujarat.gov.in', password: 'admin123', role: 'SUPERADMIN', name: 'State Command Superadmin', department_id: 'ALL', department_name: 'Statewide Command Center' },
+  { username: 'admin', email: 'admin@gujarat.gov.in', password: 'admin123', role: 'SUPERADMIN', name: 'State Command Superadmin', department_id: 'ALL', department_name: 'Statewide Command Center' }
 ];
 
 export const AuthProvider = ({ children }) => {

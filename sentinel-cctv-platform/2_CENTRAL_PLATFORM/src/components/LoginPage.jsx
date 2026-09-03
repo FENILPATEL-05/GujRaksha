@@ -26,12 +26,6 @@ export const LoginPage = () => {
     setIsLoading(false);
   };
 
-  const handleFillCredentials = (u, p) => {
-    setUsername(u);
-    setPassword(p);
-    setError('');
-  };
-
   return (
     <div className="login-page">
       <div className="login-ambient"></div>
@@ -53,7 +47,7 @@ export const LoginPage = () => {
             <label>Username / Email ID</label>
             <input
               type="text"
-              placeholder="e.g. superadmin, police_admin, rto_admin"
+              placeholder="Username or email"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoFocus
@@ -91,28 +85,6 @@ export const LoginPage = () => {
             )}
           </button>
         </form>
-
-        <div className="login-footer">
-          <div className="login-creds">
-            <div className="login-cred-title"><ShieldCheck size={12} strokeWidth={2.2} /> Quick Access Role Credentials (Click to fill)</div>
-            <div className="login-cred-row" style={{ cursor: 'pointer' }} onClick={() => handleFillCredentials('superadmin', 'admin123')}>
-              <span className="login-cred-role" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171' }}>Superadmin</span>
-              <code>superadmin</code> / <code>admin123</code>
-            </div>
-            <div className="login-cred-row" style={{ cursor: 'pointer' }} onClick={() => handleFillCredentials('police_admin', 'police123')}>
-              <span className="login-cred-role" style={{ background: 'rgba(34, 211, 238, 0.15)', color: '#22d3ee' }}>Police Admin</span>
-              <code>police_admin</code> / <code>police123</code>
-            </div>
-            <div className="login-cred-row" style={{ cursor: 'pointer' }} onClick={() => handleFillCredentials('rto_admin', 'rto123')}>
-              <span className="login-cred-role" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24' }}>Transport Admin</span>
-              <code>rto_admin</code> / <code>rto123</code>
-            </div>
-            <div className="login-cred-row" style={{ cursor: 'pointer' }} onClick={() => handleFillCredentials('viewer', 'viewer123')}>
-              <span className="login-cred-role">Viewer (Read-Only)</span>
-              <code>viewer</code> / <code>viewer123</code>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

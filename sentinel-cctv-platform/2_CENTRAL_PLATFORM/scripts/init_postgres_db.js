@@ -18,11 +18,13 @@ import {
   initialWatchlist,
   initialDetections
 } from '../src/db/seeds.js';
+import { initialUsers } from '../src/db/userStore.js';
 
 const { Pool } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '../');
+const DATA_DIR = path.join(PROJECT_ROOT, 'data');
 
 // Load environment variables
 dotenv.config({ path: path.join(PROJECT_ROOT, '.env') });
@@ -36,8 +38,10 @@ const config = {
 };
 
 async function main() {
+  const isReset = process.argv.includes('--reset') || process.argv.includes('-r');
+
   console.log('======================================================================');
-  console.log(' 🐘 GUJRAKSHA POSTGRESQL & POSTGIS DATABASE SETUP TOOL');
+  console.log(` 🐘 GUJRAKSHA POSTGRESQL & POSTGIS DATABASE ${isReset ? 'RESET & ' : ''}SETUP TOOL`);
   console.log('======================================================================');
   console.log(`Connecting to: postgres://${config.user}:****@${config.host}:${config.port}/${config.database}`);
 
@@ -47,13 +51,29 @@ async function main() {
     const client = await pool.connect();
     console.log('✅ Connected to PostgreSQL Server successfully!');
 
+    // Handle Clean Reset
+    if (isReset) {
+      console.log('🧹 Performing Clean System Reset...');
+      await client.query('DROP TABLE IF EXISTS camera_audit_logs, anpr_detections, watchlist, cameras, departments, users CASCADE;');
+      console.log('   ✅ PostgreSQL tables dropped.');
+
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(path.join(DATA_DIR, 'cameras.json'), '[]', 'utf8');
+      fs.writeFileSync(path.join(DATA_DIR, 'watchlist.json'), '[]', 'utf8');
+      fs.writeFileSync(path.join(DATA_DIR, 'detections.json'), '[]', 'utf8');
+      fs.writeFileSync(path.join(DATA_DIR, 'users.json'), JSON.stringify(initialUsers, null, 2), 'utf8');
+      console.log('   ✅ Local JSON storage files initialized cleanly.');
+    }
+
     // 1. Execute schema.sql
     const schemaPath = path.join(PROJECT_ROOT, 'src/db/schema.sql');
     if (fs.existsSync(schemaPath)) {
       console.log('⚡ Executing schema.sql DDL migrations...');
       const schemaSql = fs.readFileSync(schemaPath, 'utf8');
       await client.query(schemaSql);
-      console.log('✅ Schema tables (departments, cameras, watchlist, anpr_detections) created!');
+      console.log('✅ Schema tables (departments, cameras, watchlist, anpr_detections, users) created!');
     }
 
     // 2. Migrate Departments
@@ -69,9 +89,24 @@ async function main() {
         [d.code, d.name, d.category, d.nodal_officer, d.contact_email, d.contact_phone, d.status, d.icon, d.color, d.description]
       );
     }
-    console.log(`📦 Synced ${initialDepartments.length} departments into PostgreSQL.`);
+    console.log(`📦 Synced ${initialDepartments.length} Gujarat Government departments into PostgreSQL.`);
 
-    // 3. Migrate Cameras
+    // 3. Migrate Default Super Admin User
+    for (const u of initialUsers) {
+      await client.query(
+        `INSERT INTO users (id, username, email, password, name, role, department_id, department_name, status, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         ON CONFLICT (username) DO UPDATE SET
+          email = EXCLUDED.email,
+          password = EXCLUDED.password,
+          role = EXCLUDED.role,
+          status = EXCLUDED.status`,
+        [u.id, u.username, u.email, u.password, u.name, u.role, u.department_id, u.department_name, u.status || 'ACTIVE', u.created_at || new Date()]
+      );
+    }
+    console.log(`👤 Synced Default Super Admin (User: ${initialUsers[0].username} | Email: ${initialUsers[0].email}) into PostgreSQL.`);
+
+    // 4. Migrate Cameras (if any defined)
     for (const c of initialCameras) {
       await client.query(
         `INSERT INTO cameras (
@@ -98,9 +133,11 @@ async function main() {
         ]
       );
     }
-    console.log(`📦 Synced ${initialCameras.length} cameras into PostgreSQL.`);
+    if (initialCameras.length > 0) {
+      console.log(`📦 Synced ${initialCameras.length} cameras into PostgreSQL.`);
+    }
 
-    // 4. Migrate Watchlist
+    // 5. Migrate Watchlist (if any defined)
     for (const w of initialWatchlist) {
       await client.query(
         `INSERT INTO watchlist (id, vehicle_plate, vehicle_type, category, fir_number, police_station, owner_name, priority, status, description, created_at)
@@ -112,9 +149,11 @@ async function main() {
         [w.id, w.vehicle_plate, w.vehicle_type, w.category, w.fir_number, w.police_station, w.owner_name, w.priority, w.status, w.description, w.created_at || new Date().toISOString()]
       );
     }
-    console.log(`📦 Synced ${initialWatchlist.length} watchlist records into PostgreSQL.`);
+    if (initialWatchlist.length > 0) {
+      console.log(`📦 Synced ${initialWatchlist.length} watchlist records into PostgreSQL.`);
+    }
 
-    // 5. Migrate Detections
+    // 6. Migrate Detections (if any defined)
     for (const d of initialDetections) {
       await client.query(
         `INSERT INTO anpr_detections (id, vehicle_plate, confidence, camera_id, camera_code, camera_name, district, location_lat, location_lng, speed_kmh, vehicle_type, is_watchlist_hit, watchlist_category, watchlist_fir, raw_payload, timestamp)
@@ -128,16 +167,22 @@ async function main() {
         ]
       );
     }
-    console.log(`📦 Synced ${initialDetections.length} ANPR detection logs into PostgreSQL.`);
 
-    // 6. Query counts
+    // 7. Query counts
     const countCams = await client.query('SELECT COUNT(*) FROM cameras');
     const countDepts = await client.query('SELECT COUNT(*) FROM departments');
     const countWL = await client.query('SELECT COUNT(*) FROM watchlist');
     const countDet = await client.query('SELECT COUNT(*) FROM anpr_detections');
+    const countUsers = await client.query('SELECT COUNT(*) FROM users');
 
     console.log('======================================================================');
-    console.log(`🎉 PostgreSQL Database Ready! Total Cameras: ${countCams.rows[0].count} | Departments: ${countDepts.rows[0].count} | Watchlist: ${countWL.rows[0].count} | Detections: ${countDet.rows[0].count}`);
+    console.log(`🎉 PostgreSQL Database Ready!`);
+    console.log(`   Departments : ${countDepts.rows[0].count} (Master Catalogue)`);
+    console.log(`   Users       : ${countUsers.rows[0].count} (Default Super Admin Ready)`);
+    console.log(`   Cameras     : ${countCams.rows[0].count} (Clean / Ready for Ingestion)`);
+    console.log(`   Watchlist   : ${countWL.rows[0].count} (Clean / Ready)`);
+    console.log(`   Detections  : ${countDet.rows[0].count} (Clean / Ready)`);
+    console.log('======================================================================');
     console.log('======================================================================');
 
     client.release();
