@@ -16,6 +16,10 @@ import urllib.request
 import json
 import threading
 import socket
+import logging
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger("anpr_worker")
 
 # Suppress noisy OpenCV / FFMPEG probing logs and force zero-latency RTSP over TCP
 os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
@@ -272,17 +276,11 @@ def safe_create_ort_session(model_path: str, input_size: int = 640):
     if gpu_providers:
         try:
             sess = ort.InferenceSession(model_path, sess_options=sess_opts, providers=gpu_providers + ['CPUExecutionProvider'])
-            # Test dry-run inference to catch cuBLAS / CUDA driver mismatch early
-            input_meta = sess.get_inputs()[0]
-            in_shape = [dim if isinstance(dim, int) and dim > 0 else 1 for dim in input_meta.shape]
-            if len(in_shape) == 4:
-                in_shape[2] = input_size
-                in_shape[3] = input_size
-            dummy_in = np.zeros(in_shape, dtype=np.float32)
-            sess.run(None, {input_meta.name: dummy_in})
-            return sess, "GPU (NVIDIA CUDA)"
+            active = sess.get_providers()[0] if sess.get_providers() else "CPUExecutionProvider"
+            mode = "GPU (NVIDIA CUDA)" if "CUDA" in active else ("GPU (TensorRT)" if "TensorRT" in active else "CPU (ONNX)")
+            return sess, mode
         except Exception as e:
-            logger.info(f"ℹ️ [ONNX Worker] GPU cuBLAS not ready ({e}), activating optimized CPU provider...")
+            logger.warning(f"ℹ️ [ONNX Worker] GPU session initialization note: {e}")
 
     # Reliable CPU SIMD Provider
     sess = ort.InferenceSession(model_path, sess_options=sess_opts, providers=['CPUExecutionProvider'])
