@@ -45,7 +45,8 @@ import {
   Send,
   Save,
   Settings,
-  Sliders
+  Sliders,
+  Film
 } from "lucide-react";
 
 import { Pagination } from "./Pagination";
@@ -489,7 +490,7 @@ export const ANPRIntelligencePage = ({
             <button
               type="button"
               className={`hub-nav-item ${activeTab === "ai_vision" ? "active" : ""}`}
-              onClick={() => setActiveTab("ai_vision")}
+              onClick={() => { setActiveTab("ai_vision"); localStorage.setItem("gujraksha_anpr_tab", "ai_vision"); }}
             >
               <div className="nav-item-left">
                 <Eye size={15} strokeWidth={2.2} />
@@ -499,8 +500,20 @@ export const ANPRIntelligencePage = ({
 
             <button
               type="button"
+              className={`hub-nav-item ${activeTab === "forensics" ? "active" : ""}`}
+              onClick={() => { setActiveTab("forensics"); localStorage.setItem("gujraksha_anpr_tab", "forensics"); }}
+            >
+              <div className="nav-item-left">
+                <Film size={15} strokeWidth={2.2} />
+                <span>Video Forensics AI</span>
+              </div>
+              <span className="hub-nav-badge" style={{ fontSize: "9.5px", background: "rgba(34, 211, 238, 0.15)", color: "var(--accent)" }}>OFFLINE</span>
+            </button>
+
+            <button
+              type="button"
               className={`hub-nav-item ${activeTab === "detections" ? "active" : ""}`}
-              onClick={() => setActiveTab("detections")}
+              onClick={() => { setActiveTab("detections"); localStorage.setItem("gujraksha_anpr_tab", "detections"); }}
             >
               <div className="nav-item-left">
                 <Radio size={15} strokeWidth={2.2} />
@@ -587,19 +600,11 @@ export const ANPRIntelligencePage = ({
           ) : (
           <div style={{
             display: "flex",
-            flexDirection: "column",
-            gap: "16px",
-            minHeight: "100%",
-            paddingBottom: "24px"
+            gap: "8px",
+            height: "100%",
+            minHeight: 0,
+            alignItems: "stretch"
           }}>
-            {/* Upper: Live CCTV AI Vision Surveillance Grid */}
-            <div style={{
-              display: "flex",
-              gap: "8px",
-              height: "560px",
-              minHeight: 0,
-              alignItems: "stretch"
-            }}>
 
           {/* Left Side: Live CCTV Stream Visualizer (Takes all available main space) */}
           <div style={{
@@ -943,13 +948,13 @@ export const ANPRIntelligencePage = ({
               </div>
             )}
 
-            </div>
           </div>
-
-          {/* Lower Section: Offline Recorded Video AI Forensic Scanner & Interactive Timeline */}
-          <ForensicVideoAnalyzer addToast={addToast} watchlist={watchlist} />
         </div>
         )
+      ) : activeTab === "forensics" ? (
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflowY: "auto" }}>
+          <ForensicVideoAnalyzer addToast={addToast} watchlist={watchlist} />
+        </div>
       ) : activeTab === "watchlist" ? (
         <WatchlistManagerPage
           onOpenAddWatchlist={onOpenAddWatchlist}
