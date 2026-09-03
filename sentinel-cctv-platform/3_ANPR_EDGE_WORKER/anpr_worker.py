@@ -291,6 +291,7 @@ class PlateDetectorONNX:
     """YOLOv9 License Plate Detector using ONNX Runtime (CUDA / TensorRT GPU with CPU Fallback)."""
     def __init__(self, model_path: str):
         self.model_path = model_path
+        self._lock = threading.Lock()
         self.session, self.accel_mode = safe_create_ort_session(model_path, DET_SIZE)
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name
@@ -318,19 +319,20 @@ class PlateDetectorONNX:
 
     def detect(self, img: np.ndarray, conf_thresh: float = 0.20, iou_thresh: float = 0.45):
         blob, scale, (pad_w, pad_h) = self.preprocess(img)
-        try:
-            outputs = self.session.run([self.output_name], {self.input_name: blob})
-        except Exception as run_err:
-            if "cublas" in str(run_err).lower() or "cuda" in str(run_err).lower():
-                logger.warning(f"CUDA plate detect runtime error ({run_err}). Recovering on CPU...")
-                import onnxruntime as ort
-                sess_opts = ort.SessionOptions()
-                sess_opts.intra_op_num_threads = min(8, max(2, os.cpu_count() or 4))
-                self.session = ort.InferenceSession(self.model_path, sess_options=sess_opts, providers=['CPUExecutionProvider'])
-                self.accel_mode = "CPU (ONNX Fallback)"
+        with self._lock:
+            try:
                 outputs = self.session.run([self.output_name], {self.input_name: blob})
-            else:
-                return []
+            except Exception as run_err:
+                if "cublas" in str(run_err).lower() or "cuda" in str(run_err).lower():
+                    logger.warning(f"CUDA plate detect runtime error ({run_err}). Recovering on CPU...")
+                    import onnxruntime as ort
+                    sess_opts = ort.SessionOptions()
+                    sess_opts.intra_op_num_threads = min(8, max(2, os.cpu_count() or 4))
+                    self.session = ort.InferenceSession(self.model_path, sess_options=sess_opts, providers=['CPUExecutionProvider'])
+                    self.accel_mode = "CPU (ONNX Fallback)"
+                    outputs = self.session.run([self.output_name], {self.input_name: blob})
+                else:
+                    return []
 
         preds = outputs[0][0].T
         mask = preds[:, 4] >= conf_thresh
@@ -368,6 +370,7 @@ class PlateOCRONNX:
     """CCT Transformer OCR Recognizer using ONNX Runtime (CUDA / TensorRT GPU with CPU Fallback)."""
     def __init__(self, model_path: str):
         self.model_path = model_path
+        self._lock = threading.Lock()
         self.session, self.accel_mode = safe_create_ort_session(model_path, OCR_W)
         self.input_name = self.session.get_inputs()[0].name
         self.input_type = self.session.get_inputs()[0].type
@@ -399,19 +402,20 @@ class PlateOCRONNX:
             batch = crop_resized[np.newaxis, :].astype(np.uint8)
         else:
             batch = crop_resized[np.newaxis, :].astype(np.float32)
-        try:
-            outputs = self.session.run(None, {self.input_name: batch})
-        except Exception as run_err:
-            if "cublas" in str(run_err).lower() or "cuda" in str(run_err).lower():
-                logger.warning(f"CUDA OCR runtime error ({run_err}). Recovering on CPU...")
-                import onnxruntime as ort
-                sess_opts = ort.SessionOptions()
-                sess_opts.intra_op_num_threads = min(8, max(2, os.cpu_count() or 4))
-                self.session = ort.InferenceSession(self.model_path, sess_options=sess_opts, providers=['CPUExecutionProvider'])
-                self.accel_mode = "CPU (ONNX Fallback)"
+        with self._lock:
+            try:
                 outputs = self.session.run(None, {self.input_name: batch})
-            else:
-                return "", 0.0
+            except Exception as run_err:
+                if "cublas" in str(run_err).lower() or "cuda" in str(run_err).lower():
+                    logger.warning(f"CUDA OCR runtime error ({run_err}). Recovering on CPU...")
+                    import onnxruntime as ort
+                    sess_opts = ort.SessionOptions()
+                    sess_opts.intra_op_num_threads = min(8, max(2, os.cpu_count() or 4))
+                    self.session = ort.InferenceSession(self.model_path, sess_options=sess_opts, providers=['CPUExecutionProvider'])
+                    self.accel_mode = "CPU (ONNX Fallback)"
+                    outputs = self.session.run(None, {self.input_name: batch})
+                else:
+                    return "", 0.0
 
         plate_out = None
         for o in outputs:
@@ -435,6 +439,7 @@ class ObjectDetectorONNX:
     """YOLO Object & Vehicle Detector using ONNX Runtime (CUDA / TensorRT GPU with CPU Fallback)."""
     def __init__(self, model_path: str):
         self.model_path = model_path
+        self._lock = threading.Lock()
         self.input_size = 640
         self.session, self.accel_mode = safe_create_ort_session(model_path, self.input_size)
         self.input_name = self.session.get_inputs()[0].name
@@ -459,19 +464,20 @@ class ObjectDetectorONNX:
             return []
         h, w = img.shape[:2]
         blob, scale, (pad_w, pad_h) = self.preprocess(img)
-        try:
-            outputs = self.session.run([self.output_name], {self.input_name: blob})
-        except Exception as run_err:
-            if "cublas" in str(run_err).lower() or "cuda" in str(run_err).lower():
-                logger.warning(f"CUDA ObjectDetector runtime error ({run_err}). Recovering on CPU...")
-                import onnxruntime as ort
-                sess_opts = ort.SessionOptions()
-                sess_opts.intra_op_num_threads = min(8, max(2, os.cpu_count() or 4))
-                self.session = ort.InferenceSession(self.model_path, sess_options=sess_opts, providers=['CPUExecutionProvider'])
-                self.accel_mode = "CPU (ONNX Fallback)"
+        with self._lock:
+            try:
                 outputs = self.session.run([self.output_name], {self.input_name: blob})
-            else:
-                return []
+            except Exception as run_err:
+                if "cublas" in str(run_err).lower() or "cuda" in str(run_err).lower():
+                    logger.warning(f"CUDA ObjectDetector runtime error ({run_err}). Recovering on CPU...")
+                    import onnxruntime as ort
+                    sess_opts = ort.SessionOptions()
+                    sess_opts.intra_op_num_threads = min(8, max(2, os.cpu_count() or 4))
+                    self.session = ort.InferenceSession(self.model_path, sess_options=sess_opts, providers=['CPUExecutionProvider'])
+                    self.accel_mode = "CPU (ONNX Fallback)"
+                    outputs = self.session.run([self.output_name], {self.input_name: blob})
+                else:
+                    return []
 
         raw = outputs[0][0]
         preds = raw.T if raw.shape[0] < raw.shape[1] else raw
@@ -1244,7 +1250,7 @@ class CameraWorkerThread(threading.Thread):
                 # 3. License Plate Detection (Runs when ANPR or OBJECT_DETECTION is active)
                 raw_boxes = []
                 if not is_no_ai and self.detector is not None:
-                    if hasattr(self.detector, "triton_client") or getattr(self.detector, "accel_mode", "").startswith("GPU"):
+                    if hasattr(self.detector, "triton_client"):
                         raw_boxes = self.detector.detect(frame, self.conf, self.iou)
                     else:
                         with INFERENCE_LOCK:
@@ -1253,7 +1259,7 @@ class CameraWorkerThread(threading.Thread):
                 # 4. Target-Specific Object Detection (Only if specifically configured for OBJECT_DETECTION)
                 raw_objects = []
                 if is_obj_cam and self.object_detector is not None:
-                    if hasattr(self.object_detector, "triton_client") or getattr(self.object_detector, "accel_mode", "").startswith("GPU"):
+                    if hasattr(self.object_detector, "triton_client"):
                         raw_objects = self.object_detector.detect(frame, conf_thresh=0.25, iou_thresh=0.45)
                     else:
                         with INFERENCE_LOCK:
@@ -1272,7 +1278,7 @@ class CameraWorkerThread(threading.Thread):
                     raw_text, ocr_conf = "", 0.0
                     if should_run_ocr:
                         self.last_ocr_run = now
-                        if getattr(self.ocr, "accel_mode", "").startswith("GPU"):
+                        if hasattr(self.ocr, "triton_client"):
                             raw_text, ocr_conf = self.ocr.recognize(frame, (x1, y1, x2, y2))
                         else:
                             with INFERENCE_LOCK:

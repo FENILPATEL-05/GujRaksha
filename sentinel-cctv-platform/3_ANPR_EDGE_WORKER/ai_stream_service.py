@@ -102,6 +102,7 @@ class ObjectDetectorONNX:
     """YOLO Object Detector using robust ONNX Runtime with automatic CPU fallback."""
     def __init__(self, model_path: str, conf_thresh: float = 0.30, iou_thresh: float = 0.45):
         self.model_path = model_path
+        self._lock = threading.Lock()
         self.input_size = 640
         self.session, self.accel_mode = safe_create_ort_session(model_path, self.input_size)
         self.input_name = self.session.get_inputs()[0].name
@@ -126,20 +127,21 @@ class ObjectDetectorONNX:
         blob = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
         blob = np.transpose(blob, (2, 0, 1))[np.newaxis, :]
 
-        try:
-            outputs = self.session.run([self.output_name], {self.input_name: blob})
-        except Exception as run_err:
-            if "cublas" in str(run_err).lower() or "cuda" in str(run_err).lower():
-                logger.warning(f"CUDA runtime error ({run_err}). Automatically recovering on CPUExecutionProvider...")
-                import onnxruntime as ort
-                sess_opts = ort.SessionOptions()
-                sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-                sess_opts.intra_op_num_threads = min(8, max(2, os.cpu_count() or 4))
-                self.session = ort.InferenceSession(self.model_path, sess_options=sess_opts, providers=['CPUExecutionProvider'])
-                self.accel_mode = "CPU (ONNX Fallback)"
+        with self._lock:
+            try:
                 outputs = self.session.run([self.output_name], {self.input_name: blob})
-            else:
-                return []
+            except Exception as run_err:
+                if "cublas" in str(run_err).lower() or "cuda" in str(run_err).lower():
+                    logger.warning(f"CUDA runtime error ({run_err}). Automatically recovering on CPUExecutionProvider...")
+                    import onnxruntime as ort
+                    sess_opts = ort.SessionOptions()
+                    sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+                    sess_opts.intra_op_num_threads = min(8, max(2, os.cpu_count() or 4))
+                    self.session = ort.InferenceSession(self.model_path, sess_options=sess_opts, providers=['CPUExecutionProvider'])
+                    self.accel_mode = "CPU (ONNX Fallback)"
+                    outputs = self.session.run([self.output_name], {self.input_name: blob})
+                else:
+                    return []
 
         preds = outputs[0][0]
         if preds.shape[0] < preds.shape[1]:

@@ -314,6 +314,7 @@ class PlateDetectorONNX:
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"ONNX Model not found: {model_path}")
 
+        self._lock = threading.Lock()
         available = ort.get_available_providers() if HAS_ONNXRUNTIME else []
         if provider and provider in available:
             providers = [provider, 'CPUExecutionProvider']
@@ -357,7 +358,8 @@ class PlateDetectorONNX:
 
     def detect(self, img: np.ndarray, conf_thresh: float = 0.20, iou_thresh: float = 0.45):
         blob, scale, (pad_w, pad_h) = self.preprocess(img)
-        outputs = self.session.run(None, {self.input_name: blob})
+        with self._lock:
+            outputs = self.session.run(None, {self.input_name: blob})
         raw_out = outputs[0]
         preds = raw_out[0].T if raw_out.ndim == 3 else raw_out.T
         mask = preds[:, 4] >= conf_thresh
@@ -397,6 +399,7 @@ class PlateOCRONNX:
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"ONNX Model not found: {model_path}")
 
+        self._lock = threading.Lock()
         available = ort.get_available_providers() if HAS_ONNXRUNTIME else []
         if provider and provider in available:
             providers = [provider, 'CPUExecutionProvider']
@@ -441,7 +444,8 @@ class PlateOCRONNX:
 
         batch = crop_resized[np.newaxis, :].astype(np.float32)
 
-        outputs = self.session.run(None, {self.input_name: batch})
+        with self._lock:
+            outputs = self.session.run(None, {self.input_name: batch})
         plate_out = outputs[-1] if len(outputs) > 0 else outputs[0]
         chars = plate_out[0]
         indices = np.argmax(chars, axis=1)
@@ -459,6 +463,7 @@ class ObjectDetectorONNX:
     def __init__(self, model_path: str):
         if not HAS_ONNXRUNTIME:
             raise RuntimeError("onnxruntime is not installed.")
+        self._lock = threading.Lock()
         providers = ['CUDAExecutionProvider', 'TensorRTExecutionProvider', 'CPUExecutionProvider']
         avail = ort.get_available_providers()
         valid_providers = [p for p in providers if p in avail]
@@ -494,7 +499,8 @@ class ObjectDetectorONNX:
             return []
         h, w = img.shape[:2]
         blob, scale, (pad_w, pad_h) = self.preprocess(img)
-        outputs = self.session.run([self.output_name], {self.input_name: blob})
+        with self._lock:
+            outputs = self.session.run([self.output_name], {self.input_name: blob})
         raw = outputs[0][0]
         preds = raw.T if raw.shape[0] < raw.shape[1] else raw
         if len(preds) == 0:
