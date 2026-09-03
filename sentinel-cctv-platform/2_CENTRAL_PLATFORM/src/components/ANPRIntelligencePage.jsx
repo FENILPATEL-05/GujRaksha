@@ -108,6 +108,8 @@ export const ANPRIntelligencePage = ({
   const [testPlateInput, setTestPlateInput] = useState("GJ-01-ER-9821");
   const [testQueryOutput, setTestQueryOutput] = useState(null);
   const [isQuerying, setIsQuerying] = useState(false);
+  const [isLookupModalOpen, setIsLookupModalOpen] = useState(false);
+  const [lookupResult, setLookupResult] = useState(null);
   const [gateways, setGateways] = useState([
     {
       id: "vahan",
@@ -155,19 +157,94 @@ export const ANPRIntelligencePage = ({
     if (addToast) addToast(`Connection verified with ${gwName} (Ping: 54ms)`, "info", "Handshake Verified");
   };
 
-  const handleRunSimpleTest = () => {
+  const handleRunSimpleTest = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const rawPlate = (testPlateInput || "").trim().toUpperCase();
+    if (!rawPlate) {
+      if (addToast) addToast("Please enter a valid vehicle plate number.", "error", "Input Required");
+      return;
+    }
+
     setIsQuerying(true);
     setTestQueryOutput(null);
+
+    const cleanPlate = rawPlate.replace(/[^A-Z0-9]/g, "");
+    const formattedPlate = rawPlate.includes("-") 
+      ? rawPlate 
+      : (cleanPlate.length >= 8 ? `${cleanPlate.slice(0, 2)}-${cleanPlate.slice(2, 4)}-${cleanPlate.slice(4, 6)}-${cleanPlate.slice(6)}` : cleanPlate);
+
+    let isWatchlistMatch = false;
+    let watchlistInfo = null;
+
+    try {
+      const res = await fetch('/api/v1/watchlist');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        const found = json.data.find(w => (w.vehicle_plate || '').replace(/[^A-Z0-9]/g, "") === cleanPlate);
+        if (found) {
+          isWatchlistMatch = true;
+          watchlistInfo = found;
+        }
+      }
+    } catch (_) {}
+
     setTimeout(() => {
       setIsQuerying(false);
+      const outputData = {
+        plate: rawPlate,
+        formattedPlate: formattedPlate,
+        isWatchlistMatch,
+        watchlistInfo,
+        vahan: {
+          rcStatus: "ACTIVE (Valid)",
+          ownerName: isWatchlistMatch ? (watchlistInfo?.owner_name || "Under Active Investigation") : "RAHUL M. PATEL",
+          vehicleClass: isWatchlistMatch ? (watchlistInfo?.vehicle_type || "Commercial Transport / Sedan") : "Motor Car (LMV - Hyundai Creta 1.5 SX)",
+          makerModel: "Hyundai Motor India / Creta 1.5L Petrol",
+          fuelType: "Petrol / BS-VI OBD-II",
+          registrationDate: "14-Mar-2023",
+          vehicleAge: "3 Years 5 Months",
+          rtoJurisdiction: `${rawPlate.slice(0, 5) || "GJ-01"} (Ahmedabad RTO - Subhash Bridge)`,
+          insuranceValidity: "12-Mar-2027 (HDFC ERGO General Insurance)",
+          pucValidity: "18-Nov-2026 (Valid)",
+          fitnessValidity: "13-Mar-2038",
+          chassisNumber: `MA3EFE0S0N${Math.floor(100000 + Math.random() * 900000)}`,
+          engineNumber: `G4FLM${Math.floor(100000 + Math.random() * 900000)}`
+        },
+        egujcop: {
+          crimeStatus: isWatchlistMatch ? "WANTED / ACTIVE POLICE FIR DETECTED" : "VERIFIED CLEAN (No Criminal Record)",
+          firNumber: isWatchlistMatch ? (watchlistInfo?.fir_number || "FIR #502/2026") : "None",
+          policeStation: isWatchlistMatch ? (watchlistInfo?.police_station || "SG Highway Police Station") : "None",
+          crimeCategory: isWatchlistMatch ? (watchlistInfo?.category || "STOLEN_VEHICLE") : "Clear / Whitelisted",
+          priority: isWatchlistMatch ? (watchlistInfo?.priority || "CRITICAL") : "NORMAL",
+          seizureOrder: isWatchlistMatch ? "IMMEDIATE INTERCEPT & SEIZE" : "NO ACTIVE SEIZURE ORDER",
+          lastSighting: isWatchlistMatch ? "Detected via S.G. Highway Junction CCTV" : "No Suspicious Incidents Reported"
+        },
+        network: {
+          gateway: "MoRTH National VAHAN 4.0 & Gujarat State eGujCop CCTNS Grid",
+          latency: "52ms",
+          protocol: "REST API / mTLS 1.3 with SHA-256 HMAC Signature",
+          clientNode: "GJ-POLICE-CCC-CENTRAL-01",
+          queryTimestamp: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })
+        }
+      };
+
       setTestQueryOutput({
-        plate: testPlateInput,
-        vahan: "Active RC · Hyundai Creta (White) · Owner: R. Patel · RTO: GJ-01",
-        egujcop: "Verified Clean (No Active Stolen FIR)",
-        latency: "58ms (mTLS 1.3)"
+        plate: rawPlate,
+        vahan: `${outputData.vahan.rcStatus} · ${outputData.vahan.makerModel} · Owner: ${outputData.vahan.ownerName}`,
+        egujcop: outputData.egujcop.crimeStatus,
+        latency: "52ms (mTLS 1.3)"
       });
-      if (addToast) addToast(`Records fetched for ${testPlateInput} (Latency: 58ms)`, "success", "Query Success");
-    }, 500);
+      setLookupResult(outputData);
+      setIsLookupModalOpen(true);
+
+      if (addToast) {
+        addToast(
+          isWatchlistMatch ? `🚨 Police Watchlist Match Found for ${rawPlate}!` : `Inter-Agency records verified for ${rawPlate} (Latency: 52ms)`,
+          isWatchlistMatch ? "error" : "success",
+          isWatchlistMatch ? "Wanted Hit" : "Lookup Complete"
+        );
+      }
+    }, 450);
   };
 
 
@@ -1198,12 +1275,18 @@ export const ANPRIntelligencePage = ({
               Simulate high-speed API payload query against VAHAN & eGujCop mock service endpoints.
             </p>
 
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <form onSubmit={handleRunSimpleTest} style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
               <input
                 type="text"
-                placeholder="Enter vehicle plate number"
+                placeholder="Enter vehicle plate number (e.g. GJ01AB1234)"
                 value={testPlateInput}
                 onChange={(e) => setTestPlateInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleRunSimpleTest(e);
+                  }
+                }}
                 style={{
                   background: "var(--input-bg)",
                   border: "1px solid var(--panel-border)",
@@ -1218,43 +1301,53 @@ export const ANPRIntelligencePage = ({
                 }}
               />
               <button
+                type="submit"
                 className="btn btn-sm btn-primary"
-                onClick={handleRunSimpleTest}
                 disabled={isQuerying}
                 style={{ gap: "6px" }}
               >
-                <Search size={14} /> {isQuerying ? "Querying..." : "Simulate Query"}
+                <Search size={14} /> {isQuerying ? "Querying..." : "Simulate Query & Inspect Details"}
               </button>
-            </div>
-
+            </form>
 
             {testQueryOutput && (
-              <div style={{
-                marginTop: "14px",
-                padding: "12px 14px",
-                background: "rgba(15, 23, 42, 0.6)",
-                border: "1px solid rgba(56, 189, 248, 0.3)",
-                borderRadius: "8px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "10px",
-                fontSize: "12px"
-              }}>
+              <div
+                onClick={() => setIsLookupModalOpen(true)}
+                style={{
+                  marginTop: "14px",
+                  padding: "12px 14px",
+                  background: "var(--input-bg)",
+                  border: "1px solid rgba(34, 211, 238, 0.3)",
+                  borderRadius: "8px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "10px",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease"
+                }}
+                title="Click to view detailed modal"
+              >
                 <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
-                  <span style={{ fontFamily: "var(--font-mono)", fontWeight: 800, color: "#38bdf8" }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontWeight: 800, color: "var(--accent)" }}>
                     {testQueryOutput.plate}
                   </span>
                   <span style={{ color: "var(--text-secondary)" }}>
                     <strong>VAHAN:</strong> {testQueryOutput.vahan}
                   </span>
-                  <span style={{ color: "#4ade80", fontWeight: 600 }}>
+                  <span style={{ color: "#10b981", fontWeight: 600 }}>
                     <strong>eGujCop:</strong> {testQueryOutput.egujcop}
                   </span>
                 </div>
-                <div style={{ fontSize: "11px", color: "var(--text-dim)" }}>
-                  Latency: <span style={{ color: "#4ade80", fontWeight: 700 }}>{testQueryOutput.latency}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{ fontSize: "11px", color: "var(--text-dim)" }}>
+                    Latency: <span style={{ color: "#10b981", fontWeight: 700 }}>{testQueryOutput.latency}</span>
+                  </div>
+                  <span className="badge" style={{ fontSize: "10.5px", background: "rgba(34, 211, 238, 0.12)", color: "var(--accent)", border: "1px solid rgba(34, 211, 238, 0.3)", gap: "4px" }}>
+                    <Eye size={11} /> View Modal
+                  </span>
                 </div>
               </div>
             )}
@@ -1906,6 +1999,307 @@ export const ANPRIntelligencePage = ({
               >
                 <LocateFixed size={13} /> Trace Route on Map
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inter-Agency Registry Intelligence Lookup Modal */}
+      {isLookupModalOpen && lookupResult && (
+        <div className="modal-overlay" style={{ zIndex: 9999 }}>
+          <div className="modal modal-lg" style={{ maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden", width: "90%", maxWidth: "800px" }}>
+            {/* Modal Header */}
+            <div className="modal-head" style={{ flexShrink: 0, borderBottom: "1px solid var(--panel-border)", padding: "16px 20px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "8px",
+                  background: lookupResult.isWatchlistMatch ? "rgba(239, 68, 68, 0.15)" : "rgba(34, 211, 238, 0.15)",
+                  border: `1px solid ${lookupResult.isWatchlistMatch ? "rgba(239, 68, 68, 0.3)" : "rgba(34, 211, 238, 0.3)"}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: lookupResult.isWatchlistMatch ? "#ef4444" : "var(--accent)"
+                }}>
+                  {lookupResult.isWatchlistMatch ? <ShieldAlert size={20} /> : <ShieldCheck size={20} />}
+                </div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "var(--text-primary)" }}>
+                      Inter-Agency Vehicle Intelligence Records
+                    </h3>
+                    <span className="badge" style={{
+                      background: lookupResult.isWatchlistMatch ? "rgba(239, 68, 68, 0.15)" : "rgba(16, 185, 129, 0.15)",
+                      color: lookupResult.isWatchlistMatch ? "#ef4444" : "#10b981",
+                      border: `1px solid ${lookupResult.isWatchlistMatch ? "rgba(239, 68, 68, 0.3)" : "rgba(16, 185, 129, 0.3)"}`,
+                      fontSize: "10.5px",
+                      fontWeight: 800
+                    }}>
+                      {lookupResult.isWatchlistMatch ? "POLICE WATCHLIST HIT" : "CLEAN VERIFIED"}
+                    </span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: "11.5px", color: "var(--text-dim)" }}>
+                    Cross-referenced via VAHAN 4.0 (MoRTH) & eGujCop Police CCTNS Network
+                  </p>
+                </div>
+              </div>
+              <button className="modal-close" onClick={() => setIsLookupModalOpen(false)}>
+                <X size={17} strokeWidth={2.2} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="modal-body" style={{ overflowY: "auto", flex: 1, padding: "20px" }}>
+              {/* Top Banner: HSRP Plate & Status */}
+              <div style={{
+                background: "var(--input-bg)",
+                border: "1px solid var(--panel-border)",
+                borderRadius: "10px",
+                padding: "16px 20px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "14px",
+                marginBottom: "16px"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                  {/* Indian HSRP License Plate Box */}
+                  <div style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    border: "2px solid #1e293b",
+                    borderRadius: "6px",
+                    overflow: "hidden",
+                    background: "#ffffff",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.12)"
+                  }}>
+                    <div style={{
+                      background: "#1e3a8a",
+                      color: "#fff",
+                      padding: "4px 6px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "9px",
+                      fontWeight: 900,
+                      lineHeight: 1
+                    }}>
+                      <span>🇮🇳</span>
+                      <span style={{ fontSize: "8px", marginTop: "2px" }}>IND</span>
+                    </div>
+                    <div style={{
+                      padding: "6px 14px",
+                      color: "#0f172a",
+                      fontFamily: "var(--font-mono)",
+                      fontSize: "18px",
+                      fontWeight: 900,
+                      letterSpacing: "1.5px"
+                    }}>
+                      {lookupResult.formattedPlate || lookupResult.plate}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--text-primary)" }}>
+                      {lookupResult.vahan.makerModel}
+                    </div>
+                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>
+                      Registered to: <strong style={{ color: "var(--text-primary)" }}>{lookupResult.vahan.ownerName}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <span className="badge" style={{
+                    padding: "6px 12px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    background: "rgba(34, 211, 238, 0.12)",
+                    color: "var(--accent)",
+                    border: "1px solid rgba(34, 211, 238, 0.3)"
+                  }}>
+                    <Building2 size={12} /> {lookupResult.vahan.rtoJurisdiction}
+                  </span>
+                </div>
+              </div>
+
+              {/* 2-Column Grid: VAHAN vs eGujCop */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px", marginBottom: "16px" }}>
+                {/* Column 1: VAHAN 4.0 National Vehicle Registry */}
+                <div style={{
+                  background: "var(--input-bg)",
+                  border: "1px solid var(--panel-border)",
+                  borderRadius: "10px",
+                  padding: "16px"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px", borderBottom: "1px solid var(--panel-border)", paddingBottom: "10px" }}>
+                    <Database size={15} style={{ color: "var(--accent)" }} />
+                    <h4 style={{ margin: 0, fontSize: "13.5px", fontWeight: 800, color: "var(--text-primary)" }}>
+                      VAHAN 4.0 (MoRTH Registry)
+                    </h4>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "12px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "var(--text-dim)" }}>RC Status:</span>
+                      <span style={{ color: "#10b981", fontWeight: 800 }}>{lookupResult.vahan.rcStatus}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "var(--text-dim)" }}>Vehicle Class:</span>
+                      <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{lookupResult.vahan.vehicleClass}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "var(--text-dim)" }}>Fuel / Emission:</span>
+                      <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{lookupResult.vahan.fuelType}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "var(--text-dim)" }}>Registration Date:</span>
+                      <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{lookupResult.vahan.registrationDate} ({lookupResult.vahan.vehicleAge})</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "var(--text-dim)" }}>Insurance Validity:</span>
+                      <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{lookupResult.vahan.insuranceValidity}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "var(--text-dim)" }}>PUC Certificate:</span>
+                      <span style={{ color: "#10b981", fontWeight: 700 }}>{lookupResult.vahan.pucValidity}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "var(--text-dim)" }}>Fitness Certificate:</span>
+                      <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{lookupResult.vahan.fitnessValidity}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "var(--text-dim)" }}>Chassis No. (Masked):</span>
+                      <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-mono)", fontSize: "11px" }}>{lookupResult.vahan.chassisNumber}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 2: eGujCop Crime & Police Watchlist */}
+                <div style={{
+                  background: lookupResult.isWatchlistMatch ? "rgba(239, 68, 68, 0.04)" : "var(--input-bg)",
+                  border: `1px solid ${lookupResult.isWatchlistMatch ? "rgba(239, 68, 68, 0.3)" : "var(--panel-border)"}`,
+                  borderRadius: "10px",
+                  padding: "16px"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px", borderBottom: `1px solid ${lookupResult.isWatchlistMatch ? "rgba(239, 68, 68, 0.2)" : "var(--panel-border)"}`, paddingBottom: "10px" }}>
+                    <ShieldAlert size={15} style={{ color: lookupResult.isWatchlistMatch ? "#ef4444" : "#10b981" }} />
+                    <h4 style={{ margin: 0, fontSize: "13.5px", fontWeight: 800, color: "var(--text-primary)" }}>
+                      eGujCop Police & Crime Network
+                    </h4>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "12px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "var(--text-dim)" }}>Crime / FIR Status:</span>
+                      <span style={{ color: lookupResult.isWatchlistMatch ? "#ef4444" : "#10b981", fontWeight: 800 }}>
+                        {lookupResult.egujcop.crimeStatus}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "var(--text-dim)" }}>FIR Number:</span>
+                      <span style={{ color: lookupResult.isWatchlistMatch ? "#ef4444" : "var(--text-primary)", fontWeight: 700 }}>
+                        {lookupResult.egujcop.firNumber}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "var(--text-dim)" }}>Police Jurisdiction:</span>
+                      <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{lookupResult.egujcop.policeStation}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "var(--text-dim)" }}>Category:</span>
+                      <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{lookupResult.egujcop.crimeCategory}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "var(--text-dim)" }}>Action Priority:</span>
+                      <span className="badge" style={{
+                        background: lookupResult.isWatchlistMatch ? "rgba(239, 68, 68, 0.15)" : "rgba(148, 163, 184, 0.12)",
+                        color: lookupResult.isWatchlistMatch ? "#ef4444" : "var(--text-secondary)",
+                        border: `1px solid ${lookupResult.isWatchlistMatch ? "rgba(239, 68, 68, 0.3)" : "var(--panel-border)"}`,
+                        fontSize: "10.5px"
+                      }}>
+                        {lookupResult.egujcop.priority}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "var(--text-dim)" }}>Seizure Order:</span>
+                      <span style={{ color: lookupResult.isWatchlistMatch ? "#ef4444" : "var(--text-secondary)", fontWeight: 600 }}>
+                        {lookupResult.egujcop.seizureOrder}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: "var(--text-dim)" }}>Last Sighting:</span>
+                      <span style={{ color: "var(--text-secondary)", fontSize: "11px", textAlign: "right" }}>{lookupResult.egujcop.lastSighting}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Telemetry Card */}
+              <div style={{
+                background: "rgba(15, 23, 42, 0.05)",
+                border: "1px dashed var(--panel-border)",
+                borderRadius: "8px",
+                padding: "10px 14px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "8px",
+                fontSize: "11px",
+                color: "var(--text-dim)"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Lock size={12} style={{ color: "var(--accent)" }} />
+                  <span>Protocol: <strong style={{ color: "var(--text-primary)" }}>{lookupResult.network.protocol}</strong></span>
+                </div>
+                <div>
+                  Latency: <span style={{ color: "#10b981", fontWeight: 700 }}>{lookupResult.network.latency}</span> · Node: <span style={{ color: "var(--text-secondary)" }}>{lookupResult.network.clientNode}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="modal-foot" style={{ flexShrink: 0, borderTop: "1px solid var(--panel-border)", padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--panel-bg)" }}>
+              <button
+                className="btn btn-sm"
+                onClick={() => {
+                  const summary = `VEHICLE INTELLIGENCE REPORT\nPlate: ${lookupResult.formattedPlate}\nModel: ${lookupResult.vahan.makerModel}\nOwner: ${lookupResult.vahan.ownerName}\nRTO: ${lookupResult.vahan.rtoJurisdiction}\nRC Status: ${lookupResult.vahan.rcStatus}\neGujCop Status: ${lookupResult.egujcop.crimeStatus}\nFIR: ${lookupResult.egujcop.firNumber}\nStation: ${lookupResult.egujcop.policeStation}`;
+                  navigator.clipboard.writeText(summary);
+                  if (addToast) addToast("Vehicle intelligence report copied to clipboard!", "success", "Copied");
+                }}
+                style={{ gap: "6px" }}
+              >
+                <Copy size={13} /> Copy Report Summary
+              </button>
+
+              <div style={{ display: "flex", gap: "8px" }}>
+                {!lookupResult.isWatchlistMatch && onOpenAddWatchlist && (
+                  <button
+                    className="btn btn-sm btn-danger"
+                    onClick={() => {
+                      setIsLookupModalOpen(false);
+                      onOpenAddWatchlist({
+                        vehicle_plate: lookupResult.plate,
+                        vehicle_type: lookupResult.vahan.vehicleClass,
+                        owner_name: lookupResult.vahan.ownerName
+                      });
+                    }}
+                    style={{ gap: "6px" }}
+                  >
+                    <ShieldAlert size={13} /> Flag to Watchlist
+                  </button>
+                )}
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => setIsLookupModalOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -16,6 +16,8 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAdvancedStream, setShowAdvancedStream] = useState(false);
   const [errors, setErrors] = useState({});
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [form, setForm] = useState({
     name: '',
@@ -209,9 +211,6 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
       setIsSubmitting(false);
     }
   };
-
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleExecuteDelete = async () => {
     setIsDeleting(true);
