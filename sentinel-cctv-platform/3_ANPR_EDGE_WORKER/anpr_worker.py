@@ -294,6 +294,7 @@ class PlateDetectorONNX:
         self.session, self.accel_mode = safe_create_ort_session(model_path, DET_SIZE)
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name
+        self.input_type = self.session.get_inputs()[0].type
 
     def preprocess(self, img: np.ndarray):
         h, w = img.shape[:2]
@@ -308,8 +309,11 @@ class PlateDetectorONNX:
         canvas[pad_h : pad_h + new_h, pad_w : pad_w + new_w] = resized
 
         canvas_rgb = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
-        blob = (canvas_rgb.astype(np.float32) / 255.0)
-        blob = np.transpose(blob, (2, 0, 1))[np.newaxis, :]  # NCHW
+        if "uint8" in str(getattr(self, "input_type", "")).lower():
+            blob = np.transpose(canvas_rgb, (2, 0, 1))[np.newaxis, :]
+        else:
+            blob = (canvas_rgb.astype(np.float32) / 255.0)
+            blob = np.transpose(blob, (2, 0, 1))[np.newaxis, :]  # NCHW
         return blob, scale, (pad_w, pad_h)
 
     def detect(self, img: np.ndarray, conf_thresh: float = 0.20, iou_thresh: float = 0.45):
@@ -366,6 +370,7 @@ class PlateOCRONNX:
         self.model_path = model_path
         self.session, self.accel_mode = safe_create_ort_session(model_path, OCR_W)
         self.input_name = self.session.get_inputs()[0].name
+        self.input_type = self.session.get_inputs()[0].type
 
     def recognize(self, img: np.ndarray, bbox: tuple = None):
         if bbox:
@@ -390,7 +395,10 @@ class PlateOCRONNX:
             crop_resized = cv2.resize(crop, (OCR_W, OCR_H), interpolation=cv2.INTER_LINEAR)
             crop_resized = cv2.cvtColor(crop_resized, cv2.COLOR_BGR2RGB)
 
-        batch = crop_resized[np.newaxis, :].astype(np.float32)
+        if "uint8" in str(getattr(self, "input_type", "")).lower():
+            batch = crop_resized[np.newaxis, :].astype(np.uint8)
+        else:
+            batch = crop_resized[np.newaxis, :].astype(np.float32)
         try:
             outputs = self.session.run(None, {self.input_name: batch})
         except Exception as run_err:
@@ -405,8 +413,15 @@ class PlateOCRONNX:
             else:
                 return "", 0.0
 
-        plate_out = outputs[-1] if len(outputs) > 0 else outputs[0]
-        chars = plate_out[0]
+        plate_out = None
+        for o in outputs:
+            if len(o.shape) >= 2 and (o.shape[-1] == 37 or (len(o.shape) == 3 and o.shape[1] == 10)):
+                plate_out = o
+                break
+        if plate_out is None:
+            plate_out = outputs[0]
+
+        chars = plate_out[0] if len(plate_out.shape) == 3 else plate_out
         indices = np.argmax(chars, axis=1)
         probs = np.max(chars, axis=1)
 
