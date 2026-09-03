@@ -52,6 +52,17 @@ except ImportError:
     HAS_ONNXRUNTIME = False
     ort = None
 
+def get_ort_providers():
+    if not HAS_ONNXRUNTIME or ort is None:
+        return []
+    fn = getattr(ort, "get_available_providers", None)
+    if callable(fn):
+        try:
+            return fn()
+        except Exception:
+            pass
+    return []
+
 try:
     import websocket
     HAS_WEBSOCKET = True
@@ -252,8 +263,8 @@ class PlateDetectorONNX:
             raise RuntimeError("onnxruntime is not installed.")
         
         providers = ['CUDAExecutionProvider', 'TensorRTExecutionProvider', 'CPUExecutionProvider']
-        avail = ort.get_available_providers()
-        valid_providers = [p for p in providers if p in avail]
+        avail = get_ort_providers()
+        valid_providers = [p for p in providers if p in avail] if avail else providers
         
         sess_opts = ort.SessionOptions()
         sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
@@ -326,8 +337,8 @@ class PlateOCRONNX:
             raise RuntimeError("onnxruntime is not installed.")
         
         providers = ['CUDAExecutionProvider', 'TensorRTExecutionProvider', 'CPUExecutionProvider']
-        avail = ort.get_available_providers()
-        valid_providers = [p for p in providers if p in avail]
+        avail = get_ort_providers()
+        valid_providers = [p for p in providers if p in avail] if avail else providers
         
         sess_opts = ort.SessionOptions()
         sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
@@ -382,8 +393,8 @@ class ObjectDetectorONNX:
         if not HAS_ONNXRUNTIME:
             raise RuntimeError("onnxruntime is not installed.")
         providers = ['CUDAExecutionProvider', 'TensorRTExecutionProvider', 'CPUExecutionProvider']
-        avail = ort.get_available_providers()
-        valid_providers = [p for p in providers if p in avail]
+        avail = get_ort_providers()
+        valid_providers = [p for p in providers if p in avail] if avail else providers
         sess_opts = ort.SessionOptions()
         sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         sess_opts.log_severity_level = 3
@@ -790,7 +801,7 @@ def create_anpr_pipeline(backend: str = "auto", num_threads: int = 4, triton_url
     gpu_available = False
     if HAS_ONNXRUNTIME:
         try:
-            providers = ort.get_available_providers()
+            providers = get_ort_providers()
             gpu_available = 'CUDAExecutionProvider' in providers or 'TensorRTExecutionProvider' in providers
         except Exception:
             gpu_available = False
