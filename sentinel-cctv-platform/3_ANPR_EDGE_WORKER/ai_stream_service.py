@@ -584,39 +584,34 @@ class AsyncAIStreamEngine:
                     tracked = byte_tracker.update(raw_dets)
 
             p_boxes = []
-            if enable_plt:
-                # 1. First detect within tracked vehicle bounding boxes
+            if enable_plt and real_plate_detector is not None:
+                # 1. First detect within tracked vehicle bounding boxes for higher accuracy
                 for obj in tracked:
                     if obj["label"] in ["car", "bus", "truck", "motorcycle"]:
                         vx1, vy1, vx2, vy2 = map(int, obj["box"])
                         vw, vh = vx2 - vx1, vy2 - vy1
                         tr_id = obj.get("track_id")
                         if vw > 20 and vh > 20:
-                            if tr_id is not None and tr_id in self.vehicle_plate_cache:
-                                p_txt, o_conf = self.vehicle_plate_cache[tr_id]
-                                px1 = max(0, int(vx1 + 0.15 * vw))
-                                px2 = min(w - 1, int(vx1 + 0.85 * vw))
-                                py1 = max(0, int(vy1 + 0.50 * vh))
-                                py2 = min(h - 1, int(vy1 + 0.95 * vh))
-                                p_boxes.append((px1, py1, px2, py2, p_txt, o_conf))
-                            elif real_plate_detector is not None:
-                                v_crop = frame[max(0, vy1):min(h, vy2), max(0, vx1):min(w, vx2)]
-                                if v_crop.size > 0:
-                                    try:
-                                        v_plates = real_plate_detector.detect(v_crop, conf_thresh=0.08, iou_thresh=0.45)
-                                        for cpx1, cpy1, cpx2, cpy2, p_sc in v_plates:
-                                            g_px1 = max(0, vx1 + cpx1)
-                                            g_py1 = max(0, vy1 + cpy1)
-                                            g_px2 = min(w - 1, vx1 + cpx2)
-                                            g_py2 = min(h - 1, vy1 + cpy2)
-                                            p_txt, o_conf = "", 0.0
-                                            if real_plate_ocr is not None:
-                                                p_txt, o_conf = real_plate_ocr.recognize(frame, (g_px1, g_py1, g_px2, g_py2))
+                            v_crop = frame[max(0, vy1):min(h, vy2), max(0, vx1):min(w, vx2)]
+                            if v_crop.size > 0:
+                                try:
+                                    v_plates = real_plate_detector.detect(v_crop, conf_thresh=0.08, iou_thresh=0.45)
+                                    for cpx1, cpy1, cpx2, cpy2, p_sc in v_plates:
+                                        g_px1 = max(0, vx1 + cpx1)
+                                        g_py1 = max(0, vy1 + cpy1)
+                                        g_px2 = min(w - 1, vx1 + cpx2)
+                                        g_py2 = min(h - 1, vy1 + cpy2)
+                                        
+                                        p_txt, o_conf = "", 0.0
+                                        if tr_id is not None and tr_id in self.vehicle_plate_cache:
+                                            p_txt, o_conf = self.vehicle_plate_cache[tr_id]
+                                        elif real_plate_ocr is not None:
+                                            p_txt, o_conf = real_plate_ocr.recognize(frame, (g_px1, g_py1, g_px2, g_py2))
                                             clean_p = normalize_ocr_text(p_txt) if p_txt else ""
                                             if clean_p and len(clean_p) >= 4:
+                                                p_txt = clean_p
                                                 if tr_id is not None:
                                                     self.vehicle_plate_cache[tr_id] = (clean_p, o_conf)
-                                                p_boxes.append((g_px1, g_py1, g_px2, g_py2, clean_p, o_conf))
                                                 if self.is_anpr_camera:
                                                     anpr_metadata_queue.submit(
                                                         camera_id=self.camera_id,
@@ -626,37 +621,56 @@ class AsyncAIStreamEngine:
                                                         vehicle_crop=v_crop,
                                                         vehicle_type=obj.get("label", "car").capitalize()
                                                     )
-                                                break
-                                    except Exception:
-                                        pass
+                                        
+                                        p_boxes.append((g_px1, g_py1, g_px2, g_py2, p_txt, o_conf))
+                                        break
+                                except Exception:
+                                    pass
 
-                # 2. Direct full-frame plate detection fallback
-                if real_plate_detector is not None:
-                    try:
-                        f_plates = real_plate_detector.detect(frame, conf_thresh=0.08, iou_thresh=0.45)
-                        for fpx1, fpy1, fpx2, fpy2, p_sc in f_plates:
-                            # Avoid duplicates if already found in vehicle box
-                            already_found = any(abs(fpx1 - px[0]) < 30 and abs(fpy1 - px[1]) < 30 for px in p_boxes)
-                            if already_found:
-                                continue
-                            p_txt, o_conf = "", 0.0
-                            if real_plate_ocr is not None:
-                                p_txt, o_conf = real_plate_ocr.recognize(frame, (fpx1, fpy1, fpx2, fpy2))
-                            clean_p = normalize_ocr_text(p_txt) if p_txt else ""
-                            if clean_p and len(clean_p) >= 4:
-                                p_boxes.append((fpx1, fpy1, fpx2, fpy2, clean_p, o_conf))
-                                if self.is_anpr_camera:
-                                    crop = frame[max(0, fpy1-20):min(h, fpy2+20), max(0, fpx1-20):min(w, fpx2+20)]
-                                    anpr_metadata_queue.submit(
-                                        camera_id=self.camera_id,
-                                        camera_code=self.camera_code,
-                                        plate_text=clean_p,
-                                        ocr_conf=o_conf,
-                                        vehicle_crop=crop if crop.size > 0 else None,
-                                        vehicle_type="Vehicle"
-                                    )
-                    except Exception:
-                        pass
+                # 2. Direct full-frame plate detection fallback for unclassified vehicles
+                try:
+                    f_plates = real_plate_detector.detect(frame, conf_thresh=0.08, iou_thresh=0.45)
+                    for fpx1, fpy1, fpx2, fpy2, p_sc in f_plates:
+                        # Avoid duplicates if already found in vehicle box
+                        already_found = any(abs(fpx1 - px[0]) < 35 and abs(fpy1 - px[1]) < 25 for px in p_boxes)
+                        if already_found:
+                            continue
+                        p_txt, o_conf = "", 0.0
+                        if real_plate_ocr is not None:
+                            p_txt, o_conf = real_plate_ocr.recognize(frame, (fpx1, fpy1, fpx2, fpy2))
+                        clean_p = normalize_ocr_text(p_txt) if p_txt else ""
+                        if clean_p and len(clean_p) >= 4:
+                            p_boxes.append((fpx1, fpy1, fpx2, fpy2, clean_p, o_conf))
+                            if self.is_anpr_camera:
+                                crop = frame[max(0, fpy1-20):min(h, fpy2+20), max(0, fpx1-20):min(w, fpx2+20)]
+                                anpr_metadata_queue.submit(
+                                    camera_id=self.camera_id,
+                                    camera_code=self.camera_code,
+                                    plate_text=clean_p,
+                                    ocr_conf=o_conf,
+                                    vehicle_crop=crop if crop.size > 0 else None,
+                                    vehicle_type="Vehicle"
+                                )
+                except Exception:
+                    pass
+
+            # 3. Non-Maximum Suppression deduplication on all plate boxes
+            if len(p_boxes) > 1:
+                deduped = []
+                for b in p_boxes:
+                    bx1, by1, bx2, by2, b_txt, b_conf = b
+                    is_dup = False
+                    for d in deduped:
+                        dx1, dy1, dx2, dy2, d_txt, d_conf = d
+                        # Check distance between box centers
+                        bcx, bcy = (bx1 + bx2) / 2, (by1 + by2) / 2
+                        dcx, dcy = (dx1 + dx2) / 2, (dy1 + dy2) / 2
+                        if abs(bcx - dcx) < 40 and abs(bcy - dcy) < 30:
+                            is_dup = True
+                            break
+                    if not is_dup:
+                        deduped.append(b)
+                p_boxes = deduped
 
             infer_ms = (time.time() - t0) * 1000.0
 

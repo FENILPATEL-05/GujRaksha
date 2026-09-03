@@ -602,16 +602,30 @@ export const LiveCCTVFeed = ({
 
   const displayDetections = useMemo(() => {
     if (!liveDetections || !Array.isArray(liveDetections)) return [];
-    return liveDetections.filter((det) => {
+    const seen = new Set();
+    const unique = [];
+    for (const det of liveDetections) {
       const cls = String(det.class_name || det.class || det.label || det.type || '').toLowerCase();
-      return (
+      const isPlate = (
         det.type === 'PLATE' ||
         cls.includes('plate') ||
         cls.includes('anpr') ||
-        !!det.plate ||
-        !!det.plate_text
+        Boolean(det.plate) ||
+        Boolean(det.plate_text)
       );
-    });
+      if (!isPlate) continue;
+
+      const pTxt = (det.plate || det.plate_text || det.label || '').trim().toUpperCase();
+      const bKey = Array.isArray(det.normalized_box)
+        ? det.normalized_box.map(n => Math.round(n * 20)).join('_')
+        : (Array.isArray(det.box) ? det.box.map(n => Math.round(n / 20)).join('_') : '');
+      const key = `${pTxt}_${bKey}`;
+
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(det);
+    }
+    return unique;
   }, [liveDetections]);
 
   return (
