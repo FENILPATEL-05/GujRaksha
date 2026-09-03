@@ -935,6 +935,99 @@ class AIStreamRequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
                 return
 
+        if path in ["/api/v1/ai/scan_frame", "/ai/scan_frame"]:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            try:
+                data = json.loads(body)
+                img_data_b64 = data.get("image", "")
+                if "," in img_data_b64:
+                    img_data_b64 = img_data_b64.split(",", 1)[1]
+
+                import base64
+                img_bytes = base64.b64decode(img_data_b64)
+                np_arr = np.frombuffer(img_bytes, np.uint8)
+                frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+                if frame is None or frame.size == 0:
+                    raise ValueError("Failed to decode frame image")
+
+                h, w = frame.shape[:2]
+                detected_objects = []
+                detected_plates = []
+
+                # 1. Object Detection
+                if detector is not None:
+                    raw_dets = detector.detect(frame)
+                    for det in raw_dets:
+                        bx1, by1, bx2, by2 = map(float, det["box"])
+                        cls_name = det.get("label", "object")
+                        score = float(det.get("score", 0.85))
+                        detected_objects.append({
+                            "class": cls_name,
+                            "confidence": round(score, 3),
+                            "box": [round(bx1 / w, 4), round(by1 / h, 4), round((bx2 - bx1) / w, 4), round((by2 - by1) / h, 4)]
+                        })
+
+                # 2. Plate Detection
+                if real_plate_detector is not None:
+                    found_plate = False
+                    for obj in detected_objects:
+                        if obj["class"] in ["car", "bus", "truck", "motorcycle"]:
+                            ox, oy, ow_norm, oh_norm = obj["box"]
+                            vx1, vy1 = int(ox * w), int(oy * h)
+                            vx2, vy2 = int((ox + ow_norm) * w), int((oy + oh_norm) * h)
+                            v_crop = frame[max(0, vy1):min(h, vy2), max(0, vx1):min(w, vx2)]
+                            if v_crop.size > 0:
+                                v_plates = real_plate_detector.detect(v_crop, conf_thresh=0.10, iou_thresh=0.45)
+                                for cpx1, cpy1, cpx2, cpy2, p_score in v_plates:
+                                    g_px1 = max(0, vx1 + cpx1)
+                                    g_py1 = max(0, vy1 + cpy1)
+                                    g_px2 = min(w - 1, vx1 + cpx2)
+                                    g_py2 = min(h - 1, vy1 + cpy2)
+                                    p_txt, o_conf = "", 0.0
+                                    if real_plate_ocr is not None:
+                                        p_txt, o_conf = real_plate_ocr.recognize(frame, (g_px1, g_py1, g_px2, g_py2))
+                                    clean_p = normalize_ocr_text(p_txt) if p_txt else ""
+                                    if clean_p and len(clean_p) >= 4:
+                                        detected_plates.append({
+                                            "plate_text": clean_p,
+                                            "confidence": round(float(o_conf if o_conf > 0 else p_score), 3),
+                                            "box": [round(g_px1 / w, 4), round(g_py1 / h, 4), round((g_px2 - g_px1) / w, 4), round((g_py2 - g_py1) / h, 4)]
+                                        })
+                                        found_plate = True
+                                        break
+                    if not found_plate:
+                        f_plates = real_plate_detector.detect(frame, conf_thresh=0.10, iou_thresh=0.45)
+                        for fpx1, fpy1, fpx2, fpy2, p_score in f_plates:
+                            p_txt, o_conf = "", 0.0
+                            if real_plate_ocr is not None:
+                                p_txt, o_conf = real_plate_ocr.recognize(frame, (fpx1, fpy1, fpx2, fpy2))
+                            clean_p = normalize_ocr_text(p_txt) if p_txt else ""
+                            if clean_p and len(clean_p) >= 4:
+                                detected_plates.append({
+                                    "plate_text": clean_p,
+                                    "confidence": round(float(o_conf if o_conf > 0 else p_score), 3),
+                                    "box": [round(fpx1 / w, 4), round(fpy1 / h, 4), round((fpx2 - fpx1) / w, 4), round((fpy2 - fpy1) / h, 4)]
+                                })
+
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "success": True,
+                    "objects": detected_objects,
+                    "plates": detected_plates
+                }).encode('utf-8'))
+                return
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode('utf-8'))
+                return
+
         self.send_response(404)
         self.end_headers()
 

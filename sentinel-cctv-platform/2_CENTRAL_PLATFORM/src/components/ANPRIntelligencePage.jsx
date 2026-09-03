@@ -51,6 +51,7 @@ import {
 import { Pagination } from "./Pagination";
 import { WatchlistManagerPage } from "./WatchlistManagerPage";
 import { LiveCCTVFeed } from "./LiveCCTVFeed";
+import { ForensicVideoAnalyzer } from "./ForensicVideoAnalyzer";
 
 export const ANPRIntelligencePage = ({
 
@@ -86,6 +87,7 @@ export const ANPRIntelligencePage = ({
   const [selectedSnapshotDet, setSelectedSnapshotDet] = useState(null);
   const [modalSearch, setModalSearch] = useState("");
   const [watchlistCount, setWatchlistCount] = useState(0);
+  const [watchlist, setWatchlist] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -278,6 +280,7 @@ export const ANPRIntelligencePage = ({
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
         setWatchlistCount(json.data.length);
+        setWatchlist(json.data);
       }
     } catch (_) {}
   };
@@ -584,11 +587,19 @@ export const ANPRIntelligencePage = ({
           ) : (
           <div style={{
             display: "flex",
-            gap: "8px",
-            height: "100%",
-            minHeight: 0,
-            alignItems: "stretch"
+            flexDirection: "column",
+            gap: "16px",
+            minHeight: "100%",
+            paddingBottom: "24px"
           }}>
+            {/* Upper: Live CCTV AI Vision Surveillance Grid */}
+            <div style={{
+              display: "flex",
+              gap: "8px",
+              height: "560px",
+              minHeight: 0,
+              alignItems: "stretch"
+            }}>
 
           {/* Left Side: Live CCTV Stream Visualizer (Takes all available main space) */}
           <div style={{
@@ -932,15 +943,13 @@ export const ANPRIntelligencePage = ({
               </div>
             )}
 
+            </div>
           </div>
+
+          {/* Lower Section: Offline Recorded Video AI Forensic Scanner & Interactive Timeline */}
+          <ForensicVideoAnalyzer addToast={addToast} watchlist={watchlist} />
         </div>
-
-
         )
-
-
-
-
       ) : activeTab === "watchlist" ? (
         <WatchlistManagerPage
           onOpenAddWatchlist={onOpenAddWatchlist}
