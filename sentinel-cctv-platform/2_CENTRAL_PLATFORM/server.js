@@ -62,6 +62,7 @@ const mountApiEndpoints = (prefix = '') => {
   app.use(`${prefix}/api/v1/auth`, authRoutes);
   app.use(`${prefix}/api/v1`, proxyRoutes);
   app.use(`${prefix}/api/v1/proxy-stream`, proxyRoutes);
+  app.use(`${prefix}/whep`, proxyRoutes);
 
   // Camera Ingest Catalogue API (Protocol Section 1)
   app.get(`${prefix}/api/ingest`, (req, res, next) => {
