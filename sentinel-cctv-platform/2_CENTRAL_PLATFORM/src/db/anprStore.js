@@ -356,20 +356,44 @@ class AnprDataStore {
 
     matched.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-    const waypoints = matched.map((d, index) => ({
-      sequence: index + 1,
-      id: d.id,
-      camera_id: d.camera_id,
-      camera_code: d.camera_code,
-      camera_name: d.camera_name,
-      district: d.district,
-      latitude: d.latitude || d.location_lat,
-      longitude: d.longitude || d.location_lng,
-      speed_kmh: d.speed_kmh,
-      confidence: d.confidence,
-      timestamp: d.timestamp,
-      is_watchlist_hit: d.is_watchlist_hit
-    }));
+    const waypoints = matched.map((d, index) => {
+      // Dynamic camera coordinate re-binding from pool/database
+      let cam = null;
+      const searchKey = String(d.camera_id || d.camera_code || "").trim();
+      if (searchKey) {
+        cam = db.getById(searchKey) || db.getByCameraCode(searchKey) || db.getById(d.camera_code) || db.getByCameraCode(d.camera_code);
+        if (!cam) {
+          const digits = searchKey.replace(/\D/g, "");
+          if (digits) {
+            const padded = 'cam' + digits.padStart(2, '0');
+            const govPadded = 'GJ-GOV-CAM' + digits.padStart(2, '0');
+            cam = db.getById(padded) || db.getByCameraCode(govPadded) || db.getById(`cam${digits}`) || db.getById(`gov-feed-${digits}`) || db.getByCameraCode(`GJ-GOV-${digits.padStart(3, '0')}`);
+          }
+        }
+      }
+
+      const lat = (cam && typeof cam.latitude === "number" && !isNaN(cam.latitude)) 
+        ? cam.latitude 
+        : (parseFloat(d.latitude) || parseFloat(d.location_lat) || 23.0225);
+      const lng = (cam && typeof cam.longitude === "number" && !isNaN(cam.longitude)) 
+        ? cam.longitude 
+        : (parseFloat(d.longitude) || parseFloat(d.location_lng) || 72.5714);
+
+      return {
+        sequence: index + 1,
+        id: d.id,
+        camera_id: cam ? cam.id : (d.camera_id || "cam01"),
+        camera_code: cam ? cam.camera_code : (d.camera_code || "GJ-GOV-CAM01"),
+        camera_name: cam ? cam.name : (d.camera_name || "State CCTV Node"),
+        district: cam ? cam.district : (d.district || "Ahmedabad"),
+        latitude: lat,
+        longitude: lng,
+        speed_kmh: d.speed_kmh || 45,
+        confidence: d.confidence || 95,
+        timestamp: d.timestamp,
+        is_watchlist_hit: d.is_watchlist_hit
+      };
+    });
 
     return {
       vehicle_plate: plateNumber.toUpperCase(),
@@ -393,8 +417,17 @@ class AnprDataStore {
     const watchlistHit = watchlistStore.getByPlate(cleanPlate);
 
     let camMeta = null;
-    if (payload.camera_id || payload.camera_code) {
-      camMeta = db.getById(payload.camera_id || payload.camera_code);
+    const searchId = String(payload.camera_id || payload.camera_code || "").trim();
+    if (searchId) {
+      camMeta = db.getById(searchId) || db.getByCameraCode(searchId) || db.getById(payload.camera_code) || db.getByCameraCode(payload.camera_code);
+      if (!camMeta) {
+        const digits = searchId.replace(/\D/g, "");
+        if (digits) {
+          const padded = 'cam' + digits.padStart(2, '0');
+          const govPadded = 'GJ-GOV-CAM' + digits.padStart(2, '0');
+          camMeta = db.getById(padded) || db.getByCameraCode(govPadded) || db.getById(`cam${digits}`) || db.getById(`gov-feed-${digits}`) || db.getByCameraCode(`GJ-GOV-${digits.padStart(3, '0')}`);
+        }
+      }
     }
 
     const newDetection = {
@@ -403,12 +436,12 @@ class AnprDataStore {
       vehicle_type: payload.vehicle_type || (watchlistHit ? watchlistHit.vehicle_type : "Motor Vehicle"),
       vehicle_color: payload.vehicle_color || "Standard",
       snapshot_url: payload.snapshot_url || null,
-      camera_id: payload.camera_id || (camMeta ? camMeta.id : "gov-feed-1"),
-      camera_code: payload.camera_code || (camMeta ? camMeta.camera_code : "GJ-GOV-001"),
-      camera_name: payload.camera_name || (camMeta ? camMeta.name : "State CCTV Node"),
-      district: payload.district || (camMeta ? camMeta.district : "Ahmedabad"),
-      latitude: payload.latitude !== undefined ? parseFloat(payload.latitude) : (camMeta ? camMeta.latitude : 23.0225),
-      longitude: payload.longitude !== undefined ? parseFloat(payload.longitude) : (camMeta ? camMeta.longitude : 72.5714),
+      camera_id: camMeta ? camMeta.id : (payload.camera_id || "cam01"),
+      camera_code: camMeta ? camMeta.camera_code : (payload.camera_code || "GJ-GOV-CAM01"),
+      camera_name: camMeta ? camMeta.name : (payload.camera_name || "State CCTV Node"),
+      district: camMeta ? camMeta.district : (payload.district || "Ahmedabad"),
+      latitude: camMeta ? camMeta.latitude : (payload.latitude !== undefined ? parseFloat(payload.latitude) : 23.0225),
+      longitude: camMeta ? camMeta.longitude : (payload.longitude !== undefined ? parseFloat(payload.longitude) : 72.5714),
       speed_kmh: payload.speed_kmh ? parseInt(payload.speed_kmh, 10) : Math.floor(40 + Math.random() * 45),
       confidence: payload.confidence ? parseFloat(payload.confidence) : parseFloat((95 + Math.random() * 4.8).toFixed(1)),
       is_watchlist_hit: !!watchlistHit,

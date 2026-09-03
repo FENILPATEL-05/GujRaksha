@@ -67,28 +67,14 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
   if (!camera) return null;
 
   const handleStreamUrlChange = (val) => {
-    const nextForm = { ...form, stream_url: val };
+    setForm((prev) => ({
+      ...prev,
+      stream_url: val,
+      rtsp_url: val
+    }));
     if (errors.stream_url) {
       setErrors((prev) => ({ ...prev, stream_url: undefined }));
     }
-
-    const host = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
-    const cleanId = (camera.id || '').replace('gov-feed-', '').replace('cam-', '').trim() || '1';
-
-    if (val.startsWith('rtsp://')) {
-      nextForm.rtsp_url = val;
-      nextForm.whep_url = `http://${host}:8889/stream/${cleanId}/whep`;
-      nextForm.hls_url = `http://${host}:8888/stream/${cleanId}/index.m3u8`;
-    } else if (val.endsWith('/whep') || val.includes(':8889/')) {
-      nextForm.whep_url = val;
-      nextForm.rtsp_url = `rtsp://${host}:8554/stream/${cleanId}`;
-      nextForm.hls_url = `http://${host}:8888/stream/${cleanId}/index.m3u8`;
-    } else if (val.trim()) {
-      nextForm.rtsp_url = val;
-      nextForm.whep_url = `http://${host}:8889/stream/${cleanId}/whep`;
-      nextForm.hls_url = `http://${host}:8888/stream/${cleanId}/index.m3u8`;
-    }
-    setForm(nextForm);
   };
 
   const updateField = (field, value) => {

@@ -167,7 +167,7 @@ export const LiveCCTVFeed = ({
     }
 
     if (cam.rtsp_url && (cam.rtsp_url.includes(':8554/') || cam.rtsp_url.includes('/stream/'))) {
-      const match = cam.rtsp_url.match(/rtsp:\/\/(?:[^@]+@)?([^:/]+):?(\d*)\/(.+)/);
+      const match = cam.rtsp_url.match(/rtsp:\/\/(?:.+@)?([^:/]+):?(\d*)\/(.+)/);
       if (match) {
         if (isHttps) {
           return `/whep/${match[3]}/whep`;
@@ -261,7 +261,10 @@ export const LiveCCTVFeed = ({
     abortControllerRef.current = controller;
 
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" }
+      ]
     });
     peerConnectionRef.current = pc;
 
@@ -269,8 +272,22 @@ export const LiveCCTVFeed = ({
     pc.addTransceiver("audio", { direction: "recvonly" });
 
     pc.ontrack = (event) => {
-      if (videoRef.current && event.streams && event.streams[0]) {
-        videoRef.current.srcObject = event.streams[0];
+      if (videoRef.current) {
+        if (event.streams && event.streams[0]) {
+          videoRef.current.srcObject = event.streams[0];
+        } else if (event.track) {
+          videoRef.current.srcObject = new MediaStream([event.track]);
+        }
+        videoRef.current.play().catch(() => {});
+        setIsLoading(false);
+        setIsPlaying(true);
+        setStreamError(false);
+        if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "connected") {
         setIsLoading(false);
         setIsPlaying(true);
         setStreamError(false);
@@ -289,10 +306,33 @@ export const LiveCCTVFeed = ({
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
+    // Wait for ICE candidate gathering (ensures MediaMTX receives client network routes)
+    await new Promise((resolve) => {
+      if (pc.iceGatheringState === "complete") {
+        resolve();
+      } else {
+        const checkState = () => {
+          if (pc.iceGatheringState === "complete") {
+            pc.removeEventListener("icegatheringstatechange", checkState);
+            resolve();
+          }
+        };
+        pc.addEventListener("icegatheringstatechange", checkState);
+        setTimeout(resolve, 600);
+      }
+    });
+
+    const sdpToSend = pc.localDescription ? pc.localDescription.sdp : offer.sdp;
+
+    const authHeaders = {
+      "Content-Type": "application/sdp",
+      "Authorization": "Basic " + btoa("fenil.patel@nxon.io:WWL7-E6HY-ZC54")
+    };
+
     const res = await fetch(whepUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/sdp" },
-      body: offer.sdp,
+      headers: authHeaders,
+      body: sdpToSend,
       signal: controller.signal
     });
 

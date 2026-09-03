@@ -362,10 +362,10 @@ class OnboardingService {
         const locMeta = this.resolveLocationMetadata(cam.location || cam.name);
         const camType = this.resolveCameraType(camId, cam.name, cam.location);
 
-        // Required Stream Endpoints
+        // Required Stream Endpoints (with Gujarat Police Challenge auth credentials)
         const hlsUrl = `https://cctv.corp8.cloud/${camId}/index.m3u8`;
-        const rtspUrl = `rtsp://103.250.160.189:8554/stream/${camId}`;
-        const whepUrl = `http://103.250.160.189:8889/stream/${camId}/whep`;
+        const rtspUrl = `rtsp://fenil.patel@nxon.io:WWL7-E6HY-ZC54@103.250.160.189:8554/stream/${camId}`;
+        const whepUrl = `http://fenil.patel@nxon.io:WWL7-E6HY-ZC54@103.250.160.189:8889/stream/${camId}/whep`;
 
         const cameraRecord = {
           id: camId,
