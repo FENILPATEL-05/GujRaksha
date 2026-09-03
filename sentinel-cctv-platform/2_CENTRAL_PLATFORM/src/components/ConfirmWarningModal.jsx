@@ -32,7 +32,7 @@ export const ConfirmWarningModal = ({
         style={{
           maxWidth: '440px',
           width: '92%',
-          background: 'var(--panel-bg-solid)',
+          background: 'var(--panel-bg)',
           border: `1px solid ${themeColors.border}`,
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.65)'
         }}
@@ -100,7 +100,7 @@ export const ConfirmWarningModal = ({
           className="modal-foot"
           style={{
             padding: '12px 22px',
-            background: 'rgba(15, 23, 42, 0.4)',
+            background: 'var(--input-bg)',
             borderTop: '1px solid var(--panel-border)',
             display: 'flex',
             justifyContent: 'flex-end',

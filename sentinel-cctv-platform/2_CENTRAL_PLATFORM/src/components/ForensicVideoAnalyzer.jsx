@@ -497,9 +497,11 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
     }
 
     const activeDets = detections.filter(d => Math.abs(d.time - timeSec) <= 0.6);
-    const listToDraw = selectedDetection && Math.abs(selectedDetection.time - timeSec) <= 1.2
-      ? [...activeDets.filter(d => d.id !== selectedDetection.id), selectedDetection]
-      : activeDets;
+
+    // Spotlight Mode: When an investigator clicks a detection card, ONLY draw that specific object's bounding box.
+    // Full Playback Mode: When video is playing, draw all active detections on screen simultaneously!
+    const isSpotlightActive = selectedDetection && videoRef.current?.paused;
+    const listToDraw = isSpotlightActive ? [selectedDetection] : activeDets;
 
     listToDraw.forEach(det => {
       const isSelected = selectedDetection && selectedDetection.id === det.id;
@@ -517,16 +519,22 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
 
       ctx.save();
 
+      // Spotlight Glow
+      if (isSelected) {
+        ctx.fillStyle = isSelected ? (det.isWatchlist ? "rgba(239, 68, 68, 0.15)" : "rgba(56, 189, 248, 0.15)") : "transparent";
+        ctx.fillRect(x, y, w, h);
+      }
+
       // Bounding Box
       ctx.strokeStyle = color;
-      ctx.lineWidth = isSelected ? 3.5 : 2.2;
+      ctx.lineWidth = isSelected ? 4 : 2.2;
       ctx.shadowColor = color;
-      ctx.shadowBlur = isSelected ? 12 : 6;
+      ctx.shadowBlur = isSelected ? 16 : 6;
       ctx.strokeRect(x, y, w, h);
 
       // Corner Brackets
-      const cl = Math.min(14, w / 4, h / 4);
-      ctx.lineWidth = 3.5;
+      const cl = Math.min(16, w / 4, h / 4);
+      ctx.lineWidth = isSelected ? 4 : 3.5;
       ctx.beginPath(); ctx.moveTo(x, y + cl); ctx.lineTo(x, y); ctx.lineTo(x + cl, y); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(x + w - cl, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + cl); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(x, y + h - cl); ctx.lineTo(x, y + h); ctx.lineTo(x + cl, y + h); ctx.stroke();
@@ -545,29 +553,37 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
       const tagH = 20;
       const tagY = Math.max(offsetY, y - tagH - 4);
 
-      ctx.fillStyle = "rgba(15, 23, 42, 0.90)";
+      ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
       ctx.fillRect(x, tagY, txtWidth + 14, tagH);
       ctx.strokeStyle = color;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1.2;
       ctx.strokeRect(x, tagY, txtWidth + 14, tagH);
 
       // Label Text
       ctx.fillStyle = color;
       ctx.fillText(labelText, x + 6, tagY + 14);
 
-      // Timestamp Tag
+      // Spotlight Watermark Banner
       if (isSelected) {
         ctx.fillStyle = "#fff";
-        ctx.font = "10px monospace";
-        ctx.fillText(`⏱ ${det.timeFormatted}`, x, Math.min(canvasH - 6, y + h + 15));
+        ctx.font = "bold 10.5px monospace";
+        ctx.fillText(`🎯 INSPECTED TARGET · ⏱ ${det.timeFormatted}`, x, Math.min(canvasH - 8, y + h + 16));
       }
 
       ctx.restore();
     });
   }, [detections, selectedDetection]);
 
-  // Click on Detection Card -> Seek Video & Highlight (Pause without autoplay)
+  // Click on Detection Card -> Spotlight ONLY that target & seek to frozen frame
   const handleSelectDetection = (det) => {
+    if (selectedDetection && selectedDetection.id === det.id) {
+      // Toggle off spotlight if clicked again -> show all active detections
+      setSelectedDetection(null);
+      if (videoRef.current) {
+        drawOverlayForTime(videoRef.current.currentTime);
+      }
+      return;
+    }
     setSelectedDetection(det);
     if (videoRef.current) {
       videoRef.current.pause();
@@ -580,14 +596,18 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
     }
   };
 
-  // Toggle Play / Pause
+  // Toggle Play / Pause: Automatically clear spotlight and render all bounding boxes during playback
   const togglePlay = () => {
     if (!videoRef.current) return;
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
     } else {
-      videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+      setSelectedDetection(null);
+      videoRef.current.play().then(() => {
+        setIsPlaying(true);
+        drawOverlayForTime(videoRef.current.currentTime);
+      }).catch(() => {});
     }
   };
 
@@ -595,6 +615,7 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
   const handleSeek = (e) => {
     const val = parseFloat(e.target.value);
     setCurrentTime(val);
+    setSelectedDetection(null);
     if (videoRef.current) {
       videoRef.current.currentTime = val;
     }
@@ -917,7 +938,15 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
               playsInline
               onLoadedMetadata={handleLoadedMetadata}
               onTimeUpdate={handleTimeUpdate}
-              onEnded={() => setIsPlaying(false)}
+              onPlay={() => {
+                setIsPlaying(true);
+                setSelectedDetection(null);
+              }}
+              onPause={() => setIsPlaying(false)}
+              onEnded={() => {
+                setIsPlaying(false);
+                setSelectedDetection(null);
+              }}
               style={{
                 width: "100%",
                 height: "100%",
