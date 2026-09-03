@@ -1770,8 +1770,6 @@ export const ANPRIntelligencePage = ({
       </div>
 
       {/* Clean Minimal Assigned Cameras Modal */}
-
-
       {selectedWorkerModal && (
         <div
           className="modal-overlay"
@@ -1781,7 +1779,7 @@ export const ANPRIntelligencePage = ({
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.75)",
+            backgroundColor: "rgba(0, 0, 0, 0.65)",
             backdropFilter: "blur(5px)",
             display: "flex",
             alignItems: "center",
@@ -1794,22 +1792,30 @@ export const ANPRIntelligencePage = ({
           <div
             className="modal-content"
             style={{
-              backgroundColor: "#0f172a",
-              border: "1px solid rgba(56, 189, 248, 0.3)",
+              backgroundColor: "var(--panel-bg)",
+              border: "1px solid var(--panel-border)",
               borderRadius: "12px",
               width: "100%",
               maxWidth: "780px",
               maxHeight: "82vh",
               display: "flex",
               flexDirection: "column",
-              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.7)",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)",
               overflow: "hidden"
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Top Close Bar with Search */}
-            <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255, 255, 255, 0.1)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0b1120", gap: "12px" }}>
-              <div style={{ fontWeight: 700, fontSize: "14px", color: "#fff", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div style={{
+              padding: "12px 16px",
+              borderBottom: "1px solid var(--panel-border)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              background: "var(--input-bg)",
+              gap: "12px"
+            }}>
+              <div style={{ fontWeight: 700, fontSize: "14px", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px" }}>
                 <Video size={16} style={{ color: "var(--accent)" }} />
                 <span>Assigned Cameras</span>
                 <span className="badge" style={{ background: "rgba(34, 211, 238, 0.15)", color: "var(--accent)", fontSize: "11px", padding: "2px 7px" }}>
@@ -1818,22 +1824,23 @@ export const ANPRIntelligencePage = ({
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, maxWidth: "340px" }}>
-                <div className="search-box" style={{ width: "100%", margin: 0, display: "flex", alignItems: "center", background: "rgba(255,255,255,0.06)", padding: "4px 8px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <div className="search-box" style={{ width: "100%", margin: 0, display: "flex", alignItems: "center", background: "var(--panel-bg)", padding: "4px 8px", borderRadius: "6px", border: "1px solid var(--panel-border)" }}>
                   <Search size={13} style={{ color: "var(--text-dim)", marginRight: "6px" }} />
                   <input
                     type="text"
                     placeholder="Search camera code or name..."
                     value={modalSearch}
                     onChange={(e) => setModalSearch(e.target.value)}
-                    style={{ width: "100%", background: "transparent", border: "none", color: "#fff", fontSize: "11.5px", outline: "none" }}
+                    style={{ width: "100%", background: "transparent", border: "none", color: "var(--text-primary)", fontSize: "11.5px", outline: "none" }}
                   />
                   {modalSearch && <X size={12} style={{ cursor: "pointer", color: "var(--text-dim)" }} onClick={() => setModalSearch("")} />}
                 </div>
               </div>
 
               <button
+                type="button"
                 onClick={() => setSelectedWorkerModal(null)}
-                style={{ background: "transparent", border: "none", color: "var(--text-dim)", cursor: "pointer", padding: "4px" }}
+                style={{ background: "transparent", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "4px" }}
               >
                 <X size={18} />
               </button>
@@ -1842,12 +1849,12 @@ export const ANPRIntelligencePage = ({
             {/* Clean Camera Table */}
             <div style={{ flex: 1, overflowY: "auto", padding: "0" }}>
               <table className="table" style={{ width: "100%", margin: 0, fontSize: "12px" }}>
-                <thead style={{ position: "sticky", top: 0, background: "#1e293b", zIndex: 10 }}>
+                <thead style={{ position: "sticky", top: 0, background: "var(--input-bg)", borderBottom: "1px solid var(--panel-border)", zIndex: 10 }}>
                   <tr>
-                    <th style={{ width: "45px", padding: "8px 12px" }}>#</th>
-                    <th style={{ padding: "8px 12px" }}>Camera Code</th>
-                    <th style={{ padding: "8px 12px" }}>Camera Name</th>
-                    <th style={{ padding: "8px 12px", textAlign: "right" }}>Detection Mode</th>
+                    <th style={{ width: "45px", padding: "8px 12px", color: "var(--text-secondary)" }}>#</th>
+                    <th style={{ padding: "8px 12px", color: "var(--text-secondary)" }}>Camera Code</th>
+                    <th style={{ padding: "8px 12px", color: "var(--text-secondary)" }}>Camera Name</th>
+                    <th style={{ padding: "8px 12px", textAlign: "right", color: "var(--text-secondary)" }}>Detection Mode</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1874,22 +1881,23 @@ export const ANPRIntelligencePage = ({
                     }
 
                     return filtered.map((cam, idx) => (
-                      <tr key={cam.id || cam.camera_code || idx} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                        <td style={{ color: "var(--text-dim)", fontFamily: "var(--font-mono)", padding: "7px 12px" }}>
+                      <tr key={cam.id || cam.camera_code || idx} style={{ borderBottom: "1px solid var(--panel-border)" }}>
+                        <td style={{ color: "var(--text-dim)", fontFamily: "var(--font-mono)", padding: "8px 12px" }}>
                           {idx + 1}
                         </td>
-                        <td style={{ padding: "7px 12px" }}>
+                        <td style={{ padding: "8px 12px" }}>
                           <div style={{ fontWeight: 700, color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>
                             {cam.camera_code || `CAM-${cam.id}`}
                           </div>
                         </td>
-                        <td style={{ color: "var(--text-secondary)", fontWeight: 500, padding: "7px 12px" }}>
+                        <td style={{ color: "var(--text-secondary)", fontWeight: 500, padding: "8px 12px" }}>
                           {cam.name || `Gujarat Traffic Camera ${cam.id}`}
                         </td>
-                        <td style={{ textAlign: "right", padding: "7px 12px" }}>
+                        <td style={{ textAlign: "right", padding: "8px 12px" }}>
                           <span className="badge" style={{
                             background: String(cam.detection_mode).includes("ANPR") ? "rgba(34, 211, 238, 0.15)" : "rgba(16, 185, 129, 0.15)",
                             color: String(cam.detection_mode).includes("ANPR") ? "var(--accent)" : "#10b981",
+                            border: "1px solid var(--panel-border)",
                             fontSize: "10.5px",
                             fontWeight: 600
                           }}>
@@ -1908,7 +1916,6 @@ export const ANPRIntelligencePage = ({
 
       {/* Captured ANPR Snapshot Modal */}
       {selectedSnapshotDet && (
-
         <div
           className="modal-overlay"
           style={{
@@ -1917,7 +1924,7 @@ export const ANPRIntelligencePage = ({
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            backgroundColor: "rgba(0, 0, 0, 0.75)",
             backdropFilter: "blur(6px)",
             display: "flex",
             alignItems: "center",
@@ -1930,13 +1937,13 @@ export const ANPRIntelligencePage = ({
           <div
             className="modal-content"
             style={{
-              backgroundColor: "#0f172a",
-              border: "1px solid rgba(56, 189, 248, 0.3)",
+              backgroundColor: "var(--panel-bg)",
+              border: "1px solid var(--panel-border)",
               borderRadius: "12px",
               width: "100%",
               maxWidth: "520px",
               padding: "20px",
-              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.7)"
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)"
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1948,6 +1955,7 @@ export const ANPRIntelligencePage = ({
                 </h3>
               </div>
               <button
+                type="button"
                 className="btn btn-sm btn-icon"
                 onClick={() => setSelectedSnapshotDet(null)}
                 style={{ background: "transparent", border: "none", color: "var(--text-secondary)", cursor: "pointer" }}
@@ -1960,7 +1968,7 @@ export const ANPRIntelligencePage = ({
             <div style={{
               width: "100%",
               height: "260px",
-              backgroundColor: "#020617",
+              backgroundColor: "#000",
               borderRadius: "8px",
               overflow: "hidden",
               border: "1px solid var(--panel-border)",
@@ -1991,7 +1999,8 @@ export const ANPRIntelligencePage = ({
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
               gap: "10px",
-              backgroundColor: "rgba(30, 41, 59, 0.5)",
+              backgroundColor: "var(--input-bg)",
+              border: "1px solid var(--panel-border)",
               padding: "12px",
               borderRadius: "8px",
               fontSize: "12px",
@@ -1999,13 +2008,13 @@ export const ANPRIntelligencePage = ({
             }}>
               <div>
                 <span style={{ color: "var(--text-dim)", display: "block", fontSize: "11px" }}>License Plate</span>
-                <strong style={{ color: "#38bdf8", fontFamily: "var(--font-mono)", fontSize: "14px" }}>
+                <strong style={{ color: "var(--accent)", fontFamily: "var(--font-mono)", fontSize: "14px" }}>
                   {selectedSnapshotDet.vehicle_plate}
                 </strong>
               </div>
               <div>
                 <span style={{ color: "var(--text-dim)", display: "block", fontSize: "11px" }}>Confidence</span>
-                <strong style={{ color: "#4ade80" }}>
+                <strong style={{ color: "#10b981" }}>
                   {selectedSnapshotDet.confidence || 95}%
                 </strong>
               </div>
@@ -2025,6 +2034,7 @@ export const ANPRIntelligencePage = ({
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
               <button
+                type="button"
                 className="btn btn-sm btn-primary"
                 onClick={() => {
                   const plate = selectedSnapshotDet.vehicle_plate;
