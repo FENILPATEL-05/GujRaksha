@@ -356,14 +356,16 @@ export const LiveCCTVFeed = ({
         await startWhepConnection(whepApiUrl);
       } catch (err) {
         if (err.name === "AbortError") return;
-        console.warn("WHEP connection error, trying HTTP fallback:", err.message);
-        // Fallback to video / proxy
-        if (camera.hls_url || (rawStreamUrl && !rawStreamUrl.startsWith("rtsp://"))) {
+        console.warn("WHEP connection offline/404, using fallback gateway stream:", err.message);
+        if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
+        setStreamError(false);
+        // Fallback to video / RTSP proxy / MJPEG
+        if (camera.hls_url) {
           setStreamMode("video");
-          setActiveProtocol("HLS / Video Fallback");
+          setActiveProtocol("HLS Live Feed");
         } else {
           setStreamMode("mjpeg");
-          setActiveProtocol("MJPEG Gateway");
+          setActiveProtocol("Live Stream Gateway");
         }
       }
     } else if (isMjpegPattern) {
@@ -521,9 +523,10 @@ export const LiveCCTVFeed = ({
     setSelectedClasses(prev => ({ ...prev, [classKey]: !prev[classKey] }));
   }, []);
 
-  const effectiveFallbackUrl = (rawStreamUrl.startsWith('rtsp://'))
-    ? rtspProxyUrl
-    : (camera.hls_url || rawStreamUrl);
+  const actualRtspUrl = camera?.rtsp_url || camera?.stream_url || (camera?.urls && camera.urls.rtsp) || '';
+  const effectiveFallbackUrl = (actualRtspUrl && actualRtspUrl.startsWith('rtsp://'))
+    ? `${apiPrefix}/api/v1/proxy-stream?url=${encodeURIComponent(actualRtspUrl)}`
+    : (camera.hls_url || (rawStreamUrl && !rawStreamUrl.includes(':8889/') && !rawStreamUrl.endsWith('/whep') ? rawStreamUrl : `${apiPrefix}/api/v1/proxy-stream?url=${encodeURIComponent(actualRtspUrl || 'rtsp://localhost:8554/stream/' + cleanNumId)}`));
 
   const getBoxStyle = (det) => {
     const lbl = String(det.label || '').toUpperCase();

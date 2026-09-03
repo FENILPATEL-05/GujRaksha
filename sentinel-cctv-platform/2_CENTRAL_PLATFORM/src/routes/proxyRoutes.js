@@ -6,8 +6,13 @@ import { URL } from 'url';
 const router = express.Router();
 
 // 1. WHEP WebRTC SDP Proxy Endpoint (Supports POST / GET / OPTIONS / PATCH / DELETE)
-router.all(['/proxy-whep', '/whep-proxy'], (req, res) => {
-  const targetUrl = req.query.url;
+router.all(['/proxy-whep', '/whep-proxy', '/whep/*'], (req, res) => {
+  let targetUrl = req.query.url;
+  if (!targetUrl && req.path.startsWith('/whep/')) {
+    const streamPath = req.path.replace(/^\/whep\//, '');
+    const mediamtxHost = process.env.MEDIAMTX_HOST || '127.0.0.1';
+    targetUrl = `http://${mediamtxHost}:8889/${streamPath}`;
+  }
   if (!targetUrl) {
     return res.status(400).json({ error: 'Missing target WHEP URL.' });
   }
