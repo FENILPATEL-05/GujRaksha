@@ -442,6 +442,27 @@ export const ANPRIntelligencePage = ({
     }
   }, [activeTab, activeVisionCam?.camera_code, activeVisionCam?.id]);
 
+  useEffect(() => {
+    if (activeVisionCam) {
+      const source = activeVisionCam.rtsp_url || activeVisionCam.stream_url || (activeVisionCam.urls && (activeVisionCam.urls.rtsp || activeVisionCam.urls.hls || activeVisionCam.urls.whep)) || "";
+      try {
+        fetch("/api/v1/ai/stream_controls", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source: source,
+            camera_id: activeVisionCam.id,
+            camera_code: activeVisionCam.camera_code,
+            detect_objects: Boolean(enableObjDetection),
+            detect_plates: Boolean(enablePlateDetection),
+            trails: Boolean(enableObjDetection),
+            classes: selectedClasses
+          })
+        }).catch(() => {});
+      } catch (_) {}
+    }
+  }, [enableObjDetection, enablePlateDetection, selectedClasses, activeVisionCam]);
+
   return (
     <div className="table-view hub-table-view">
       <div className="hub-layout-wrapper">

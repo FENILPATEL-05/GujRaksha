@@ -461,64 +461,43 @@ export const LiveCCTVFeed = ({
   const camCode = camera?.camera_code || camera?.id || 'GJ-GOV-001';
   const aiSourceUrl = camera?.rtsp_url || camera?.stream_url || (camera?.urls && (camera.urls.rtsp || camera.urls.hls || camera.urls.whep)) || rawStreamUrl || "0";
   const aiFallbackUrl = camera?.hls_url || (camera?.urls && (camera.urls.hls || camera.urls.whep)) || (camera?.stream_url && !camera.stream_url.startsWith('rtsp://') ? camera.stream_url : '') || rawStreamUrl || "";
-  const aiStreamUrl = `${apiPrefix}/api/v1/ai/video_feed?source=${encodeURIComponent(aiSourceUrl)}&fallback=${encodeURIComponent(aiFallbackUrl)}&camera_id=${encodeURIComponent(camId)}&camera_code=${encodeURIComponent(camCode)}&is_anpr=${isAnprCamera}&trails=true&dwell=false&zone=false`;
+  const aiStreamUrl = `${apiPrefix}/api/v1/ai/video_feed?source=${encodeURIComponent(aiSourceUrl)}&fallback=${encodeURIComponent(aiFallbackUrl)}&camera_id=${encodeURIComponent(camId)}&camera_code=${encodeURIComponent(camCode)}&is_anpr=${isAnprCamera}&detect_objects=${enableObjDetection}&detect_plates=${enablePlateDetection}&trails=${enableObjDetection}&dwell=false&zone=false`;
+
+  // Reactively broadcast AI controls to Python Stream Service whenever filters or detection toggles change
+  useEffect(() => {
+    try {
+      fetch(`${apiPrefix}/api/v1/ai/stream_controls`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: aiSourceUrl,
+          camera_id: camId,
+          camera_code: camCode,
+          detect_objects: Boolean(enableObjDetection),
+          detect_plates: Boolean(enablePlateDetection),
+          trails: Boolean(enableObjDetection),
+          classes: selectedClasses
+        })
+      }).catch(() => {});
+    } catch (_) {}
+  }, [enableObjDetection, enablePlateDetection, selectedClasses, apiPrefix, aiSourceUrl, camId, camCode]);
 
   const handleToggleObjects = useCallback((e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     const nextVal = !enableObjDetection;
     setEnableObjDetection(nextVal);
-    try {
-      fetch(`${apiPrefix}/api/v1/ai/stream_controls`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: aiSourceUrl,
-          detect_objects: nextVal,
-          detect_plates: enablePlateDetection,
-          trails: nextVal,
-          classes: selectedClasses
-        })
-      }).catch(() => {});
-    } catch (_) {}
-  }, [enableObjDetection, enablePlateDetection, selectedClasses, apiPrefix, aiSourceUrl]);
+  }, [enableObjDetection]);
 
   const handleTogglePlates = useCallback((e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     const nextVal = !enablePlateDetection;
     setEnablePlateDetection(nextVal);
-    try {
-      fetch(`${apiPrefix}/api/v1/ai/stream_controls`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: aiSourceUrl,
-          detect_objects: enableObjDetection,
-          detect_plates: nextVal,
-          classes: selectedClasses
-        })
-      }).catch(() => {});
-    } catch (_) {}
-  }, [enableObjDetection, enablePlateDetection, selectedClasses, apiPrefix, aiSourceUrl]);
+  }, [enablePlateDetection]);
 
   const handleToggleClass = useCallback((classKey, e) => {
     if (e) e.stopPropagation();
-    setSelectedClasses(prev => {
-      const nextClasses = { ...prev, [classKey]: !prev[classKey] };
-      try {
-        fetch(`${apiPrefix}/api/v1/ai/stream_controls`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            source: aiSourceUrl,
-            detect_objects: enableObjDetection,
-            detect_plates: enablePlateDetection,
-            classes: nextClasses
-          })
-        }).catch(() => {});
-      } catch (_) {}
-      return nextClasses;
-    });
-  }, [enableObjDetection, enablePlateDetection, apiPrefix, aiSourceUrl]);
+    setSelectedClasses(prev => ({ ...prev, [classKey]: !prev[classKey] }));
+  }, []);
 
   const effectiveFallbackUrl = (rawStreamUrl.startsWith('rtsp://'))
     ? rtspProxyUrl

@@ -396,7 +396,7 @@ export const BulkCameraImportModal = ({
               onClick={() => fileInputRef.current?.click()}
               style={{
                 border: isDragOver ? '2px dashed var(--accent)' : '2px dashed var(--panel-border)',
-                background: isDragOver ? 'rgba(34, 211, 238, 0.08)' : 'rgba(15, 23, 42, 0.5)',
+                background: isDragOver ? 'rgba(34, 211, 238, 0.12)' : 'var(--input-bg)',
                 borderRadius: '10px',
                 padding: '36px 20px',
                 textAlign: 'center',
@@ -437,7 +437,7 @@ export const BulkCameraImportModal = ({
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  background: 'rgba(30, 41, 59, 0.6)',
+                  background: 'var(--panel-bg)',
                   border: '1px solid var(--panel-border)',
                   borderRadius: '8px',
                   padding: '10px 16px'
@@ -467,21 +467,21 @@ export const BulkCameraImportModal = ({
 
               {/* KPI Badges Row */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px' }}>
-                <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--panel-border)', borderRadius: '6px', padding: '8px 12px' }}>
+                <div style={{ background: 'var(--panel-bg)', border: '1px solid var(--panel-border)', borderRadius: '6px', padding: '8px 12px' }}>
                   <div style={{ fontSize: '10px', textTransform: 'uppercase', color: 'var(--text-dim)', fontWeight: 700 }}>Total Cameras</div>
-                  <div style={{ fontSize: '17px', fontWeight: 800, color: '#fff' }}>{totalCount.toLocaleString()}</div>
+                  <div style={{ fontSize: '17px', fontWeight: 800, color: 'var(--text-primary)' }}>{totalCount.toLocaleString()}</div>
                 </div>
                 <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '6px', padding: '8px 12px' }}>
                   <div style={{ fontSize: '10px', textTransform: 'uppercase', color: '#10b981', fontWeight: 700 }}>Valid GPS</div>
-                  <div style={{ fontSize: '17px', fontWeight: 800, color: '#4ade80' }}>{validRowCount.toLocaleString()}</div>
+                  <div style={{ fontSize: '17px', fontWeight: 800, color: '#10b981' }}>{validRowCount.toLocaleString()}</div>
                 </div>
-                <div style={{ background: invalidRowCount > 0 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(15, 23, 42, 0.6)', border: invalidRowCount > 0 ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--panel-border)', borderRadius: '6px', padding: '8px 12px' }}>
+                <div style={{ background: invalidRowCount > 0 ? 'rgba(239, 68, 68, 0.08)' : 'var(--panel-bg)', border: invalidRowCount > 0 ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--panel-border)', borderRadius: '6px', padding: '8px 12px' }}>
                   <div style={{ fontSize: '10px', textTransform: 'uppercase', color: invalidRowCount > 0 ? '#ef4444' : 'var(--text-dim)', fontWeight: 700 }}>GPS Errors</div>
-                  <div style={{ fontSize: '17px', fontWeight: 800, color: invalidRowCount > 0 ? '#f87171' : 'var(--text-dim)' }}>{invalidRowCount.toLocaleString()}</div>
+                  <div style={{ fontSize: '17px', fontWeight: 800, color: invalidRowCount > 0 ? '#ef4444' : 'var(--text-dim)' }}>{invalidRowCount.toLocaleString()}</div>
                 </div>
                 <div style={{ background: 'rgba(34, 211, 238, 0.08)', border: '1px solid rgba(34, 211, 238, 0.3)', borderRadius: '6px', padding: '8px 12px' }}>
-                  <div style={{ fontSize: '10px', textTransform: 'uppercase', color: '#38bdf8', fontWeight: 700 }}>Districts Covered</div>
-                  <div style={{ fontSize: '17px', fontWeight: 800, color: '#38bdf8' }}>{uniqueDistricts}</div>
+                  <div style={{ fontSize: '10px', textTransform: 'uppercase', color: '#0284c7', fontWeight: 700 }}>Districts Covered</div>
+                  <div style={{ fontSize: '17px', fontWeight: 800, color: '#0284c7' }}>{uniqueDistricts}</div>
                 </div>
               </div>
             </div>
@@ -496,7 +496,7 @@ export const BulkCameraImportModal = ({
                 borderRadius: '8px',
                 padding: '10px 14px',
                 fontSize: '11.5px',
-                color: '#f87171',
+                color: '#ef4444',
                 maxHeight: '80px',
                 overflowY: 'auto',
                 flexShrink: 0
@@ -509,7 +509,7 @@ export const BulkCameraImportModal = ({
                 <div key={i}>• {err}</div>
               ))}
               {parseErrors.length > 10 && (
-                <div style={{ fontStyle: 'italic', marginTop: '2px', color: '#fca5a5' }}>
+                <div style={{ fontStyle: 'italic', marginTop: '2px', color: '#ef4444' }}>
                   ... and {parseErrors.length - 10} more rows with errors (click 'Errors Only' filter below to view).
                 </div>
               )}
@@ -522,7 +522,7 @@ export const BulkCameraImportModal = ({
               {/* Preview Controls Bar */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px', flexShrink: 0 }}>
                 {/* Filter Tabs */}
-                <div style={{ display: 'flex', gap: '4px', background: 'rgba(15, 23, 42, 0.8)', padding: '3px', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
+                <div style={{ display: 'flex', gap: '4px', background: 'var(--input-bg)', padding: '3px', borderRadius: '6px', border: '1px solid var(--panel-border)' }}>
                   <button
                     type="button"
                     onClick={() => { setPreviewFilter('all'); setPreviewPage(1); }}

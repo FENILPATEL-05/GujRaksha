@@ -112,7 +112,18 @@ export const MapView = ({
 
   // Police Command HUD & Tactical Dock State
   const [selectedDockCamera, setSelectedDockCamera] = useState(null);
-  const [mapLayerMode, setMapLayerMode] = useState('dark'); // 'dark', 'satellite', 'street'
+  const [mapLayerMode, setMapLayerMode] = useState(() => {
+    const saved = localStorage.getItem('gujraksha_map_layer');
+    if (saved) return saved;
+    return theme === 'dark' ? 'dark' : 'street';
+  });
+
+  useEffect(() => {
+    const isCustomized = localStorage.getItem('gujraksha_map_layer_customized');
+    if (!isCustomized) {
+      setMapLayerMode(theme === 'dark' ? 'dark' : 'street');
+    }
+  }, [theme]);
 
   const camerasRef = useRef(cameras);
   useEffect(() => {
@@ -971,9 +982,13 @@ export const MapView = ({
 
   const handleToggleMapLayer = () => {
     setMapLayerMode(prev => {
-      if (prev === 'dark') return 'satellite';
-      if (prev === 'satellite') return 'street';
-      return 'dark';
+      let next;
+      if (prev === 'street') next = 'satellite';
+      else if (prev === 'satellite') next = 'dark';
+      else next = 'street';
+      localStorage.setItem('gujraksha_map_layer', next);
+      localStorage.setItem('gujraksha_map_layer_customized', 'true');
+      return next;
     });
   };
 

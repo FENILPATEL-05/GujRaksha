@@ -284,19 +284,32 @@ try:
 except Exception as gpu_e:
     logger.info(f"ℹ️ [AI Engine] GPU ONNX not activated ({gpu_e}), activating optimized CPU pipeline...")
 
-# STEP 2: Fallback to LiteRT / OpenCV DNN
+# STEP 2: Fallback to CPU ONNX Runtime / LiteRT / OpenCV DNN
 if not gpu_loaded:
+    try:
+        if os.path.exists(det_onnx_path) and os.path.exists(ocr_onnx_path):
+            from anpr_worker import PlateDetectorONNX, PlateOCRONNX
+            real_plate_detector = PlateDetectorONNX(det_onnx_path)
+            real_plate_ocr = PlateOCRONNX(ocr_onnx_path)
+            active_backend_mode = "CPU (ONNX Runtime SIMD)"
+            logger.info("✅ [AI Engine] CPU ONNX Plate Recognition Models Activated")
+    except Exception as e:
+        logger.info(f"ONNX CPU load note: {e}")
+
+    if real_plate_detector is None:
+        try:
+            from anpr_tflite_scanner import PlateDetectorTFLite, PlateOCRTFLite
+            if os.path.exists(tflite_det_path):
+                real_plate_detector = PlateDetectorTFLite(tflite_det_path)
+            if os.path.exists(tflite_ocr_path):
+                real_plate_ocr = PlateOCRTFLite(tflite_ocr_path)
+            active_backend_mode = "CPU XNNPACK (LiteRT)"
+        except Exception as e:
+            logger.error(f"Failed to load CPU ANPR models: {e}")
+
     if detector is None:
         detector = OpenCVONNXDetector(obj_onnx_path if os.path.exists(obj_onnx_path) else None)
-    try:
-        from anpr_tflite_scanner import PlateDetectorTFLite, PlateOCRTFLite
-        if os.path.exists(tflite_det_path):
-            real_plate_detector = PlateDetectorTFLite(tflite_det_path)
-        if os.path.exists(tflite_ocr_path):
-            real_plate_ocr = PlateOCRTFLite(tflite_ocr_path)
-        active_backend_mode = "CPU XNNPACK (LiteRT)"
-    except Exception as e:
-        logger.error(f"Failed to load CPU ANPR models: {e}")
+
     current_ai_stats["backend_engine"] = active_backend_mode
     logger.info(f"✅ [AI Engine] Active Backend: {active_backend_mode}")
 
@@ -528,7 +541,7 @@ class AsyncAIStreamEngine:
 
             t0 = time.time()
             tracked = []
-            if enable_obj and detector is not None:
+            if detector is not None:
                 raw_dets = detector.detect(frame)
                 if raw_dets:
                     tracked = byte_tracker.update(raw_dets)
@@ -540,20 +553,19 @@ class AsyncAIStreamEngine:
                         vx1, vy1, vx2, vy2 = map(int, obj["box"])
                         vw, vh = vx2 - vx1, vy2 - vy1
                         tr_id = obj.get("track_id")
-                        if vw > 35 and vh > 35:
-                            px1 = max(0, int(vx1 + 0.20 * vw))
-                            px2 = min(w - 1, int(vx1 + 0.80 * vw))
-                            py1 = max(0, int(vy1 + 0.65 * vh))
-                            py2 = min(h - 1, int(vy1 + 0.90 * vh))
-
+                        if vw > 25 and vh > 25:
                             if tr_id is not None and tr_id in self.vehicle_plate_cache:
                                 p_txt, o_conf = self.vehicle_plate_cache[tr_id]
+                                px1 = max(0, int(vx1 + 0.15 * vw))
+                                px2 = min(w - 1, int(vx1 + 0.85 * vw))
+                                py1 = max(0, int(vy1 + 0.55 * vh))
+                                py2 = min(h - 1, int(vy1 + 0.95 * vh))
                                 p_boxes.append((px1, py1, px2, py2, p_txt, o_conf))
-                            elif real_plate_detector is not None and (frame_idx % 2 == 0):
+                            elif real_plate_detector is not None:
                                 v_crop = frame[max(0, vy1):min(h, vy2), max(0, vx1):min(w, vx2)]
                                 if v_crop.size > 0:
                                     try:
-                                        v_plates = real_plate_detector.detect(v_crop, conf_thresh=0.15, iou_thresh=0.45)
+                                        v_plates = real_plate_detector.detect(v_crop, conf_thresh=0.10, iou_thresh=0.45)
                                         for cpx1, cpy1, cpx2, cpy2, _ in v_plates:
                                             g_px1 = max(0, vx1 + cpx1)
                                             g_py1 = max(0, vy1 + cpy1)
@@ -580,6 +592,31 @@ class AsyncAIStreamEngine:
                                                 break
                                     except Exception:
                                         pass
+
+                # Direct plate detection fallback on frame
+                if not p_boxes and real_plate_detector is not None and (frame_idx % 2 == 0):
+                    try:
+                        f_plates = real_plate_detector.detect(frame, conf_thresh=0.10, iou_thresh=0.45)
+                        for fpx1, fpy1, fpx2, fpy2, _ in f_plates:
+                            p_txt, o_conf = "", 0.0
+                            if real_plate_ocr is not None:
+                                p_txt, o_conf = real_plate_ocr.recognize(frame, (fpx1, fpy1, fpx2, fpy2))
+                            clean_p = normalize_ocr_text(p_txt) if p_txt else ""
+                            if clean_p and len(clean_p) >= 4:
+                                p_boxes.append((fpx1, fpy1, fpx2, fpy2, clean_p, o_conf))
+                                if self.is_anpr_camera:
+                                    crop = frame[max(0, fpy1-20):min(h, fpy2+20), max(0, fpx1-20):min(w, fpx2+20)]
+                                    anpr_metadata_queue.submit(
+                                        camera_id=self.camera_id,
+                                        camera_code=self.camera_code,
+                                        plate_text=clean_p,
+                                        ocr_conf=o_conf,
+                                        vehicle_crop=crop if crop.size > 0 else None,
+                                        vehicle_type="Vehicle"
+                                    )
+                                break
+                    except Exception:
+                        pass
 
             infer_ms = (time.time() - t0) * 1000.0
 
@@ -862,25 +899,34 @@ class AIStreamRequestHandler(BaseHTTPRequestHandler):
             try:
                 data = json.loads(body)
                 src_key = str(data.get("source", "0"))
-                if src_key not in STREAM_DYNAMIC_CONTROLS:
-                    STREAM_DYNAMIC_CONTROLS[src_key] = {}
+                keys_to_update = [src_key]
+                if "camera_code" in data:
+                    keys_to_update.append(str(data["camera_code"]))
+                if "camera_id" in data:
+                    keys_to_update.append(str(data["camera_id"]))
+                
+                # Propagate to all active stream keys for instant response
+                keys_to_update = list(set(keys_to_update + list(STREAM_DYNAMIC_CONTROLS.keys())))
 
-                if "detect_objects" in data:
-                    STREAM_DYNAMIC_CONTROLS[src_key]["objects"] = bool(data["detect_objects"])
-                if "detect_plates" in data:
-                    STREAM_DYNAMIC_CONTROLS[src_key]["plates"] = bool(data["detect_plates"])
-                if "trails" in data:
-                    STREAM_DYNAMIC_CONTROLS[src_key]["trails"] = bool(data["trails"])
-                if "classes" in data and isinstance(data["classes"], dict):
-                    STREAM_DYNAMIC_CONTROLS[src_key]["classes"] = {
-                        k: bool(v) for k, v in data["classes"].items()
-                    }
+                for k in keys_to_update:
+                    if k not in STREAM_DYNAMIC_CONTROLS:
+                        STREAM_DYNAMIC_CONTROLS[k] = {}
+                    if "detect_objects" in data:
+                        STREAM_DYNAMIC_CONTROLS[k]["objects"] = bool(data["detect_objects"])
+                    if "detect_plates" in data:
+                        STREAM_DYNAMIC_CONTROLS[k]["plates"] = bool(data["detect_plates"])
+                    if "trails" in data:
+                        STREAM_DYNAMIC_CONTROLS[k]["trails"] = bool(data["trails"])
+                    if "classes" in data and isinstance(data["classes"], dict):
+                        STREAM_DYNAMIC_CONTROLS[k]["classes"] = {
+                            cls_k: bool(v) for cls_k, v in data["classes"].items()
+                        }
 
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
-                self.wfile.write(json.dumps({"success": True, "controls": STREAM_DYNAMIC_CONTROLS[src_key]}).encode('utf-8'))
+                self.wfile.write(json.dumps({"success": True, "controls": STREAM_DYNAMIC_CONTROLS.get(src_key, {})}).encode('utf-8'))
                 return
             except Exception as e:
                 self.send_response(400)

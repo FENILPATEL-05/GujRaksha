@@ -273,10 +273,13 @@ class PlateDetectorONNX:
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name
         
-        active_provider = self.session.get_providers()[0]
-        if "CUDA" not in active_provider and "TensorRT" not in active_provider:
-            raise RuntimeError(f"ONNX session loaded on CPU ({active_provider}). CPU execution requires TFLite engine.")
-        self.accel_mode = "GPU (NVIDIA CUDA)" if "CUDA" in active_provider else "GPU (TensorRT)"
+        active_provider = self.session.get_providers()[0] if self.session.get_providers() else "CPUExecutionProvider"
+        if "CUDA" in active_provider:
+            self.accel_mode = "GPU (NVIDIA CUDA)"
+        elif "TensorRT" in active_provider:
+            self.accel_mode = "GPU (TensorRT)"
+        else:
+            self.accel_mode = "CPU (ONNX Runtime)"
 
     def preprocess(self, img: np.ndarray):
         h, w = img.shape[:2]
@@ -346,10 +349,13 @@ class PlateOCRONNX:
         self.session = ort.InferenceSession(model_path, sess_options=sess_opts, providers=valid_providers)
         self.input_name = self.session.get_inputs()[0].name
         
-        active_provider = self.session.get_providers()[0]
-        if "CUDA" not in active_provider and "TensorRT" not in active_provider:
-            raise RuntimeError(f"ONNX session loaded on CPU ({active_provider}). CPU execution requires TFLite engine.")
-        self.accel_mode = "GPU (NVIDIA CUDA)" if "CUDA" in active_provider else "GPU (TensorRT)"
+        active_provider = self.session.get_providers()[0] if self.session.get_providers() else "CPUExecutionProvider"
+        if "CUDA" in active_provider:
+            self.accel_mode = "GPU (NVIDIA CUDA)"
+        elif "TensorRT" in active_provider:
+            self.accel_mode = "GPU (TensorRT)"
+        else:
+            self.accel_mode = "CPU (ONNX Runtime)"
 
     def recognize(self, img: np.ndarray, bbox: tuple = None):
         if bbox:
