@@ -20,13 +20,15 @@ services:
       - DB_NAME=gujraksha
       - DB_USER=postgres
       - DB_PASSWORD=postgres
+      - AI_STREAM_HOST=ai-stream-service
+      - AI_STREAM_PORT=8090
     depends_on:
       - postgres
     networks:
       - gujraksha-net
 
   # ============================================================================
-  # 2. Distributed AI Edge Worker (Python ANPR & Bounding Box Engine)
+  # 2. Distributed AI Edge Worker (Python ANPR Engine)
   # ============================================================================
   ai-edge-worker:
     build:
@@ -42,7 +44,25 @@ services:
       - MAX_CAPACITY=100
     depends_on:
       - central-platform
-      - triton
+    networks:
+      - gujraksha-net
+
+  # ============================================================================
+  # 2.1 Live AI Vision Streaming & Forensic Scanner Service (Port 8090)
+  # ============================================================================
+  ai-stream-service:
+    build:
+      context: ./3_ANPR_EDGE_WORKER
+      dockerfile: Dockerfile
+    container_name: gujraksha_ai_stream
+    restart: unless-stopped
+    command: ["python3", "ai_stream_service.py", "--port", "8090"]
+    ports:
+      - "8090:8090"
+    environment:
+      - CENTRAL_URL=http://central-platform:3000/api/v1
+    depends_on:
+      - central-platform
     networks:
       - gujraksha-net
 
