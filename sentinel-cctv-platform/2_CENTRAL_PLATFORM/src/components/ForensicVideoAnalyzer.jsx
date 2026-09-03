@@ -303,17 +303,41 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
     drawOverlayForTime(cur);
   };
 
-  // Draw Bounding Boxes on Overlay Canvas
+  // Draw Bounding Boxes on Overlay Canvas (Aspect-Ratio Aware)
   const drawOverlayForTime = useCallback((timeSec) => {
     const canvas = overlayCanvasRef.current;
-    if (!canvas) return;
+    const video = videoRef.current;
+    if (!canvas || !video) return;
     const ctx = canvas.getContext("2d");
     const parent = canvas.parentElement;
     if (!parent) return;
 
-    canvas.width = parent.clientWidth || 640;
-    canvas.height = parent.clientHeight || 360;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const canvasW = parent.clientWidth || 640;
+    const canvasH = parent.clientHeight || 360;
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    ctx.clearRect(0, 0, canvasW, canvasH);
+
+    // Calculate actual active video rendering area (accounting for object-fit: contain letterboxing)
+    const vidW = video.videoWidth || 16;
+    const vidH = video.videoHeight || 9;
+    const vidRatio = vidW / vidH;
+    const canvasRatio = canvasW / canvasH;
+
+    let renderW, renderH, offsetX, offsetY;
+    if (canvasRatio > vidRatio) {
+      // Black bars on Left & Right
+      renderH = canvasH;
+      renderW = canvasH * vidRatio;
+      offsetX = (canvasW - renderW) / 2;
+      offsetY = 0;
+    } else {
+      // Black bars on Top & Bottom
+      renderW = canvasW;
+      renderH = canvasW / vidRatio;
+      offsetX = 0;
+      offsetY = (canvasH - renderH) / 2;
+    }
 
     // Find active detections in the +/- 0.6s window of currentTime
     const activeDets = detections.filter(d => Math.abs(d.time - timeSec) <= 0.6);
@@ -326,14 +350,16 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
     listToDraw.forEach(det => {
       const isSelected = selectedDetection && selectedDetection.id === det.id;
       const [bx, by, bw, bh] = det.box || [0.2, 0.2, 0.4, 0.4];
-      const x = bx * canvas.width;
-      const y = by * canvas.height;
-      const w = Math.max(20, bw * canvas.width);
-      const h = Math.max(20, bh * canvas.height);
+      
+      // Map normalized coordinates exactly to active video rectangle
+      const x = offsetX + (bx * renderW);
+      const y = offsetY + (by * renderH);
+      const w = Math.max(16, bw * renderW);
+      const h = Math.max(16, bh * renderH);
 
-      let color = "#38bdf8"; // Blue for vehicles/objects
+      let color = "#38bdf8"; // Cyan/Blue for vehicles/objects
       if (det.isWatchlist) color = "#ef4444"; // Red for Watchlist
-      else if (det.type === "PLATE") color = "#eab308"; // Yellow for Plates
+      else if (det.type === "PLATE") color = "#eab308"; // Bright Yellow for Plates
       else if (det.type === "PERSON") color = "#06b6d4"; // Cyan for Persons
 
       ctx.save();
@@ -362,7 +388,7 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
       ctx.font = "bold 11.5px monospace";
       const txtWidth = ctx.measureText(labelText).width;
       const tagH = 20;
-      const tagY = Math.max(0, y - tagH - 4);
+      const tagY = Math.max(offsetY, y - tagH - 4);
 
       ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
       ctx.fillRect(x, tagY, txtWidth + 14, tagH);
@@ -378,7 +404,7 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
       if (isSelected) {
         ctx.fillStyle = "#fff";
         ctx.font = "10px monospace";
-        ctx.fillText(`⏱️ ${det.timeFormatted}`, x, y + h + 15);
+        ctx.fillText(`⏱️ ${det.timeFormatted}`, x, Math.min(canvasH - 6, y + h + 15));
       }
 
       ctx.restore();

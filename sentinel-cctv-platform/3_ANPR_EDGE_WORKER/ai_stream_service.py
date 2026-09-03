@@ -583,25 +583,26 @@ class AsyncAIStreamEngine:
 
             p_boxes = []
             if enable_plt:
+                # 1. First detect within tracked vehicle bounding boxes
                 for obj in tracked:
                     if obj["label"] in ["car", "bus", "truck", "motorcycle"]:
                         vx1, vy1, vx2, vy2 = map(int, obj["box"])
                         vw, vh = vx2 - vx1, vy2 - vy1
                         tr_id = obj.get("track_id")
-                        if vw > 25 and vh > 25:
+                        if vw > 20 and vh > 20:
                             if tr_id is not None and tr_id in self.vehicle_plate_cache:
                                 p_txt, o_conf = self.vehicle_plate_cache[tr_id]
                                 px1 = max(0, int(vx1 + 0.15 * vw))
                                 px2 = min(w - 1, int(vx1 + 0.85 * vw))
-                                py1 = max(0, int(vy1 + 0.55 * vh))
+                                py1 = max(0, int(vy1 + 0.50 * vh))
                                 py2 = min(h - 1, int(vy1 + 0.95 * vh))
                                 p_boxes.append((px1, py1, px2, py2, p_txt, o_conf))
                             elif real_plate_detector is not None:
                                 v_crop = frame[max(0, vy1):min(h, vy2), max(0, vx1):min(w, vx2)]
                                 if v_crop.size > 0:
                                     try:
-                                        v_plates = real_plate_detector.detect(v_crop, conf_thresh=0.10, iou_thresh=0.45)
-                                        for cpx1, cpy1, cpx2, cpy2, _ in v_plates:
+                                        v_plates = real_plate_detector.detect(v_crop, conf_thresh=0.08, iou_thresh=0.45)
+                                        for cpx1, cpy1, cpx2, cpy2, p_sc in v_plates:
                                             g_px1 = max(0, vx1 + cpx1)
                                             g_py1 = max(0, vy1 + cpy1)
                                             g_px2 = min(w - 1, vx1 + cpx2)
@@ -614,7 +615,6 @@ class AsyncAIStreamEngine:
                                                 if tr_id is not None:
                                                     self.vehicle_plate_cache[tr_id] = (clean_p, o_conf)
                                                 p_boxes.append((g_px1, g_py1, g_px2, g_py2, clean_p, o_conf))
-                                                # PERSIST SNAPSHOT & DB INDEX ONLY FOR ANPR-ENABLED CAMERAS
                                                 if self.is_anpr_camera:
                                                     anpr_metadata_queue.submit(
                                                         camera_id=self.camera_id,
@@ -628,11 +628,15 @@ class AsyncAIStreamEngine:
                                     except Exception:
                                         pass
 
-                # Direct plate detection fallback on frame
-                if not p_boxes and real_plate_detector is not None and (frame_idx % 2 == 0):
+                # 2. Direct full-frame plate detection fallback
+                if real_plate_detector is not None:
                     try:
-                        f_plates = real_plate_detector.detect(frame, conf_thresh=0.10, iou_thresh=0.45)
-                        for fpx1, fpy1, fpx2, fpy2, _ in f_plates:
+                        f_plates = real_plate_detector.detect(frame, conf_thresh=0.08, iou_thresh=0.45)
+                        for fpx1, fpy1, fpx2, fpy2, p_sc in f_plates:
+                            # Avoid duplicates if already found in vehicle box
+                            already_found = any(abs(fpx1 - px[0]) < 30 and abs(fpy1 - px[1]) < 30 for px in p_boxes)
+                            if already_found:
+                                continue
                             p_txt, o_conf = "", 0.0
                             if real_plate_ocr is not None:
                                 p_txt, o_conf = real_plate_ocr.recognize(frame, (fpx1, fpy1, fpx2, fpy2))
@@ -649,7 +653,6 @@ class AsyncAIStreamEngine:
                                         vehicle_crop=crop if crop.size > 0 else None,
                                         vehicle_type="Vehicle"
                                     )
-                                break
                     except Exception:
                         pass
 
@@ -832,6 +835,9 @@ def generate_frames(
 
                     cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), box_color, 2)
                     label = f"{cls_name.upper()}" + (f" #{track_id}" if track_id is not None else "")
+                    if track_id is not None and track_id in engine.vehicle_plate_cache:
+                        cached_p, _ = engine.vehicle_plate_cache[track_id]
+                        label += f" | {cached_p}"
                     if is_loitering:
                         label += f" [LOITERING {dwell_time:.0f}s]"
                     elif is_inside_zone:
@@ -843,17 +849,30 @@ def generate_frames(
                     cv2.putText(annotated_frame, label, (x1 + 5, max(y1 - 7, 18)),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 2)
 
-            # Draw Plate Bounding Boxes & Text Tags
+            # Draw Plate Bounding Boxes & Text Tags (High Visibility HUD)
             if cur_enable_plates and plate_boxes:
                 frame_counts["plates"] = len(plate_boxes)
                 for px1, py1, px2, py2, clean_p, ocr_conf in plate_boxes:
-                    cv2.rectangle(annotated_frame, (px1, py1), (px2, py2), (0, 230, 255), 2)
+                    p_color = (0, 215, 255) # Bright Yellow / Gold for Plates
+                    cv2.rectangle(annotated_frame, (px1, py1), (px2, py2), p_color, 2)
+
+                    # Corner Brackets
+                    cl = max(4, min(10, (px2 - px1) // 3, (py2 - py1) // 3))
+                    cv2.line(annotated_frame, (px1, py1), (px1 + cl, py1), (0, 255, 255), 2)
+                    cv2.line(annotated_frame, (px1, py1), (px1, py1 + cl), (0, 255, 255), 2)
+                    cv2.line(annotated_frame, (px2, py1), (px2 - cl, py1), (0, 255, 255), 2)
+                    cv2.line(annotated_frame, (px2, py1), (px2, py1 + cl), (0, 255, 255), 2)
+                    cv2.line(annotated_frame, (px1, py2), (px1 + cl, py2), (0, 255, 255), 2)
+                    cv2.line(annotated_frame, (px1, py2), (px1, py2 - cl), (0, 255, 255), 2)
+                    cv2.line(annotated_frame, (px2, py2), (px2 - cl, py2), (0, 255, 255), 2)
+                    cv2.line(annotated_frame, (px2, py2), (px2, py2 - cl), (0, 255, 255), 2)
+
                     p_label = f"PLATE: {clean_p}"
                     (pw, ph), _ = cv2.getTextSize(p_label, cv2.FONT_HERSHEY_SIMPLEX, 0.52, 2)
                     cv2.rectangle(annotated_frame, (px1, max(py1 - 24, 0)), (px1 + pw + 10, max(py1, 24)), (15, 23, 42), -1)
-                    cv2.rectangle(annotated_frame, (px1, max(py1 - 24, 0)), (px1 + pw + 10, max(py1, 24)), (0, 230, 255), 1)
+                    cv2.rectangle(annotated_frame, (px1, max(py1 - 24, 0)), (px1 + pw + 10, max(py1, 24)), p_color, 1)
                     cv2.putText(annotated_frame, p_label, (px1 + 5, max(py1 - 7, 18)),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 2)
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.52, (0, 255, 255), 2)
 
             # Intrusion Zone Label
             if intrusion_zone:
