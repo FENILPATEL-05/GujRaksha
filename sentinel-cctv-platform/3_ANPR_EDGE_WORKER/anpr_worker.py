@@ -257,29 +257,46 @@ def create_accelerated_interpreter(model_path: str, num_threads: int = None):
 # ==============================================================================
 
 class PlateDetectorONNX:
-    """YOLOv9 License Plate Detector using ONNX Runtime (CUDA / TensorRT GPU)."""
+def safe_create_ort_session(model_path: str, input_size: int = 640):
+    """Initializes ONNX InferenceSession with verified GPU acceleration or automatic CPU fallback."""
+    if not HAS_ONNXRUNTIME:
+        raise RuntimeError("onnxruntime is not installed.")
+    import onnxruntime as ort
+    sess_opts = ort.SessionOptions()
+    sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    sess_opts.log_severity_level = 3
+    sess_opts.intra_op_num_threads = min(8, max(2, os.cpu_count() or 4))
+
+    avail = get_ort_providers()
+    gpu_providers = [p for p in ['CUDAExecutionProvider', 'TensorRTExecutionProvider'] if p in avail]
+
+    if gpu_providers:
+        try:
+            sess = ort.InferenceSession(model_path, sess_options=sess_opts, providers=gpu_providers + ['CPUExecutionProvider'])
+            # Test dry-run inference to catch cuBLAS / CUDA driver mismatch early
+            input_meta = sess.get_inputs()[0]
+            in_shape = [dim if isinstance(dim, int) and dim > 0 else 1 for dim in input_meta.shape]
+            if len(in_shape) == 4:
+                in_shape[2] = input_size
+                in_shape[3] = input_size
+            dummy_in = np.zeros(in_shape, dtype=np.float32)
+            sess.run(None, {input_meta.name: dummy_in})
+            return sess, "GPU (NVIDIA CUDA)"
+        except Exception as e:
+            logger.info(f"ℹ️ [ONNX Worker] GPU cuBLAS not ready ({e}), activating optimized CPU provider...")
+
+    # Reliable CPU SIMD Provider
+    sess = ort.InferenceSession(model_path, sess_options=sess_opts, providers=['CPUExecutionProvider'])
+    return sess, "CPU (ONNX SIMD)"
+
+
+class PlateDetectorONNX:
+    """YOLOv9 License Plate Detector using ONNX Runtime (CUDA / TensorRT GPU with CPU Fallback)."""
     def __init__(self, model_path: str):
-        if not HAS_ONNXRUNTIME:
-            raise RuntimeError("onnxruntime is not installed.")
-        
-        providers = ['CUDAExecutionProvider', 'TensorRTExecutionProvider', 'CPUExecutionProvider']
-        avail = get_ort_providers()
-        valid_providers = [p for p in providers if p in avail] if avail else providers
-        
-        sess_opts = ort.SessionOptions()
-        sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        sess_opts.log_severity_level = 3
-        self.session = ort.InferenceSession(model_path, sess_options=sess_opts, providers=valid_providers)
+        self.model_path = model_path
+        self.session, self.accel_mode = safe_create_ort_session(model_path, DET_SIZE)
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name
-        
-        active_provider = self.session.get_providers()[0] if self.session.get_providers() else "CPUExecutionProvider"
-        if "CUDA" in active_provider:
-            self.accel_mode = "GPU (NVIDIA CUDA)"
-        elif "TensorRT" in active_provider:
-            self.accel_mode = "GPU (TensorRT)"
-        else:
-            self.accel_mode = "CPU (ONNX Runtime)"
 
     def preprocess(self, img: np.ndarray):
         h, w = img.shape[:2]
@@ -300,7 +317,20 @@ class PlateDetectorONNX:
 
     def detect(self, img: np.ndarray, conf_thresh: float = 0.20, iou_thresh: float = 0.45):
         blob, scale, (pad_w, pad_h) = self.preprocess(img)
-        outputs = self.session.run([self.output_name], {self.input_name: blob})
+        try:
+            outputs = self.session.run([self.output_name], {self.input_name: blob})
+        except Exception as run_err:
+            if "cublas" in str(run_err).lower() or "cuda" in str(run_err).lower():
+                logger.warning(f"CUDA plate detect runtime error ({run_err}). Recovering on CPU...")
+                import onnxruntime as ort
+                sess_opts = ort.SessionOptions()
+                sess_opts.intra_op_num_threads = min(8, max(2, os.cpu_count() or 4))
+                self.session = ort.InferenceSession(self.model_path, sess_options=sess_opts, providers=['CPUExecutionProvider'])
+                self.accel_mode = "CPU (ONNX Fallback)"
+                outputs = self.session.run([self.output_name], {self.input_name: blob})
+            else:
+                return []
+
         preds = outputs[0][0].T
         mask = preds[:, 4] >= conf_thresh
         filtered = preds[mask]
@@ -325,7 +355,7 @@ class PlateDetectorONNX:
         indices = cv2.dnn.NMSBoxes(boxes, scores, conf_thresh, iou_thresh)
         detections = []
         if len(indices) > 0:
-            for idx in indices.flatten():
+            for idx in (indices.flatten() if hasattr(indices, 'flatten') else indices):
                 bx, by, bw_b, bh_b = boxes[idx]
                 detections.append((
                     int(bx), int(by), int(bx + bw_b), int(by + bh_b), float(scores[idx])
@@ -334,28 +364,11 @@ class PlateDetectorONNX:
 
 
 class PlateOCRONNX:
-    """CCT Transformer OCR Recognizer using ONNX Runtime (CUDA / TensorRT GPU)."""
+    """CCT Transformer OCR Recognizer using ONNX Runtime (CUDA / TensorRT GPU with CPU Fallback)."""
     def __init__(self, model_path: str):
-        if not HAS_ONNXRUNTIME:
-            raise RuntimeError("onnxruntime is not installed.")
-        
-        providers = ['CUDAExecutionProvider', 'TensorRTExecutionProvider', 'CPUExecutionProvider']
-        avail = get_ort_providers()
-        valid_providers = [p for p in providers if p in avail] if avail else providers
-        
-        sess_opts = ort.SessionOptions()
-        sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        sess_opts.log_severity_level = 3
-        self.session = ort.InferenceSession(model_path, sess_options=sess_opts, providers=valid_providers)
+        self.model_path = model_path
+        self.session, self.accel_mode = safe_create_ort_session(model_path, OCR_W)
         self.input_name = self.session.get_inputs()[0].name
-        
-        active_provider = self.session.get_providers()[0] if self.session.get_providers() else "CPUExecutionProvider"
-        if "CUDA" in active_provider:
-            self.accel_mode = "GPU (NVIDIA CUDA)"
-        elif "TensorRT" in active_provider:
-            self.accel_mode = "GPU (TensorRT)"
-        else:
-            self.accel_mode = "CPU (ONNX Runtime)"
 
     def recognize(self, img: np.ndarray, bbox: tuple = None):
         if bbox:
@@ -381,7 +394,20 @@ class PlateOCRONNX:
             crop_resized = cv2.cvtColor(crop_resized, cv2.COLOR_BGR2RGB)
 
         batch = crop_resized[np.newaxis, :].astype(np.float32)
-        outputs = self.session.run(None, {self.input_name: batch})
+        try:
+            outputs = self.session.run(None, {self.input_name: batch})
+        except Exception as run_err:
+            if "cublas" in str(run_err).lower() or "cuda" in str(run_err).lower():
+                logger.warning(f"CUDA OCR runtime error ({run_err}). Recovering on CPU...")
+                import onnxruntime as ort
+                sess_opts = ort.SessionOptions()
+                sess_opts.intra_op_num_threads = min(8, max(2, os.cpu_count() or 4))
+                self.session = ort.InferenceSession(self.model_path, sess_options=sess_opts, providers=['CPUExecutionProvider'])
+                self.accel_mode = "CPU (ONNX Fallback)"
+                outputs = self.session.run(None, {self.input_name: batch})
+            else:
+                return "", 0.0
+
         plate_out = outputs[-1] if len(outputs) > 0 else outputs[0]
         chars = plate_out[0]
         indices = np.argmax(chars, axis=1)
@@ -394,26 +420,13 @@ class PlateOCRONNX:
 
 
 class ObjectDetectorONNX:
-    """YOLO Object & Vehicle Detector using ONNX Runtime (CUDA / TensorRT GPU)."""
+    """YOLO Object & Vehicle Detector using ONNX Runtime (CUDA / TensorRT GPU with CPU Fallback)."""
     def __init__(self, model_path: str):
-        if not HAS_ONNXRUNTIME:
-            raise RuntimeError("onnxruntime is not installed.")
-        providers = ['CUDAExecutionProvider', 'TensorRTExecutionProvider', 'CPUExecutionProvider']
-        avail = get_ort_providers()
-        valid_providers = [p for p in providers if p in avail] if avail else providers
-        sess_opts = ort.SessionOptions()
-        sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        sess_opts.log_severity_level = 3
-        self.session = ort.InferenceSession(model_path, sess_options=sess_opts, providers=valid_providers)
+        self.model_path = model_path
+        self.input_size = 640
+        self.session, self.accel_mode = safe_create_ort_session(model_path, self.input_size)
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name
-        self.input_shape = self.session.get_inputs()[0].shape
-        self.input_size = 640 if (len(self.input_shape) >= 3 and self.input_shape[2] in [640, '640']) else 320
-        
-        active_provider = self.session.get_providers()[0]
-        if "CUDA" not in active_provider and "TensorRT" not in active_provider:
-            raise RuntimeError(f"ONNX session loaded on CPU ({active_provider}). CPU execution requires TFLite engine.")
-        self.accel_mode = "GPU (NVIDIA CUDA)" if "CUDA" in active_provider else "GPU (TensorRT)"
 
     def preprocess(self, img: np.ndarray):
         h, w = img.shape[:2]
@@ -434,7 +447,20 @@ class ObjectDetectorONNX:
             return []
         h, w = img.shape[:2]
         blob, scale, (pad_w, pad_h) = self.preprocess(img)
-        outputs = self.session.run([self.output_name], {self.input_name: blob})
+        try:
+            outputs = self.session.run([self.output_name], {self.input_name: blob})
+        except Exception as run_err:
+            if "cublas" in str(run_err).lower() or "cuda" in str(run_err).lower():
+                logger.warning(f"CUDA ObjectDetector runtime error ({run_err}). Recovering on CPU...")
+                import onnxruntime as ort
+                sess_opts = ort.SessionOptions()
+                sess_opts.intra_op_num_threads = min(8, max(2, os.cpu_count() or 4))
+                self.session = ort.InferenceSession(self.model_path, sess_options=sess_opts, providers=['CPUExecutionProvider'])
+                self.accel_mode = "CPU (ONNX Fallback)"
+                outputs = self.session.run([self.output_name], {self.input_name: blob})
+            else:
+                return []
+
         raw = outputs[0][0]
         preds = raw.T if raw.shape[0] < raw.shape[1] else raw
         if len(preds) == 0:
