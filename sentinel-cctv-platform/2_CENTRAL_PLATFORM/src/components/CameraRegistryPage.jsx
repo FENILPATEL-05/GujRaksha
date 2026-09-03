@@ -1078,7 +1078,7 @@ export const CameraRegistryPage = ({
                       const currentHost = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
                       let raw = selectedCameraForDetails.whep_url || (selectedCameraForDetails.urls && selectedCameraForDetails.urls.whep) || (selectedCameraForDetails.stream_url && selectedCameraForDetails.stream_url.includes(':8889/') ? selectedCameraForDetails.stream_url : `http://${currentHost}:8889/stream/${String(selectedCameraForDetails.number || (selectedCameraForDetails.id || '').replace('gov-feed-', '').replace('cam-', '') || '1')}/whep`);
                       if (currentHost && currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
-                        raw = raw.replace('localhost', currentHost).replace('127.0.0.1', currentHost);
+                        raw = raw.split('localhost').join(currentHost).split('127.0.0.1').join(currentHost);
                       }
                       return raw;
                     })()}
@@ -1090,7 +1090,14 @@ export const CameraRegistryPage = ({
                     Primary RTSP Backend Stream URL
                   </div>
                   <div style={{ fontSize: '11.5px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>
-                    {selectedCameraForDetails.rtsp_url || (selectedCameraForDetails.urls && selectedCameraForDetails.urls.rtsp) || selectedCameraForDetails.stream_url || 'N/A'}
+                    {(() => {
+                      const currentHost = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+                      let rawRtsp = selectedCameraForDetails.rtsp_url || (selectedCameraForDetails.urls && selectedCameraForDetails.urls.rtsp) || selectedCameraForDetails.stream_url || 'N/A';
+                      if (currentHost && currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+                        rawRtsp = rawRtsp.split('localhost').join(currentHost).split('127.0.0.1').join(currentHost);
+                      }
+                      return rawRtsp;
+                    })()}
                   </div>
                 </div>
               </div>

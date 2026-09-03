@@ -68,12 +68,26 @@ const mountApiEndpoints = (prefix = '') => {
     try {
       const result = cameraService.getCameras({});
       const list = result.cameras || [];
-      const host = req.hostname || 'localhost';
+      const hostHeader = req.headers.host ? req.headers.host.split(':')[0] : '';
+      const host = (hostHeader && hostHeader !== 'localhost' && hostHeader !== '127.0.0.1') ? hostHeader : (req.hostname || 'localhost');
+      
+      const fixHost = (str) => {
+        if (!str || typeof str !== 'string') return str;
+        if (host && host !== 'localhost' && host !== '127.0.0.1') {
+          return str.split('localhost').join(host).split('127.0.0.1').join(host);
+        }
+        return str;
+      };
+
       res.json({
         success: true,
         total_cameras: list.length,
         cameras: list.map(c => {
           const cleanId = (c.id || '').replace('gov-feed-', '');
+          const rtsp = fixHost(c.rtsp_url || (c.urls && c.urls.rtsp) || c.stream_url) || `rtsp://${host}:8554/stream/${cleanId}`;
+          const whep = fixHost(c.whep_url || (c.urls && c.urls.whep)) || `http://${host}:8889/stream/${cleanId}/whep`;
+          const hls = fixHost(c.hls_url || (c.urls && c.urls.hls)) || `http://${host}:8888/stream/${cleanId}/index.m3u8`;
+
           return {
             id: c.id,
             camera_code: c.camera_code,
@@ -94,15 +108,15 @@ const mountApiEndpoints = (prefix = '') => {
               fps: 30,
               codec: c.codec || 'H.264'
             },
-            urls: c.urls || {
-              rtsp: `rtsp://${host}:8554/stream/${cleanId}`,
-              whep: `http://${host}:8889/stream/${cleanId}/whep`,
-              hls: `http://${host}/live/stream/${cleanId}/index.m3u8`
+            urls: {
+              rtsp: rtsp,
+              whep: whep,
+              hls: hls
             },
-            rtsp_url: c.rtsp_url || `rtsp://${host}:8554/stream/${cleanId}`,
-            whep_url: c.whep_url || `http://${host}:8889/stream/${cleanId}/whep`,
-            hls_url: c.hls_url || `http://${host}/live/stream/${cleanId}/index.m3u8`,
-            stream_url: c.stream_url || `rtsp://${host}:8554/stream/${cleanId}`
+            rtsp_url: rtsp,
+            whep_url: whep,
+            hls_url: hls,
+            stream_url: rtsp
           };
         })
       });

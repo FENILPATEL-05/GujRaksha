@@ -82,13 +82,34 @@ class CameraDataStore {
     }
   }
 
+  sortCamerasList(list, sortOrder = 'asc', sortBy = 'id') {
+    if (!Array.isArray(list) || list.length === 0) return list;
+    const isAsc = String(sortOrder || 'asc').toLowerCase() !== 'desc';
+    const key = sortBy || 'id';
+    return [...list].sort((a, b) => {
+      let valA = a[key] !== undefined ? a[key] : (a.id || a.camera_code || '');
+      let valB = b[key] !== undefined ? b[key] : (b.id || b.camera_code || '');
+
+      const numA = parseInt(String(valA).replace(/[^0-9]/g, ''), 10);
+      const numB = parseInt(String(valB).replace(/[^0-9]/g, ''), 10);
+
+      if (!isNaN(numA) && !isNaN(numB) && numA !== numB) {
+        return isAsc ? numA - numB : numB - numA;
+      }
+
+      const strA = String(valA);
+      const strB = String(valB);
+      return isAsc ? strA.localeCompare(strB, undefined, { numeric: true, sensitivity: 'base' }) : strB.localeCompare(strA, undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }
+
   loadFromFile() {
     try {
       if (fs.existsSync(CAMERAS_FILE)) {
         const raw = fs.readFileSync(CAMERAS_FILE, 'utf8');
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          return parsed;
+          return this.sortCamerasList(parsed, 'asc');
         }
       }
     } catch (e) {
@@ -96,8 +117,9 @@ class CameraDataStore {
     }
     
     // First run fallback: seed default cameras and persist to disk
-    this.saveToFile([...initialCameras]);
-    return [...initialCameras];
+    const sortedSeeds = this.sortCamerasList([...initialCameras], 'asc');
+    this.saveToFile(sortedSeeds);
+    return sortedSeeds;
   }
 
   saveToFile(data = this.cameras) {
@@ -114,9 +136,9 @@ class CameraDataStore {
   async loadFromDatabase() {
     try {
       if (pgClient.isConnected()) {
-        const res = await pgClient.query('SELECT * FROM cameras ORDER BY created_at DESC');
+        const res = await pgClient.query('SELECT * FROM cameras');
         if (res && res.rows && res.rows.length > 0) {
-          this.cameras = res.rows.map(r => ({
+          const loaded = res.rows.map(r => ({
             ...r,
             latitude: parseFloat(r.latitude),
             longitude: parseFloat(r.longitude),
@@ -124,6 +146,7 @@ class CameraDataStore {
             stream_properties: typeof r.stream_properties === 'string' ? JSON.parse(r.stream_properties) : (r.stream_properties || {}),
             urls: typeof r.urls === 'string' ? JSON.parse(r.urls) : (r.urls || {})
           }));
+          this.cameras = this.sortCamerasList(loaded, 'asc');
           this.rebuildIndexes();
           this.saveToFile(this.cameras);
         } else if (this.cameras.length > 0) {

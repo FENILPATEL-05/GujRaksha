@@ -1286,28 +1286,30 @@ class CameraWorkerThread(threading.Thread):
                             time_str = time.strftime('%H:%M:%S')
                             watchlist_hit = self.watchlist_mgr.is_target_hit(cleaned_text)
 
+                            payload = {
+                                "vehicle_plate": cleaned_text,
+                                "camera_code": self.camera_code,
+                                "camera_id": self.camera_id,
+                                "confidence": round(ocr_conf * 100.0, 1),
+                                "timestamp": time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                                "is_watchlist_hit": bool(watchlist_hit)
+                            }
+                            try:
+                                data_bytes = json.dumps(payload).encode('utf-8')
+                                req = urllib.request.Request(
+                                    f"{self.central_url}/anpr/ingest",
+                                    data=data_bytes,
+                                    headers={"Content-Type": "application/json"},
+                                    method="POST"
+                                )
+                                with urllib.request.urlopen(req, timeout=3.0) as resp:
+                                    pass
+                            except Exception:
+                                pass
+
                             if watchlist_hit:
                                 category = watchlist_hit.get("category", "STOLEN_VEHICLE") if isinstance(watchlist_hit, dict) else "HOTLIST"
                                 print(f"\n\x1b[41m\x1b[1m\x1b[37m 🚨 [WATCHLIST HIT] \x1b[0m \x1b[31m\x1b[1m{cleaned_text}\x1b[0m on camera \x1b[33m[{self.camera_code}]\x1b[0m at \x1b[36m{time_str}\x1b[0m ({category})", flush=True)
-                                payload = {
-                                    "vehicle_plate": cleaned_text,
-                                    "camera_code": self.camera_code,
-                                    "camera_id": self.camera_id,
-                                    "confidence": round(ocr_conf * 100.0, 1),
-                                    "timestamp": time.strftime('%Y-%m-%dT%H:%M:%SZ')
-                                }
-                                try:
-                                    data_bytes = json.dumps(payload).encode('utf-8')
-                                    req = urllib.request.Request(
-                                        f"{self.central_url}/anpr/ingest",
-                                        data=data_bytes,
-                                        headers={"Content-Type": "application/json"},
-                                        method="POST"
-                                    )
-                                    with urllib.request.urlopen(req, timeout=3.0) as resp:
-                                        pass
-                                except Exception:
-                                    pass
                             else:
                                 print(f"\x1b[36m[ANPR SCAN]\x1b[0m 🚗 \x1b[33m[{self.camera_code}]\x1b[0m Plate: \x1b[1m\x1b[37m{cleaned_text}\x1b[0m | Time: {time_str}", flush=True)
 

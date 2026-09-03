@@ -150,7 +150,7 @@ export const LiveCCTVFeed = ({
     const sanitizeUrl = (u) => {
       if (!u) return u;
       if (currentHost && currentHost !== "localhost" && currentHost !== "127.0.0.1") {
-        return u.replace("localhost", currentHost).replace("127.0.0.1", currentHost);
+        return u.split("localhost").join(currentHost).split("127.0.0.1").join(currentHost);
       }
       return u;
     };
@@ -459,8 +459,19 @@ export const LiveCCTVFeed = ({
   const isAnprCamera = !!(camera?.detection_mode === 'ANPR' || camera?.detection_mode === 'AI_ANPR' || camera?.ai_type === 'anpr' || (camera?.stream_properties && camera.stream_properties.enable_anpr));
   const camId = camera?.id || camera?.camera_code || 'cam-1';
   const camCode = camera?.camera_code || camera?.id || 'GJ-GOV-001';
-  const aiSourceUrl = camera?.rtsp_url || camera?.stream_url || (camera?.urls && (camera.urls.rtsp || camera.urls.hls || camera.urls.whep)) || rawStreamUrl || "0";
-  const aiFallbackUrl = camera?.hls_url || (camera?.urls && (camera.urls.hls || camera.urls.whep)) || (camera?.stream_url && !camera.stream_url.startsWith('rtsp://') ? camera.stream_url : '') || rawStreamUrl || "";
+  const currentHostForAi = typeof window !== "undefined" ? (window.location.hostname || "localhost") : "localhost";
+  const sanitizeHost = (str) => {
+    if (!str || typeof str !== 'string') return str;
+    if (currentHostForAi && currentHostForAi !== "localhost" && currentHostForAi !== "127.0.0.1") {
+      return str.split("localhost").join(currentHostForAi).split("127.0.0.1").join(currentHostForAi);
+    }
+    return str;
+  };
+
+  const rawAiSource = camera?.rtsp_url || camera?.stream_url || (camera?.urls && (camera.urls.rtsp || camera.urls.hls || camera.urls.whep)) || rawStreamUrl || "0";
+  const rawAiFallback = camera?.hls_url || (camera?.urls && (camera.urls.hls || camera.urls.whep)) || (camera?.stream_url && !camera.stream_url.startsWith('rtsp://') ? camera.stream_url : '') || rawStreamUrl || "";
+  const aiSourceUrl = sanitizeHost(rawAiSource);
+  const aiFallbackUrl = sanitizeHost(rawAiFallback);
   const aiStreamUrl = `${apiPrefix}/api/v1/ai/video_feed?source=${encodeURIComponent(aiSourceUrl)}&fallback=${encodeURIComponent(aiFallbackUrl)}&camera_id=${encodeURIComponent(camId)}&camera_code=${encodeURIComponent(camCode)}&is_anpr=${isAnprCamera}&detect_objects=${enableObjDetection}&detect_plates=${enablePlateDetection}&trails=${enableObjDetection}&dwell=false&zone=false`;
 
   // Reactively broadcast AI controls to Python Stream Service whenever filters or detection toggles change
