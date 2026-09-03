@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # 1. Central Command & Control Center (Node.js Express + React GIS UI)
+  # ============================================================================
+  central-platform:
+    build:
+      context: ./2_CENTRAL_PLATFORM
+      dockerfile: Dockerfile
+    container_name: gujraksha_central_platform
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=gujraksha
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+    depends_on:
+      - postgres
+    networks:
+      - gujraksha-net
+
+  # ============================================================================
+  # 2. Distributed AI Edge Worker (Python ANPR & Bounding Box Engine)
+  # ============================================================================
+  ai-edge-worker:
+    build:
+      context: ./3_ANPR_EDGE_WORKER
+      dockerfile: Dockerfile
+    container_name: gujraksha_ai_worker
+    restart: unless-stopped
+    environment:
+      - CENTRAL_URL=http://central-platform:3000/api/v1
+      - TRITON_HOST=triton
+      - TRITON_PORT=8001
+      - TRITON_BACKEND=auto
+      - MAX_CAPACITY=100
+    depends_on:
+      - central-platform
+      - triton
+    networks:
+      - gujraksha-net
+
+  # ============================================================================
+  # 3. NVIDIA Triton GPU Inference Server
+  # ============================================================================
+  triton:
+    image: nvcr.io/nvidia/tritonserver:24.01-py3
+    container_name: gujraksha_triton_server
+    restart: unless-stopped
+    command: ["tritonserver", "--model-repository=/models", "--strict-model-config=false", "--log-verbose=1"]
+    ports:
+      - "8000:8000" # HTTP API
+      - "8001:8001" # gRPC API (High Speed Async Inference)
+      - "8002:8002" # Metrics API
+    volumes:
+      - ./triton_repository:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+    networks:
+      - gujraksha-net
+
+  # ============================================================================
+  # 4. Stream Gateway (MediaMTX RTSP / WebRTC WHEP / HLS Video Server)
+  # ============================================================================
+  stream-gateway:
+    image: bluenviron/mediamtx:latest
+    container_name: gujraksha_stream_gateway
+    restart: unless-stopped
+    ports:
+      - "8554:8554"   # RTSP Stream Ingest & Egress
+      - "8888:8888"   # HLS Streaming
+      - "8889:8889"   # WebRTC / WHEP Streaming
+      - "1935:1935"   # RTMP Streaming
+    networks:
+      - gujraksha-net
+
+  # ============================================================================
+  # 5. PostgreSQL + PostGIS Spatial Database Engine
+  # ============================================================================
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: gujraksha_postgres_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=gujraksha
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - gujraksha-net
+
+networks:
+  gujraksha-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+    driver: local
