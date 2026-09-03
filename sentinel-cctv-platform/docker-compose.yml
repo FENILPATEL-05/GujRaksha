@@ -36,12 +36,20 @@ services:
       dockerfile: Dockerfile
     container_name: gujraksha_ai_worker
     restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     environment:
       - CENTRAL_URL=http://central-platform:3000/api/v1
       - TRITON_HOST=triton
       - TRITON_PORT=8001
       - TRITON_BACKEND=auto
       - MAX_CAPACITY=100
+      - CUDA_VISIBLE_DEVICES=0
     depends_on:
       - central-platform
     networks:
@@ -59,8 +67,16 @@ services:
     command: ["python3", "ai_stream_service.py", "--port", "8090"]
     ports:
       - "8090:8090"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     environment:
       - CENTRAL_URL=http://central-platform:3000/api/v1
+      - CUDA_VISIBLE_DEVICES=0
     depends_on:
       - central-platform
     networks:

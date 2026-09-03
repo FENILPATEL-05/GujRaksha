@@ -146,13 +146,18 @@ export const LiveCCTVFeed = ({
 
   const resolveWhepApiUrl = useCallback((cam) => {
     if (!cam) return "";
+    const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
     const currentHost = typeof window !== "undefined" ? (window.location.hostname || "localhost") : "localhost";
     const sanitizeUrl = (u) => {
       if (!u) return u;
+      let res = u;
       if (currentHost && currentHost !== "localhost" && currentHost !== "127.0.0.1") {
-        return u.split("localhost").join(currentHost).split("127.0.0.1").join(currentHost);
+        res = res.split("localhost").join(currentHost).split("127.0.0.1").join(currentHost);
       }
-      return u;
+      if (isHttps && res.includes(":8889/")) {
+        res = res.replace(/^http:\/\/[^/]+:8889\//, "/whep/");
+      }
+      return res;
     };
 
     if (cam.whep_url && cam.whep_url.trim()) return sanitizeUrl(cam.whep_url.trim());
@@ -164,6 +169,9 @@ export const LiveCCTVFeed = ({
     if (cam.rtsp_url && (cam.rtsp_url.includes(':8554/') || cam.rtsp_url.includes('/stream/'))) {
       const match = cam.rtsp_url.match(/rtsp:\/\/(?:[^@]+@)?([^:/]+):?(\d*)\/(.+)/);
       if (match) {
+        if (isHttps) {
+          return `/whep/${match[3]}/whep`;
+        }
         const hostPart = (match[1] === 'localhost' || match[1] === '127.0.0.1') ? currentHost : match[1];
         return `http://${hostPart}:8889/${match[3]}/whep`;
       }
@@ -173,6 +181,9 @@ export const LiveCCTVFeed = ({
     let path = resolveStreamPath(cam);
     if (path === "stream" || path === "stream/") {
       path = `stream/${cleanId}`;
+    }
+    if (isHttps) {
+      return `/whep/${path}/whep`;
     }
     return `http://${currentHost}:8889/${path}/whep`;
   }, [resolveStreamPath, getCleanId]);
