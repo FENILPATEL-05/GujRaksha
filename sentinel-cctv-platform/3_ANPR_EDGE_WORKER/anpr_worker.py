@@ -256,7 +256,6 @@ def create_accelerated_interpreter(model_path: str, num_threads: int = None):
 # GPU ACCELERATION (ONNX Runtime / CUDA / TensorRT)
 # ==============================================================================
 
-class PlateDetectorONNX:
 def safe_create_ort_session(model_path: str, input_size: int = 640):
     """Initializes ONNX InferenceSession with verified GPU acceleration or automatic CPU fallback."""
     if not HAS_ONNXRUNTIME:
