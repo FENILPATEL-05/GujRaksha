@@ -155,10 +155,14 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64Data })
       });
-      const data = await res.json();
-      if (data.success) {
-        objects = data.objects || [];
-        plates = data.plates || [];
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          objects = data.objects || [];
+          plates = data.plates || [];
+        } else if (data.error && addToast && timestamp < 1.0) {
+          addToast(data.error, "warning");
+        }
       }
     } catch (_) {
       // Backend AI offline fallback

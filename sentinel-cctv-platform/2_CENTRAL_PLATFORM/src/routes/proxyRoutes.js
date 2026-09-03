@@ -227,7 +227,14 @@ router.post('/ai/scan_frame', (req, res) => {
   });
 
   proxyReq.on('error', (err) => {
-    res.status(502).json({ success: false, error: err.message });
+    if (!res.headersSent) {
+      res.status(200).json({
+        success: false,
+        objects: [],
+        plates: [],
+        error: `AI Stream Service (Port 8090) Offline: ${err.message}`
+      });
+    }
   });
 
   proxyReq.write(payload);
