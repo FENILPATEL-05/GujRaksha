@@ -118,6 +118,7 @@ class DepartmentDataStore {
     const newDept = {
       code: code,
       name: deptData.name.trim(),
+      category: deptData.category ? deptData.category.trim() : "General",
       nodal_officer: deptData.nodal_officer || "",
       contact_email: deptData.contact_email || (code.toLowerCase() + ".cctv@gujarat.gov.in"),
       contact_phone: deptData.contact_phone || "+91 79 2325 0000",
@@ -131,16 +132,17 @@ class DepartmentDataStore {
     // Direct Database Persistence (PostgreSQL)
     if (pgClient.isConnected()) {
       pgClient.query(
-        `INSERT INTO departments (code, name, nodal_officer, contact_email, contact_phone, color, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+        `INSERT INTO departments (code, name, category, nodal_officer, contact_email, contact_phone, color, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
          ON CONFLICT (code) DO UPDATE SET
           name = EXCLUDED.name,
+          category = EXCLUDED.category,
           nodal_officer = EXCLUDED.nodal_officer,
           contact_email = EXCLUDED.contact_email,
           contact_phone = EXCLUDED.contact_phone,
           color = EXCLUDED.color,
           updated_at = NOW()`,
-        [newDept.code, newDept.name, newDept.nodal_officer, newDept.contact_email, newDept.contact_phone, newDept.color]
+        [newDept.code, newDept.name, newDept.category, newDept.nodal_officer, newDept.contact_email, newDept.contact_phone, newDept.color]
       ).catch(err => console.warn("PG Department Insert Error:", err.message));
     }
 
@@ -159,6 +161,7 @@ class DepartmentDataStore {
     const updated = {
       ...existing,
       name: updateData.name !== undefined ? updateData.name.trim() : existing.name,
+      category: updateData.category !== undefined ? updateData.category.trim() : (existing.category || "General"),
       nodal_officer: updateData.nodal_officer !== undefined ? updateData.nodal_officer : existing.nodal_officer,
       contact_email: updateData.contact_email !== undefined ? updateData.contact_email : existing.contact_email,
       contact_phone: updateData.contact_phone !== undefined ? updateData.contact_phone : existing.contact_phone,
@@ -173,11 +176,11 @@ class DepartmentDataStore {
     if (pgClient.isConnected()) {
       pgClient.query(
         `UPDATE departments SET
-          name = $1, nodal_officer = $2, contact_email = $3,
-          contact_phone = $4, color = $5,
+          name = $1, category = $2, nodal_officer = $3, contact_email = $4,
+          contact_phone = $5, color = $6,
           updated_at = NOW()
-        WHERE code = $6`,
-        [updated.name, updated.nodal_officer, updated.contact_email, updated.contact_phone, updated.color, code]
+        WHERE code = $7`,
+        [updated.name, updated.category, updated.nodal_officer, updated.contact_email, updated.contact_phone, updated.color, code]
       ).catch(err => console.warn("PG Department Update Error:", err.message));
     }
 

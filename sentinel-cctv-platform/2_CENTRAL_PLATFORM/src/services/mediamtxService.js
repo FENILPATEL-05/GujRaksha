@@ -102,6 +102,22 @@ class MediaMtxService {
     }
   }
 
+  // Remove or revoke camera stream path from MediaMTX
+  async removeCameraStream(cameraOrId) {
+    if (!cameraOrId) return;
+    const cleanId = typeof cameraOrId === 'object'
+      ? String(cameraOrId.id || '1').replace('gov-feed-', '')
+      : String(cameraOrId).replace('gov-feed-', '');
+    const pathName = `stream/${cleanId}`;
+
+    try {
+      await this.makeRequest(`/delete/${pathName}`, 'POST', '{}');
+      console.log(`🗑️ [MediaMTX Gateway] Removed WebRTC bridge path: ${pathName}`);
+    } catch (e) {
+      // Ignore if stream path not found or not active
+    }
+  }
+
   // Sync all cameras in registry with MediaMTX on platform startup
   async syncAllCameras(cameras = []) {
     for (const cam of cameras) {

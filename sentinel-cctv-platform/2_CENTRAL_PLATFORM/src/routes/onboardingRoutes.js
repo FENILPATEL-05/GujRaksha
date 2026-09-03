@@ -4,20 +4,53 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.post('/bulk-csv', authenticateToken, (req, res, next) => {
+router.get('/template-csv', (req, res) => {
   try {
-    const csvContent = req.body.csv || req.body.data;
+    const template = onboardingService.getSampleCsvTemplate();
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="camera_onboarding_template.csv"');
+    return res.send(template);
+  } catch (err) {
+    return res.status(500).json({ success: false, error: { message: err.message } });
+  }
+});
+
+router.post('/bulk-csv', authenticateToken, async (req, res, next) => {
+  try {
+    let csvContent = '';
+    if (typeof req.body === 'string') {
+      csvContent = req.body;
+    } else if (req.body && typeof req.body === 'object') {
+      csvContent = req.body.csv || req.body.data || req.body.csvContent || req.body.content || '';
+    }
+
     if (!csvContent) {
+      csvContent = await new Promise((resolve) => {
+        let raw = '';
+        req.on('data', chunk => { raw += chunk; });
+        req.on('end', () => {
+          try {
+            const parsed = JSON.parse(raw);
+            resolve(parsed.csv || parsed.data || raw);
+          } catch (e) {
+            resolve(raw);
+          }
+        });
+        req.on('error', () => resolve(''));
+      });
+    }
+
+    if (!csvContent || !csvContent.trim()) {
       return res.status(400).json({
         success: false,
         error: { code: 'EMPTY_PAYLOAD', message: 'No CSV payload provided in request body.' }
       });
     }
 
-    const result = onboardingService.processBulkCsv(csvContent);
-    res.json({
+    const result = await onboardingService.processBulkCsv(csvContent);
+    return res.json({
       success: true,
-      message: `Bulk onboarding completed. ${result.successCount} cameras registered.`,
+      message: `Bulk onboarding completed. ${result.successCount} cameras registered successfully.`,
       data: result
     });
   } catch (err) {

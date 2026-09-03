@@ -676,6 +676,36 @@ export const MapView = ({
       attempts++;
     }
 
+    // Spiderify: at high zoom, separate co-located cameras (same/near-identical coords) into individual pins
+    if (zoom >= 16) {
+      const spideredClusters = [];
+      clusters.forEach(cl => {
+        if (cl.cameras.length > 1 && cl.cameras.length <= 12) {
+          // Check if cameras are co-located (all within ~0.00005 degrees ≈ 5m)
+          const baseLat = cl.cameras[0].latitude;
+          const baseLng = cl.cameras[0].longitude;
+          const coLocated = cl.cameras.every(c =>
+            Math.abs(c.latitude - baseLat) < 0.00008 && Math.abs(c.longitude - baseLng) < 0.00008
+          );
+          if (coLocated) {
+            // Arrange cameras in a circle around the center
+            const offsetDeg = zoom >= 18 ? 0.00015 : zoom >= 17 ? 0.0003 : 0.0006;
+            cl.cameras.forEach((cam, idx) => {
+              const angle = (2 * Math.PI * idx) / cl.cameras.length;
+              spideredClusters.push({
+                centerLat: baseLat + offsetDeg * Math.cos(angle),
+                centerLng: baseLng + offsetDeg * Math.sin(angle),
+                cameras: [cam]
+              });
+            });
+            return; // skip adding original cluster
+          }
+        }
+        spideredClusters.push(cl);
+      });
+      clusters = spideredClusters;
+    }
+
     clusters.forEach(cl => {
       if (cl.cameras.length === 1) {
         // Individual Camera Pin (Single Camera displayed directly when separated)

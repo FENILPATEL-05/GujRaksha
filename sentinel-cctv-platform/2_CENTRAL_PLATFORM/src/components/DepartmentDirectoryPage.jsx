@@ -12,6 +12,7 @@ import {
   X
 } from "lucide-react";
 import { Pagination } from "./Pagination";
+import { ConfirmWarningModal } from "./ConfirmWarningModal";
 
 export const DepartmentDirectoryPage = ({
   departments = [],
@@ -34,6 +35,8 @@ export const DepartmentDirectoryPage = ({
     if (!q) return true;
     return (
       (d.name && d.name.toLowerCase().includes(q)) ||
+      (d.category && d.category.toLowerCase().includes(q)) ||
+      (d.code && d.code.toLowerCase().includes(q)) ||
       (d.nodal_officer && d.nodal_officer.toLowerCase().includes(q)) ||
       (d.contact_email && d.contact_email.toLowerCase().includes(q)) ||
       (d.contact_phone && d.contact_phone.toLowerCase().includes(q))
@@ -45,7 +48,18 @@ export const DepartmentDirectoryPage = ({
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentDepartments = filteredDepartments.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleDeleteDept = async (dept) => {
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    submessage: '',
+    confirmText: 'Remove',
+    type: 'danger',
+    onConfirm: null,
+    isLoading: false
+  });
+
+  const handleDeleteDept = (dept) => {
     if (dept.totalCameras > 0) {
       addToast(
         `Cannot delete '${dept.name}' because ${dept.totalCameras} camera assets are currently linked to it.`,
@@ -55,22 +69,31 @@ export const DepartmentDirectoryPage = ({
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to remove '${dept.name}' from the statewide department registry?`)) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/v1/departments/${dept.code}`, { method: "DELETE" });
-      const data = await res.json();
-      if (data.success) {
-        addToast(`Department '${dept.name}' removed successfully.`, "success", "Deleted");
-        onRefresh();
-      } else {
-        addToast(data.error ? data.error.message : "Failed to delete department", "error", "Error");
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Remove Department?',
+      message: `Are you sure you want to remove "${dept.name}" (${dept.code}) from the statewide registry?`,
+      submessage: 'This department profile and key mappings will be deleted.',
+      confirmText: 'Remove Department',
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(prev => ({ ...prev, isLoading: true }));
+        try {
+          const res = await fetch(`/api/v1/departments/${dept.code}`, { method: "DELETE" });
+          const data = await res.json();
+          if (data.success) {
+            addToast(`Department '${dept.name}' removed successfully.`, "success", "Deleted");
+            onRefresh();
+          } else {
+            addToast(data.error ? data.error.message : "Failed to delete department", "error", "Error");
+          }
+        } catch (err) {
+          addToast(err.message, "error", "Network Error");
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false, isLoading: false }));
+        }
       }
-    } catch (err) {
-      addToast(err.message, "error", "Network Error");
-    }
+    });
   };
 
   return (
@@ -159,6 +182,7 @@ export const DepartmentDirectoryPage = ({
           <thead>
             <tr>
               <th>Department Name</th>
+              <th>Department Key</th>
               <th>Nodal In-Charge & Contact</th>
               <th style={{ textAlign: "center" }}>Linked Cameras</th>
               <th style={{ textAlign: "right" }}>Actions</th>
@@ -167,7 +191,7 @@ export const DepartmentDirectoryPage = ({
           <tbody>
             {currentDepartments.length === 0 ? (
               <tr>
-                <td colSpan={4} style={{ textAlign: "center", padding: "48px 16px", color: "var(--text-dim)" }}>
+                <td colSpan={5} style={{ textAlign: "center", padding: "48px 16px", color: "var(--text-dim)" }}>
                   <FolderOpen size={36} strokeWidth={1.5} style={{ color: "var(--accent)", marginBottom: "8px" }} />
                   <div>No departments match the search criteria.</div>
                 </td>
@@ -197,7 +221,25 @@ export const DepartmentDirectoryPage = ({
                       </div>
                     </td>
 
-                    {/* 2. Nodal Officer & Contact */}
+                    {/* 2. Department Key */}
+                    <td>
+                      <span
+                        className="badge"
+                        style={{
+                          background: "rgba(34, 211, 238, 0.12)",
+                          color: "var(--accent)",
+                          border: "1px solid rgba(34, 211, 238, 0.25)",
+                          fontSize: "11px",
+                          fontFamily: "var(--font-mono)",
+                          fontWeight: 700,
+                          padding: "2px 8px"
+                        }}
+                      >
+                        {dept.code}
+                      </span>
+                    </td>
+
+                    {/* 3. Nodal Officer & Contact */}
                     <td>
                       <div style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px" }}>
                         <Users size={12} strokeWidth={2} style={{ color: "var(--accent)" }} />
@@ -295,6 +337,19 @@ export const DepartmentDirectoryPage = ({
           />
         )}
       </div>
+
+      <ConfirmWarningModal
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        submessage={confirmDialog.submessage}
+        confirmText={confirmDialog.confirmText}
+        cancelText={confirmDialog.cancelText}
+        type={confirmDialog.type}
+        isLoading={confirmDialog.isLoading}
+      />
     </div>
 
   );

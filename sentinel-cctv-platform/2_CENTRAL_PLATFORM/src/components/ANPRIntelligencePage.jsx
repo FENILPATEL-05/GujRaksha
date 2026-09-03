@@ -1027,13 +1027,13 @@ export const ANPRIntelligencePage = ({
               marginTop: "10px",
               flexWrap: "wrap",
               gap: "12px",
-              background: "rgba(15, 23, 42, 0.4)",
+              background: "var(--panel-bg)",
               borderRadius: "0 0 8px 8px",
               flexShrink: 0
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
                 <div style={{ fontSize: "12.5px", color: "var(--text-secondary)" }}>
-                  Showing <strong style={{ color: "#fff" }}>{(edgePage - 1) * edgePerPage + 1}</strong>–<strong style={{ color: "#fff" }}>{Math.min(edgePage * edgePerPage, edgeNodes.length)}</strong> of <strong style={{ color: "var(--accent)" }}>{edgeNodes.length}</strong> edge nodes
+                  Showing <strong style={{ color: "var(--text-primary)" }}>{(edgePage - 1) * edgePerPage + 1}</strong>–<strong style={{ color: "var(--text-primary)" }}>{Math.min(edgePage * edgePerPage, edgeNodes.length)}</strong> of <strong style={{ color: "var(--accent)" }}>{edgeNodes.length}</strong> edge nodes
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-dim)" }}>
@@ -1045,8 +1045,8 @@ export const ANPRIntelligencePage = ({
                       setEdgePage(1);
                     }}
                     style={{
-                      background: "rgba(30, 41, 59, 0.8)",
-                      color: "#fff",
+                      background: "var(--input-bg)",
+                      color: "var(--text-primary)",
                       border: "1px solid var(--panel-border)",
                       borderRadius: "6px",
                       padding: "3px 8px",
@@ -1371,8 +1371,8 @@ export const ANPRIntelligencePage = ({
                     padding: "0 12px",
                     gap: "6px",
                     fontSize: "12px",
-                    background: activeFilterCount > 0 ? "rgba(34, 211, 238, 0.15)" : "rgba(30, 41, 59, 0.55)",
-                    borderColor: activeFilterCount > 0 ? "var(--accent)" : "rgba(255, 255, 255, 0.1)",
+                    background: activeFilterCount > 0 ? "rgba(34, 211, 238, 0.15)" : "var(--input-bg)",
+                    borderColor: activeFilterCount > 0 ? "var(--accent)" : "var(--panel-border)",
                     color: activeFilterCount > 0 ? "var(--accent)" : "var(--text-primary)"
                   }}
                   title="Open District Filters"
@@ -1594,12 +1594,12 @@ export const ANPRIntelligencePage = ({
               marginTop: "10px",
               flexWrap: "wrap",
               gap: "12px",
-              background: "rgba(15, 23, 42, 0.4)",
+              background: "var(--panel-bg)",
               borderRadius: "0 0 8px 8px"
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
                 <div style={{ fontSize: "12.5px", color: "var(--text-secondary)" }}>
-                  Showing <strong style={{ color: "#fff" }}>{(currentPage - 1) * itemsPerPage + 1}</strong>–<strong style={{ color: "#fff" }}>{Math.min(currentPage * itemsPerPage, detections.length)}</strong> of <strong style={{ color: "var(--accent)" }}>{detections.length}</strong> detection records
+                  Showing <strong style={{ color: "var(--text-primary)" }}>{(currentPage - 1) * itemsPerPage + 1}</strong>–<strong style={{ color: "var(--text-primary)" }}>{Math.min(currentPage * itemsPerPage, detections.length)}</strong> of <strong style={{ color: "var(--accent)" }}>{detections.length}</strong> detection records
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-dim)" }}>
@@ -1611,8 +1611,8 @@ export const ANPRIntelligencePage = ({
                       setCurrentPage(1);
                     }}
                     style={{
-                      background: "rgba(30, 41, 59, 0.8)",
-                      color: "#fff",
+                      background: "var(--input-bg)",
+                      color: "var(--text-primary)",
                       border: "1px solid var(--panel-border)",
                       borderRadius: "6px",
                       padding: "3px 8px",

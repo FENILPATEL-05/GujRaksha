@@ -6,6 +6,7 @@
 CREATE TABLE IF NOT EXISTS departments (
     code VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    category VARCHAR(100) DEFAULT 'General',
     nodal_officer VARCHAR(150),
     contact_email VARCHAR(150),
     contact_phone VARCHAR(50),

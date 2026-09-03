@@ -136,6 +136,27 @@ router.post('/bulk-delete', authenticateToken, async (req, res, next) => {
   }
 });
 
+router.post('/bulk-update', authenticateToken, async (req, res, next) => {
+  try {
+    const { ids, updateData } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, error: { message: 'Array of camera IDs is required for bulk update.' } });
+    }
+    if (!updateData || typeof updateData !== 'object') {
+      return res.status(400).json({ success: false, error: { message: 'updateData object is required.' } });
+    }
+    const updated = await cameraService.bulkUpdateCameras(ids, updateData);
+    res.json({
+      success: true,
+      message: `Successfully updated ${updated.length} camera assets in registry.`,
+      count: updated.length,
+      data: updated
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.delete('/:id', authenticateToken, async (req, res, next) => {
   try {
     const deleted = await cameraService.deleteCamera(req.params.id);

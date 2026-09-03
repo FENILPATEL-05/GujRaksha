@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Camera, X, Check, FileSpreadsheet, CheckCircle2, ChevronRight, ChevronLeft, RefreshCw, AlertCircle, Sliders, Radio, Zap } from 'lucide-react';
-
+import { Camera, X, Check, CheckCircle2, ChevronRight, ChevronLeft, RefreshCw, AlertCircle, Sliders, Radio, Zap } from 'lucide-react';
 
 const GUJARAT_DISTRICTS = [
   'Ahmedabad', 'Amreli', 'Anand', 'Aravalli', 'Banaskantha', 'Bharuch',
@@ -12,11 +11,9 @@ const GUJARAT_DISTRICTS = [
 ];
 
 export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, departments = [] }) => {
-  const [activeTab, setActiveTab] = useState('manual');
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAdvancedStream, setShowAdvancedStream] = useState(false);
-  const [bulkResult, setBulkResult] = useState(null);
   const [errors, setErrors] = useState({});
 
   const [form, setForm] = useState({
@@ -211,39 +208,14 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
         if (onRegisterSuccess) onRegisterSuccess();
       } else {
         const msg = data.error ? (typeof data.error === 'string' ? data.error : data.error.message) : 'Registration failed';
-        if (addToast) addToast(msg, 'error', 'Error');
+        const title = (data.error && typeof data.error === 'object' && data.error.code && data.error.code.startsWith('DUPLICATE')) ? 'Duplicate Camera' : 'Registration Error';
+        if (addToast) addToast(msg, 'error', title);
       }
     } catch (err) {
       if (addToast) addToast(err.message || 'Network error', 'error', 'Network Error');
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleCsvFile = async (file) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const csvContent = e.target.result;
-      try {
-        const res = await fetch('/api/v1/onboarding/bulk-csv', {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: csvContent
-        });
-        const data = await res.json();
-        if (data.success) {
-          setBulkResult(data.data);
-          if (addToast) addToast(`Successfully registered ${data.data.successCount} cameras from CSV!`, 'success', 'Bulk Import');
-          if (onRegisterSuccess) onRegisterSuccess();
-        } else {
-          if (addToast) addToast(data.error?.message || 'Bulk upload failed', 'error', 'Bulk Failed');
-        }
-      } catch (err) {
-        if (addToast) addToast(err.message || 'Network error', 'error', 'Network Error');
-      }
-    };
-    reader.readAsText(file);
   };
 
   return (
@@ -259,26 +231,9 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
 
         {/* Modal Body */}
         <div className="modal-body" style={{ overflowY: 'auto', flex: 1, padding: '18px 24px' }}>
-          {/* Tab Switcher */}
-          <div className="tab-nav" style={{ marginBottom: '16px' }}>
-            <button
-              className={`tab-btn ${activeTab === 'manual' ? 'active' : ''}`}
-              onClick={() => setActiveTab('manual')}
-            >
-              Step-by-Step Entry
-            </button>
-            <button
-              className={`tab-btn ${activeTab === 'bulk' ? 'active' : ''}`}
-              onClick={() => setActiveTab('bulk')}
-            >
-              Bulk CSV Import
-            </button>
-          </div>
-
-          {activeTab === 'manual' && (
-            <div>
-              {/* Wizard Step Progress Bar */}
-              <div className="wizard-stepper">
+          <div>
+            {/* Wizard Step Progress Bar */}
+            <div className="wizard-stepper">
                 <div
                   className={`wizard-step ${currentStep === 1 ? 'active' : ''} ${currentStep > 1 ? 'completed' : ''}`}
                   onClick={() => currentStep > 1 && setCurrentStep(1)}
@@ -382,9 +337,9 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                       value={form.detection_mode === 'ANPR_DETECTION' || form.detection_mode === 'ANPR' ? 'ANPR_DETECTION' : 'GENERAL_SURVEILLANCE'}
                       onChange={(e) => updateField('detection_mode', e.target.value)}
                       style={{
-                        background: 'rgba(15, 23, 42, 0.85)',
+                        background: 'var(--input-bg)',
                         borderColor: 'rgba(34, 211, 238, 0.5)',
-                        color: '#fff',
+                        color: 'var(--text-primary)',
                         fontWeight: 600,
                         fontSize: '13px',
                         padding: '8px 12px',
@@ -594,42 +549,8 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
                 </div>
               )}
 
-
-
             </div>
-          )}
-
-          {/* Bulk CSV Import Tab */}
-          {activeTab === 'bulk' && (
-            <div>
-              <div className="drop-zone" style={{ padding: '30px 20px', textAlign: 'center', border: '2px dashed var(--panel-border)', borderRadius: '12px' }}>
-                <FileSpreadsheet size={40} strokeWidth={1.5} style={{ color: 'var(--accent)', margin: '0 auto 10px', display: 'block' }} />
-                <p style={{ margin: '0 0 6px', fontSize: '13px', color: 'var(--text-primary)' }}>
-                  Drag & Drop Camera Metadata CSV file here or{' '}
-                  <label htmlFor="file-csv-onboard" style={{ color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline', fontWeight: 600 }}>
-                    Browse File
-                  </label>
-                </p>
-                <input
-                  id="file-csv-onboard"
-                  type="file"
-                  accept=".csv"
-                  style={{ display: 'none' }}
-                  onChange={(e) => handleCsvFile(e.target.files[0])}
-                />
-                <small style={{ display: 'block', color: 'var(--text-dim)', fontSize: '11px' }}>
-                  Supported CSV headers: name, camera_code, latitude, longitude, department, district, taluka, camera_type, stream_url, detection_mode
-                </small>
-              </div>
-
-              {bulkResult && (
-                <div style={{ marginTop: '16px', fontSize: '13px', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-                  <CheckCircle2 size={16} strokeWidth={2.2} /> Successfully onboarded {bulkResult.successCount} cameras!
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+          </div>
 
         {/* Fixed Modal Footer */}
         <div
@@ -644,58 +565,52 @@ export const OnboardingModal = ({ isOpen, onClose, onRegisterSuccess, addToast, 
             alignItems: 'center'
           }}
         >
-          {activeTab === 'manual' ? (
-            <>
-              <button type="button" className="btn" onClick={onClose} disabled={isSubmitting}>
-                Cancel
+          <button type="button" className="btn" onClick={onClose} disabled={isSubmitting}>
+            Cancel
+          </button>
+
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {currentStep > 1 && (
+              <button
+                type="button"
+                className="btn"
+                onClick={handlePrev}
+                disabled={isSubmitting}
+                style={{ gap: '6px' }}
+              >
+                <ChevronLeft size={14} strokeWidth={2} /> Previous
               </button>
+            )}
 
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {currentStep > 1 && (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={handlePrev}
-                    disabled={isSubmitting}
-                    style={{ gap: '6px' }}
-                  >
-                    <ChevronLeft size={14} strokeWidth={2} /> Previous
-                  </button>
-                )}
-
-                {currentStep < 3 ? (
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={handleNext}
-                    style={{ gap: '6px' }}
-                  >
-                    Next Step <ChevronRight size={14} strokeWidth={2} />
-                  </button>
+            {currentStep < 3 ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleNext}
+                style={{ gap: '6px' }}
+              >
+                Next Step <ChevronRight size={14} strokeWidth={2} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleManualSubmit}
+                disabled={isSubmitting}
+                style={{ gap: '6px' }}
+              >
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw size={14} className="spin-animation" /> Registering...
+                  </>
                 ) : (
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={handleManualSubmit}
-                    disabled={isSubmitting}
-                    style={{ gap: '6px' }}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <RefreshCw size={14} className="spin-animation" /> Registering...
-                      </>
-                    ) : (
-                      <>
-                        <Check size={14} strokeWidth={2.4} /> Save & Register Camera
-                      </>
-                    )}
-                  </button>
+                  <>
+                    <Check size={14} strokeWidth={2.4} /> Save & Register Camera
+                  </>
                 )}
-              </div>
-            </>
-          ) : (
-            <button type="button" className="btn" onClick={onClose} style={{ marginLeft: 'auto' }}>Close</button>
-          )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

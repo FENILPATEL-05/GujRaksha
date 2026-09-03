@@ -103,12 +103,12 @@ export const ExportModal = ({ isOpen, onClose, cameras, addToast }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal modal-md">
+      <div className="modal modal-sm" style={{ maxWidth: '460px', width: '92%' }}>
         <div className="modal-head">
           <h3><FileSpreadsheet size={16} strokeWidth={2.2} style={{ color: 'var(--accent)' }} /> Export & Location Reports</h3>
           <button className="modal-close" onClick={onClose}><X size={16} strokeWidth={2.2} /></button>
         </div>
-        <div className="modal-body">
+        <div className="modal-body" style={{ padding: '16px 20px' }}>
           <div className="form-field" style={{ marginBottom: '14px' }}>
             <label>Export File Format</label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginTop: '6px' }}>

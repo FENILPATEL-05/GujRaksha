@@ -18,6 +18,7 @@ export const initialDepartments = [
   {
     "code": "AGRICULTURE",
     "name": "Agriculture & Farmers Welfare (APMC)",
+    "category": "Agriculture & Civil Supplies",
     "nodal_officer": "Director of Agricultural Marketing",
     "contact_email": "agri.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 6000",
@@ -28,6 +29,7 @@ export const initialDepartments = [
   {
     "code": "CIVIL_SUPPLIES",
     "name": "Food, Civil Supplies & Consumer Affairs",
+    "category": "Agriculture & Civil Supplies",
     "nodal_officer": "Director of Civil Supplies / Storage Division",
     "contact_email": "civilsupplies.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 1066",
@@ -38,6 +40,7 @@ export const initialDepartments = [
   {
     "code": "EDUCATION",
     "name": "Education Department (GSEB / Colleges)",
+    "category": "Education & Examination",
     "nodal_officer": "Director of Higher Education / Examination Controller",
     "contact_email": "education.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 1301",
@@ -48,6 +51,7 @@ export const initialDepartments = [
   {
     "code": "ENERGY",
     "name": "Energy & Petrochemicals Department",
+    "category": "Energy & Petrochemicals",
     "nodal_officer": "Chief Electrical Inspector / Grid Security",
     "contact_email": "energy.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 0701",
@@ -58,6 +62,7 @@ export const initialDepartments = [
   {
     "code": "FINANCE",
     "name": "Finance & State Tax Department (GST)",
+    "category": "Revenue & State Taxes",
     "nodal_officer": "Chief Commissioner of State Tax",
     "contact_email": "finance.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 0501",
@@ -68,6 +73,7 @@ export const initialDepartments = [
   {
     "code": "FOREST",
     "name": "Forests & Environment Department",
+    "category": "Forest & Wildlife",
     "nodal_officer": "Principal Chief Conservator of Forests (Wildlife)",
     "contact_email": "forest.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 4125",
@@ -78,6 +84,7 @@ export const initialDepartments = [
   {
     "code": "GENERAL_ADMIN",
     "name": "General Administration Department (GAD)",
+    "category": "Administrative & Security",
     "nodal_officer": "Chief Security Officer (Sachivalaya Complex)",
     "contact_email": "gad.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 0300",
@@ -88,6 +95,7 @@ export const initialDepartments = [
   {
     "code": "GSDMA",
     "name": "Gujarat State Disaster Management Authority",
+    "category": "Disaster Management & Emergency",
     "nodal_officer": "Emergency Operations Center Director",
     "contact_email": "gsdma.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 9220",
@@ -98,6 +106,7 @@ export const initialDepartments = [
   {
     "code": "HEALTH",
     "name": "Health & Family Welfare Department",
+    "category": "Health & Medical Welfare",
     "nodal_officer": "Additional Director (Medical Infrastructure)",
     "contact_email": "health.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 0801",
@@ -108,6 +117,7 @@ export const initialDepartments = [
   {
     "code": "HOME",
     "name": "Home Department / Gujarat Police",
+    "category": "Law Enforcement & Police",
     "nodal_officer": "DGP / DIG State Command & Control Center",
     "contact_email": "police.surveillance@gujarat.gov.in",
     "contact_phone": "+91 79 2325 0000",
@@ -118,6 +128,7 @@ export const initialDepartments = [
   {
     "code": "INDUSTRIES",
     "name": "Industries & Mines (GIDC)",
+    "category": "Commerce & Industrial Parks",
     "nodal_officer": "Managing Director (GIDC Infrastructure)",
     "contact_email": "gidc.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 2501",
@@ -128,6 +139,7 @@ export const initialDepartments = [
   {
     "code": "LABOUR",
     "name": "Labour, Skill Development & Employment",
+    "category": "Labour & Skill Development",
     "nodal_officer": "Director of Employment & Training (DET)",
     "contact_email": "labour.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 3900",
@@ -138,6 +150,7 @@ export const initialDepartments = [
   {
     "code": "LEGAL",
     "name": "Legal Department & Judiciary",
+    "category": "Legal & Judiciary",
     "nodal_officer": "Registrar (Infrastructure - High Court of Gujarat)",
     "contact_email": "legal.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 2100",
@@ -148,6 +161,7 @@ export const initialDepartments = [
   {
     "code": "PANCHAYAT",
     "name": "Panchayats & Rural Development",
+    "category": "Rural Development & Panchayats",
     "nodal_officer": "Development Commissioner (Rural Surveillance)",
     "contact_email": "panchayat.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 3300",
@@ -158,6 +172,7 @@ export const initialDepartments = [
   {
     "code": "PORTS",
     "name": "Gujarat Maritime Board & Ports",
+    "category": "Ports & Maritime",
     "nodal_officer": "Chief Port Officer / Maritime Security",
     "contact_email": "gmb.surveillance@gujarat.gov.in",
     "contact_phone": "+91 79 2323 8346",
@@ -168,6 +183,7 @@ export const initialDepartments = [
   {
     "code": "PRIVATE_FEED",
     "name": "Private Commercial & Society Feeder",
+    "category": "Private & Public-Private Integration",
     "nodal_officer": "Gujarat Police Public-Private CCTV Integration Cell",
     "contact_email": "private.cctv@sentinelgujarat.in",
     "contact_phone": "+91 79 2325 9999",
@@ -178,6 +194,7 @@ export const initialDepartments = [
   {
     "code": "REVENUE",
     "name": "Revenue Department",
+    "category": "Revenue & Land Records",
     "nodal_officer": "Revenue Inspection Commissioner",
     "contact_email": "revenue.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 1501",
@@ -188,6 +205,7 @@ export const initialDepartments = [
   {
     "code": "ROADS_BUILDINGS",
     "name": "Roads & Buildings Department (R&B)",
+    "category": "Infrastructure & State Highways",
     "nodal_officer": "Chief Engineer (State Highways & Bridges)",
     "contact_email": "rnb.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 1801",
@@ -198,6 +216,7 @@ export const initialDepartments = [
   {
     "code": "SCIENCE_TECH",
     "name": "Science & Technology (GIL / Science City)",
+    "category": "Science & Technology",
     "nodal_officer": "Managing Director (Gujarat Informatics Ltd)",
     "contact_email": "dst.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 0301",
@@ -208,6 +227,7 @@ export const initialDepartments = [
   {
     "code": "SOCIAL_JUSTICE",
     "name": "Social Justice & Empowerment",
+    "category": "Social Justice & Welfare",
     "nodal_officer": "Director of Social Defense",
     "contact_email": "socialjustice.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 3200",
@@ -218,6 +238,7 @@ export const initialDepartments = [
   {
     "code": "SPORTS_YOUTH",
     "name": "Sports, Youth & Cultural Activities",
+    "category": "Sports, Youth & Culture",
     "nodal_officer": "Director General (Sports Authority of Gujarat)",
     "contact_email": "sports.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 8000",
@@ -228,6 +249,7 @@ export const initialDepartments = [
   {
     "code": "TOURISM",
     "name": "Tourism & Pilgrimage Development",
+    "category": "Tourism & Pilgrimage Sites",
     "nodal_officer": "Director of Tourism Infrastructure",
     "contact_email": "tourism.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2322 2517",
@@ -238,6 +260,7 @@ export const initialDepartments = [
   {
     "code": "TRANSPORT",
     "name": "Transport Department / RTO Gujarat",
+    "category": "Transportation & Traffic",
     "nodal_officer": "Transport Commissioner / RTO Surveillance Head",
     "contact_email": "rto.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 1361",
@@ -248,6 +271,7 @@ export const initialDepartments = [
   {
     "code": "TRIBAL_DEV",
     "name": "Tribal Development Department",
+    "category": "Tribal & Community Development",
     "nodal_officer": "Commissioner of Tribal Development",
     "contact_email": "tribal.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 3600",
@@ -258,6 +282,7 @@ export const initialDepartments = [
   {
     "code": "URBAN_DEV",
     "name": "Urban Development & Municipal Corporations",
+    "category": "Urban & Municipal Governance",
     "nodal_officer": "Chief Urban Planner / ICCC Operations Head",
     "contact_email": "urbandev.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 0901",
@@ -268,6 +293,7 @@ export const initialDepartments = [
   {
     "code": "WATER_RESOURCES",
     "name": "Water Resources & Narmada Water Supply",
+    "category": "Water Resources & Irrigation",
     "nodal_officer": "Chief Engineer (Narmada Project Surveillance)",
     "contact_email": "water.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 1601",
@@ -278,6 +304,7 @@ export const initialDepartments = [
   {
     "code": "WOMEN_CHILD",
     "name": "Women & Child Development",
+    "category": "Women & Child Development",
     "nodal_officer": "Commissioner of Women and Child Welfare",
     "contact_email": "wcd.cctv@gujarat.gov.in",
     "contact_phone": "+91 79 2325 7900",
@@ -340,6 +367,5 @@ export const initialWatchlist = [
     "created_at": "2026-08-21T09:08:53.857Z"
   }
 ];
-
 
 export const initialDetections = [];

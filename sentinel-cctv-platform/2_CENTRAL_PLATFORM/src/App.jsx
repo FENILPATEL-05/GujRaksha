@@ -25,6 +25,7 @@ import { AddWatchlistModal } from './components/AddWatchlistModal';
 import { GapAnalysisModal } from './components/GapAnalysisModal';
 import { ExportModal } from './components/ExportModal';
 import { UserManagementPage } from './components/UserManagementModal';
+import { ConfirmWarningModal } from './components/ConfirmWarningModal';
 import { ToastContainer } from './components/Toast';
 
 
@@ -206,56 +207,86 @@ export function AppContent() {
     addToast(`Plotting surveillance trajectory for ${plateNumber} across Gujarat GIS Map...`, 'info', 'Tracing Route');
   };
 
-  const handleDeleteCamera = async (cam) => {
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    submessage: '',
+    confirmText: 'Delete',
+    type: 'danger',
+    onConfirm: null,
+    isLoading: false
+  });
+
+  const handleDeleteCamera = (cam) => {
     if (!canManageCameras) {
       addToast('Only authorized department administrators can delete cameras.', 'error', 'Permission Denied');
       return;
     }
-    if (!window.confirm(`Are you sure you want to remove '${cam.name}' (${cam.camera_code || cam.id}) from the Gujarat CCTV Registry?`)) {
-      return;
-    }
 
-    try {
-      const res = await fetch(`/api/v1/cameras/${cam.id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) {
-        addToast(`Camera '${cam.name}' successfully removed from registry.`, 'success', 'Camera Asset Deleted');
-        fetchCameras();
-      } else {
-        addToast(data.error ? data.error.message : 'Failed to delete camera', 'error', 'Error');
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Camera Asset?',
+      message: `Are you sure you want to permanently remove "${cam.name}" (${cam.camera_code || cam.id})?`,
+      submessage: 'This will purge stream connections, GPS coordinates, and detach active AI ANPR pipelines.',
+      confirmText: 'Delete Camera',
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(prev => ({ ...prev, isLoading: true }));
+        try {
+          const res = await fetch(`/api/v1/cameras/${cam.id}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (data.success) {
+            addToast(`Camera '${cam.name}' successfully removed from registry.`, 'success', 'Camera Asset Deleted');
+            fetchCameras();
+          } else {
+            addToast(data.error ? data.error.message : 'Failed to delete camera', 'error', 'Error');
+          }
+        } catch (err) {
+          addToast(err.message, 'error', 'Network Error');
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false, isLoading: false }));
+        }
       }
-    } catch (err) {
-      addToast(err.message, 'error', 'Network Error');
-    }
+    });
   };
 
-  const handleBulkDeleteCameras = async (cameraIds) => {
+  const handleBulkDeleteCameras = (cameraIds) => {
     if (!canManageCameras) {
       addToast('Only authorized department administrators can delete cameras.', 'error', 'Permission Denied');
       return;
     }
     if (!cameraIds || cameraIds.length === 0) return;
 
-    if (!window.confirm(`Are you sure you want to permanently delete ${cameraIds.length} selected camera asset(s) from the Gujarat CCTV Registry?`)) {
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/v1/cameras/bulk-delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: cameraIds })
-      });
-      const data = await res.json();
-      if (data.success) {
-        addToast(`Successfully deleted ${data.count || cameraIds.length} camera assets from statewide registry.`, 'success', 'Bulk Delete Complete');
-        fetchCameras();
-      } else {
-        addToast(data.error ? data.error.message : 'Failed to bulk delete cameras', 'error', 'Delete Error');
+    setConfirmDialog({
+      isOpen: true,
+      title: `Bulk Delete ${cameraIds.length} Camera Assets?`,
+      message: `Are you sure you want to permanently remove ${cameraIds.length} selected cameras from the statewide registry?`,
+      submessage: 'All associated video stream bridges and AI processing pipelines will be revoked.',
+      confirmText: `Delete ${cameraIds.length} Cameras`,
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(prev => ({ ...prev, isLoading: true }));
+        try {
+          const res = await fetch('/api/v1/cameras/bulk-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: cameraIds })
+          });
+          const data = await res.json();
+          if (data.success) {
+            addToast(`Successfully deleted ${data.count || cameraIds.length} camera assets from statewide registry.`, 'success', 'Bulk Delete Complete');
+            fetchCameras();
+          } else {
+            addToast(data.error ? data.error.message : 'Failed to bulk delete cameras', 'error', 'Delete Error');
+          }
+        } catch (err) {
+          addToast(err.message, 'error', 'Network Error');
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false, isLoading: false }));
+        }
       }
-    } catch (err) {
-      addToast(err.message, 'error', 'Network Error');
-    }
+    });
   };
 
 
@@ -349,8 +380,14 @@ export function AppContent() {
           onExportCsv={() => setIsExportOpen(true)}
           onAddCamera={() => setIsOnboardOpen(true)}
           onSyncFeeds={handleSyncGovFeeds}
+          onRefresh={() => {
+            fetchCameras();
+            fetchDepartments();
+          }}
           departments={departments}
           isLoading={isLoadingCameras}
+          setIsLoading={setIsLoadingCameras}
+          addToast={addToast}
         />
 
       ) : activeView === 'departments' && canManageDepartments ? (
@@ -460,6 +497,19 @@ export function AppContent() {
         onClose={() => setIsExportOpen(false)}
         cameras={cameras}
         addToast={addToast}
+      />
+
+      <ConfirmWarningModal
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        submessage={confirmDialog.submessage}
+        confirmText={confirmDialog.confirmText}
+        cancelText={confirmDialog.cancelText}
+        type={confirmDialog.type}
+        isLoading={confirmDialog.isLoading}
       />
 
       <ToastContainer toasts={toasts} onDismiss={removeToast} />

@@ -706,19 +706,6 @@ export const VideoWallPage = ({
             </button>
           </div>
 
-          {/* Reset Order Button if cameras were reordered */}
-          {customOrderedCameras.length > 0 && (
-            <button
-              className="btn btn-sm"
-              onClick={handleResetOrder}
-              title="Reset Drag-and-Drop camera positions"
-              style={{ fontSize: "11px", padding: "3px 8px", gap: "3px" }}
-            >
-              <RotateCcw size={11} />
-              <span>Reset</span>
-            </button>
-          )}
-
           {/* Pagination Controls */}
           {totalPages > 1 && (
             <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>

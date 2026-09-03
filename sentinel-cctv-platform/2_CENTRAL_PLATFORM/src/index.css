@@ -2027,6 +2027,7 @@ tbody tr:last-child td { border-bottom: 1px solid var(--panel-border); }
 .modal-sm { max-width: 620px; }
 .modal-md { max-width: 980px; }
 .modal-lg { max-width: 1180px; }
+.modal-xl { max-width: 1400px; }
 
 .modal-head, .modal-header {
   display: flex;
@@ -2284,7 +2285,7 @@ form input.input-error, form select.input-error,
    ========================================================================== */
 .stream-modal-layout {
   display: grid;
-  grid-template-columns: 1.45fr 1fr;
+  grid-template-columns: 3fr 1fr;
   gap: 16px;
   align-items: start;
 }
@@ -3423,13 +3424,13 @@ body.theme-light .map-controls button:hover {
   align-items: center;
   gap: 8px;
   padding: 8px 14px 8px 12px;
-  background: rgba(15, 23, 42, 0.95);
+  background: var(--panel-bg-solid);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1.5px solid rgba(244, 63, 94, 0.4);
+  border: 1.5px solid rgba(244, 63, 94, 0.5);
   border-right: none;
   border-radius: 12px 0 0 12px;
-  box-shadow: -6px 8px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(244, 63, 94, 0.25);
+  box-shadow: var(--shadow);
   color: var(--text-primary);
   cursor: pointer;
   user-select: none;
@@ -3439,12 +3440,12 @@ body.theme-light .map-controls button:hover {
 .ai-threat-toggle-tab:hover {
   transform: translateX(-4px);
   border-color: #f43f5e;
-  box-shadow: -8px 10px 30px rgba(0, 0, 0, 0.6), 0 0 25px rgba(244, 63, 94, 0.4);
+  box-shadow: var(--shadow-lg);
 }
 
 .ai-threat-toggle-tab.all-clear {
   border-color: rgba(16, 185, 129, 0.35);
-  box-shadow: -4px 6px 18px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-sm);
 }
 
 .tab-beacon-core {
@@ -3512,11 +3513,11 @@ body.theme-light .map-controls button:hover {
   width: 375px;
   max-width: calc(100vw - 20px);
   z-index: 995;
-  background: rgba(10, 16, 31, 0.97);
+  background: var(--panel-bg-solid);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.85);
+  border-left: 1px solid var(--panel-border-strong);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
@@ -3537,8 +3538,8 @@ body.theme-light .map-controls button:hover {
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--panel-bg-solid);
   flex-shrink: 0;
 }
 
@@ -3583,8 +3584,8 @@ body.theme-light .map-controls button:hover {
 .btn-clear-all-alerts {
   font-size: 10.5px;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--input-bg);
+  border: 1px solid var(--panel-border);
   color: var(--text-secondary);
   border-radius: 6px;
   padding: 4px 8px;
@@ -3602,8 +3603,8 @@ body.theme-light .map-controls button:hover {
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  background: var(--input-bg);
   color: var(--text-secondary);
   display: flex;
   align-items: center;
@@ -3613,8 +3614,8 @@ body.theme-light .map-controls button:hover {
 }
 
 .btn-close-sidebar:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  background: var(--hover-bg);
 }
 
 .threat-sidebar-body {
@@ -3659,10 +3660,10 @@ body.theme-light .map-controls button:hover {
 .easy-sidebar-alert-card {
   border-radius: 10px;
   padding: 12px;
-  background: rgba(15, 23, 42, 0.9);
-  border: 1px solid rgba(244, 63, 94, 0.35);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border-strong);
   border-left: 4px solid #f43f5e;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -3693,7 +3694,7 @@ body.theme-light .map-controls button:hover {
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 12.5px;
-  color: #fff;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3757,8 +3758,9 @@ body.theme-light .map-controls button:hover {
 .card-vehicle-tag {
   font-size: 10px;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--input-bg);
   color: var(--text-secondary);
+  border: 1px solid var(--panel-border);
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -3783,7 +3785,7 @@ body.theme-light .map-controls button:hover {
 
 .card-description {
   font-size: 11px;
-  color: var(--text-dim);
+  color: var(--text-secondary);
   line-height: 1.35;
 }
 
@@ -4374,7 +4376,7 @@ body.theme-light .map-controls button:hover {
   justify-content: space-between;
   margin-bottom: 20px;
   padding: 12px 18px;
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--input-bg);
   border: 1px solid var(--panel-border);
   border-radius: 12px;
   gap: 8px;

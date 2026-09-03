@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { Pagination } from "./Pagination";
+import { ConfirmWarningModal } from "./ConfirmWarningModal";
 
 export const WatchlistManagerPage = ({
   onOpenAddWatchlist,
@@ -86,26 +87,45 @@ export const WatchlistManagerPage = ({
     };
   }, []);
 
-  const handleDelete = async (item) => {
-    if (!window.confirm(`Remove '${item.vehicle_plate}' from the police surveillance watchlist?`)) {
-      return;
-    }
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    submessage: '',
+    confirmText: 'Remove Target',
+    type: 'danger',
+    onConfirm: null,
+    isLoading: false
+  });
 
-    try {
-      const res = await fetch(`/api/v1/watchlist/${item.id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (data.success) {
-        addToast?.(`Target '${item.vehicle_plate}' removed from watchlist.`, "success", "Watchlist Updated");
-        // Optimistically update local state immediately
-        setWatchlist(prev => prev.filter(w => w.id !== item.id));
-        window.dispatchEvent(new CustomEvent("watchlist_updated"));
-        if (onWatchlistChange) onWatchlistChange(watchlist.length - 1);
-      } else {
-        addToast?.(data.error ? data.error.message : "Failed to delete item", "error", "Error");
+  const handleDelete = (item) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Remove Target from Watchlist?',
+      message: `Are you sure you want to remove vehicle "${item.vehicle_plate}" from active police surveillance?`,
+      submessage: `Reason: ${item.reason || 'Flagged Target'} | District: ${item.district || 'Statewide'}`,
+      confirmText: 'Remove Target',
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(prev => ({ ...prev, isLoading: true }));
+        try {
+          const res = await fetch(`/api/v1/watchlist/${item.id}`, { method: "DELETE" });
+          const data = await res.json();
+          if (data.success) {
+            addToast?.(`Target '${item.vehicle_plate}' removed from watchlist.`, "success", "Watchlist Updated");
+            setWatchlist(prev => prev.filter(w => w.id !== item.id));
+            window.dispatchEvent(new CustomEvent("watchlist_updated"));
+            if (onWatchlistChange) onWatchlistChange(watchlist.length - 1);
+          } else {
+            addToast?.(data.error ? data.error.message : "Failed to delete item", "error", "Error");
+          }
+        } catch (err) {
+          addToast?.(err.message, "error", "Network Error");
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false, isLoading: false }));
+        }
       }
-    } catch (err) {
-      addToast?.(err.message, "error", "Network Error");
-    }
+    });
   };
 
   const handleSaveEdit = async (e) => {
@@ -200,8 +220,8 @@ export const WatchlistManagerPage = ({
                 padding: "0 12px",
                 gap: "6px",
                 fontSize: "12px",
-                background: activeFilterCount > 0 ? "rgba(34, 211, 238, 0.15)" : "rgba(30, 41, 59, 0.55)",
-                borderColor: activeFilterCount > 0 ? "var(--accent)" : "rgba(255, 255, 255, 0.1)",
+                background: activeFilterCount > 0 ? "rgba(34, 211, 238, 0.15)" : "var(--input-bg)",
+                borderColor: activeFilterCount > 0 ? "var(--accent)" : "var(--panel-border)",
                 color: activeFilterCount > 0 ? "var(--accent)" : "var(--text-primary)"
               }}
               title="Open Watchlist Filters"
@@ -434,12 +454,12 @@ export const WatchlistManagerPage = ({
           marginTop: "10px",
           flexWrap: "wrap",
           gap: "12px",
-          background: "rgba(15, 23, 42, 0.4)",
+          background: "var(--panel-bg)",
           borderRadius: "0 0 8px 8px"
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
             <div style={{ fontSize: "12.5px", color: "var(--text-secondary)" }}>
-              Showing <strong style={{ color: "#fff" }}>{(currentPage - 1) * itemsPerPage + 1}</strong>–<strong style={{ color: "#fff" }}>{Math.min(currentPage * itemsPerPage, filteredWatchlist.length)}</strong> of <strong style={{ color: "var(--danger)" }}>{filteredWatchlist.length}</strong> target records
+              Showing <strong style={{ color: "var(--text-primary)" }}>{(currentPage - 1) * itemsPerPage + 1}</strong>–<strong style={{ color: "var(--text-primary)" }}>{Math.min(currentPage * itemsPerPage, filteredWatchlist.length)}</strong> of <strong style={{ color: "var(--danger)" }}>{filteredWatchlist.length}</strong> target records
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-dim)" }}>
@@ -451,8 +471,8 @@ export const WatchlistManagerPage = ({
                   setCurrentPage(1);
                 }}
                 style={{
-                  background: "rgba(30, 41, 59, 0.8)",
-                  color: "#fff",
+                  background: "var(--input-bg)",
+                  color: "var(--text-primary)",
                   border: "1px solid var(--panel-border)",
                   borderRadius: "6px",
                   padding: "3px 8px",
@@ -607,6 +627,19 @@ export const WatchlistManagerPage = ({
           </div>
         </div>
       )}
+
+      <ConfirmWarningModal
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        submessage={confirmDialog.submessage}
+        confirmText={confirmDialog.confirmText}
+        cancelText={confirmDialog.cancelText}
+        type={confirmDialog.type}
+        isLoading={confirmDialog.isLoading}
+      />
     </div>
   );
 };

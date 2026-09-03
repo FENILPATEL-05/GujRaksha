@@ -344,19 +344,74 @@ class WorkerOrchestratorService {
       w.stats.active_streams = w.assigned_cameras.length;
     });
 
-    console.log(`⚖️ [Worker Orchestrator] Central auto-distributed ${allCams.length} ANPR cameras across ${onlineWorkers.length} workers.`);
-
     return {
       success: true,
-      total_cameras: allCams.length,
-      online_workers: onlineWorkers.length,
-      distribution: onlineWorkers.map(w => ({
+      worker_count: onlineWorkers.length,
+      total_cameras_distributed: allCams.length,
+      workers: onlineWorkers.map(w => ({
         worker_id: w.worker_id,
         state: w.state,
-        assigned_count: w.assigned_cameras.length,
-        max_capacity: w.max_capacity
+        assigned_count: w.assigned_cameras.length
       }))
     };
+  }
+
+  /**
+   * Automatically revokes deleted camera from all active worker nodes.
+   */
+  onCameraDeleted(cameraIdOrCode) {
+    if (!cameraIdOrCode) return;
+    const targetStr = String(cameraIdOrCode).toLowerCase();
+    let totalRevoked = 0;
+
+    for (const [workerId, worker] of this.workers.entries()) {
+      const prevCount = worker.assigned_cameras.length;
+      worker.assigned_cameras = worker.assigned_cameras.filter(c => {
+        const idMatch = String(c.id || "").toLowerCase() === targetStr;
+        const codeMatch = String(c.camera_code || "").toLowerCase() === targetStr;
+        return !idMatch && !codeMatch;
+      });
+
+      if (worker.assigned_cameras.length !== prevCount) {
+        totalRevoked += (prevCount - worker.assigned_cameras.length);
+        worker.state = worker.assigned_cameras.length > 0 ? "SCANNING" : "STANDBY";
+        worker.stats.active_streams = worker.assigned_cameras.length;
+
+        try {
+          anprStore.broadcastAlert({
+            type: "WORKER_STATUS_CHANGED",
+            worker_id: worker.worker_id,
+            status: worker.status,
+            state: worker.state,
+            assigned_count: worker.assigned_cameras.length,
+            timestamp: new Date().toISOString()
+          });
+        } catch (_) {}
+      }
+    }
+
+    if (totalRevoked > 0) {
+      console.log(`🛑 [Worker Orchestrator] Revoked deleted camera (${cameraIdOrCode}) from ${totalRevoked} worker stream pipeline(s).`);
+    }
+  }
+
+  /**
+   * Bulk revoke multiple deleted cameras from all workers.
+   */
+  onCamerasDeleted(ids = []) {
+    if (!Array.isArray(ids) || ids.length === 0) return;
+    ids.forEach(id => this.onCameraDeleted(id));
+  }
+
+  /**
+   * Sync worker assignments when camera ANPR / detection_mode is toggled or updated.
+   */
+  syncAllWorkerAssignments() {
+    for (const [workerId, worker] of this.workers.entries()) {
+      if (!worker.is_manually_assigned && worker.status === "ONLINE") {
+        this.heartbeat(workerId);
+      }
+    }
   }
 
   /**

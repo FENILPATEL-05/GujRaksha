@@ -115,7 +115,7 @@ class CameraDataStore {
     try {
       if (pgClient.isConnected()) {
         const res = await pgClient.query('SELECT * FROM cameras ORDER BY created_at DESC');
-        if (res && res.rows) {
+        if (res && res.rows && res.rows.length > 0) {
           this.cameras = res.rows.map(r => ({
             ...r,
             latitude: parseFloat(r.latitude),
@@ -126,6 +126,9 @@ class CameraDataStore {
           }));
           this.rebuildIndexes();
           this.saveToFile(this.cameras);
+        } else if (this.cameras.length > 0) {
+          // Database is empty but local store has seed cameras -> sync local cameras into DB
+          await this.bulkCreate(this.cameras);
         }
       }
     } catch (err) {
@@ -373,6 +376,12 @@ class CameraDataStore {
     return this.cameraMap.get(key) || this.cameras.find(c => c.id === id || c.camera_code === id);
   }
 
+  getByCameraCode(code) {
+    if (!code) return null;
+    const key = String(code).toLowerCase().trim();
+    return this.cameraMap.get(key) || this.cameras.find(c => (c.camera_code || '').toLowerCase() === key);
+  }
+
   getNextCameraIdentifiers() {
     let maxNum = 0;
     this.cameras.forEach(c => {
@@ -485,8 +494,16 @@ class CameraDataStore {
 
   async create(cameraData) {
     const autoIds = this.getNextCameraIdentifiers();
-    const id = cameraData.id || autoIds.id;
-    const cameraCode = cameraData.camera_code || autoIds.camera_code;
+    const inputCode = (cameraData.camera_code || '').trim().toUpperCase();
+    const inputId = (cameraData.id || '').trim();
+
+    const existingCam = this.cameras.find(c => 
+      (inputCode && (c.camera_code || '').toUpperCase() === inputCode) ||
+      (inputId && String(c.id).toLowerCase() === inputId.toLowerCase())
+    );
+
+    const id = inputId || (existingCam ? existingCam.id : autoIds.id);
+    const cameraCode = inputCode || (existingCam ? existingCam.camera_code : autoIds.camera_code);
 
     const streamData = this.normalizeStreamData(cameraData, id);
 
@@ -494,22 +511,24 @@ class CameraDataStore {
       id: id,
       camera_code: cameraCode,
       name: cameraData.name,
-      department_id: cameraData.department_id || 'HOME',
-      department_name: cameraData.department_name || 'Home Department / Gujarat Police',
-      district: cameraData.district || 'Ahmedabad',
-      taluka: cameraData.taluka || '',
+      department_id: cameraData.department_id || (existingCam ? existingCam.department_id : 'HOME'),
+      department_name: cameraData.department_name || (existingCam ? existingCam.department_name : 'Home Department / Gujarat Police'),
+      district: cameraData.district || (existingCam ? existingCam.district : 'Ahmedabad'),
+      taluka: cameraData.taluka || (existingCam ? existingCam.taluka : ''),
       latitude: parseFloat(cameraData.latitude),
       longitude: parseFloat(cameraData.longitude),
-      address: cameraData.address || '',
-      ownership_type: cameraData.ownership_type || 'GOVERNMENT',
-      camera_type: cameraData.camera_type || 'PTZ',
-      detection_mode: cameraData.detection_mode || 'GENERAL_SURVEILLANCE',
-      vms_vendor: cameraData.vms_vendor || 'Live Sentinel Feeder (H264/MP4)',
+      address: cameraData.address || (existingCam ? existingCam.address : ''),
+      ownership_type: cameraData.ownership_type || (existingCam ? existingCam.ownership_type : 'GOVERNMENT'),
+      camera_type: cameraData.camera_type || (existingCam ? existingCam.camera_type : 'PTZ'),
+      detection_mode: (cameraData.detection_mode && cameraData.detection_mode !== 'GENERAL_SURVEILLANCE')
+        ? cameraData.detection_mode
+        : (existingCam ? (existingCam.detection_mode || 'GENERAL_SURVEILLANCE') : (cameraData.detection_mode || 'GENERAL_SURVEILLANCE')),
+      vms_vendor: cameraData.vms_vendor || (existingCam ? existingCam.vms_vendor : 'Live Sentinel Feeder'),
       stream_url: streamData.stream_url,
-      retention_days: parseInt(cameraData.retention_days || 15, 10),
-      status: cameraData.status || 'ACTIVE',
-      installation_date: cameraData.installation_date || new Date().toISOString().split('T')[0],
-      created_at: cameraData.created_at || new Date().toISOString(),
+      retention_days: parseInt(cameraData.retention_days || (existingCam ? existingCam.retention_days : 15), 10),
+      status: cameraData.status || (existingCam ? existingCam.status : 'ACTIVE'),
+      installation_date: cameraData.installation_date || (existingCam ? existingCam.installation_date : new Date().toISOString().split('T')[0]),
+      created_at: existingCam ? existingCam.created_at : (cameraData.created_at || new Date().toISOString()),
       updated_at: new Date().toISOString(),
       codec: streamData.codec,
       urls: streamData.urls,
@@ -519,7 +538,7 @@ class CameraDataStore {
       stream_properties: streamData.stream_properties
     };
 
-    const existingIdx = this.cameras.findIndex(c => c.id === newCamera.id || c.camera_code === newCamera.camera_code);
+    const existingIdx = this.cameras.findIndex(c => c.id === newCamera.id || (c.camera_code && c.camera_code.toUpperCase() === newCamera.camera_code.toUpperCase()));
     if (existingIdx >= 0) {
       this.cameras[existingIdx] = newCamera;
     } else {
@@ -538,9 +557,8 @@ class CameraDataStore {
             vms_vendor, stream_url, rtsp_url, whep_url, hls_url, codec, retention_days,
             status, installation_date, stream_properties, urls, created_at, updated_at
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, NOW(), NOW())
-          ON CONFLICT (id) DO UPDATE SET
+          ON CONFLICT (camera_code) DO UPDATE SET
             name = EXCLUDED.name,
-            camera_code = EXCLUDED.camera_code,
             department_id = EXCLUDED.department_id,
             department_name = EXCLUDED.department_name,
             district = EXCLUDED.district,
@@ -550,7 +568,10 @@ class CameraDataStore {
             address = EXCLUDED.address,
             ownership_type = EXCLUDED.ownership_type,
             camera_type = EXCLUDED.camera_type,
-            detection_mode = EXCLUDED.detection_mode,
+            detection_mode = CASE 
+              WHEN EXCLUDED.detection_mode = 'GENERAL_SURVEILLANCE' AND cameras.detection_mode IS NOT NULL AND cameras.detection_mode != '' THEN cameras.detection_mode 
+              ELSE EXCLUDED.detection_mode 
+            END,
             vms_vendor = EXCLUDED.vms_vendor,
             stream_url = EXCLUDED.stream_url,
             rtsp_url = EXCLUDED.rtsp_url,
@@ -559,6 +580,7 @@ class CameraDataStore {
             codec = EXCLUDED.codec,
             retention_days = EXCLUDED.retention_days,
             status = EXCLUDED.status,
+            installation_date = EXCLUDED.installation_date,
             stream_properties = EXCLUDED.stream_properties,
             urls = EXCLUDED.urls,
             updated_at = NOW()`,
@@ -712,12 +734,186 @@ class CameraDataStore {
     return removedList;
   }
 
-  async bulkCreate(cameraList) {
-    const added = [];
-    for (const c of cameraList) {
-      added.push(await this.create(c));
+  async bulkUpdate(ids = [], updateData = {}) {
+    if (!Array.isArray(ids) || ids.length === 0) return [];
+    const idSet = new Set(ids.map(String));
+    const updatedList = [];
+    const now = new Date().toISOString();
+
+    for (let i = 0; i < this.cameras.length; i++) {
+      const c = this.cameras[i];
+      if (idSet.has(String(c.id)) || idSet.has(String(c.camera_code))) {
+        const updated = {
+          ...c,
+          ...updateData,
+          updated_at: now
+        };
+        this.cameras[i] = updated;
+        updatedList.push(updated);
+      }
     }
-    return added;
+
+    this.rebuildIndexes();
+    this.saveToFile();
+
+    // Direct Database Persistence (PostgreSQL)
+    if (pgClient.isConnected() && updatedList.length > 0) {
+      try {
+        const idArray = Array.from(idSet);
+        if (updateData.detection_mode !== undefined) {
+          await pgClient.query(
+            'UPDATE cameras SET detection_mode = $1, updated_at = NOW() WHERE id = ANY($2) OR camera_code = ANY($2)',
+            [updateData.detection_mode, idArray]
+          );
+        }
+        if (updateData.status !== undefined) {
+          await pgClient.query(
+            'UPDATE cameras SET status = $1, updated_at = NOW() WHERE id = ANY($2) OR camera_code = ANY($2)',
+            [updateData.status, idArray]
+          );
+        }
+      } catch (err) {
+        console.warn('PG Bulk Camera Update Error:', err.message);
+      }
+    }
+
+    return updatedList;
+  }
+
+  async bulkCreate(cameraList) {
+    if (!Array.isArray(cameraList) || cameraList.length === 0) return [];
+
+    const now = new Date().toISOString();
+    const processedCameras = [];
+
+    for (const cameraData of cameraList) {
+      const inputCode = (cameraData.camera_code || '').trim().toUpperCase();
+      const inputId = (cameraData.id || '').trim();
+
+      const existing = this.cameras.find(c => 
+        (inputCode && (c.camera_code || '').toUpperCase() === inputCode) ||
+        (inputId && String(c.id).toLowerCase() === inputId.toLowerCase())
+      );
+
+      const id = inputId || (existing ? existing.id : `cam-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`);
+      const cameraCode = inputCode || (existing ? existing.camera_code : `GJ-${(cameraData.district || 'GEN').substring(0, 3).toUpperCase()}-CAM-${Math.floor(1000 + Math.random() * 9000)}`);
+      const streamData = this.normalizeStreamData(cameraData, id);
+
+      const newCamera = {
+        id: id,
+        camera_code: cameraCode,
+        name: cameraData.name,
+        department_id: cameraData.department_id || (existing ? existing.department_id : 'HOME'),
+        department_name: cameraData.department_name || (existing ? existing.department_name : `${cameraData.department_id || 'Home'} Department`),
+        district: cameraData.district || (existing ? existing.district : 'Ahmedabad'),
+        taluka: cameraData.taluka || (existing ? existing.taluka : ''),
+        latitude: parseFloat(cameraData.latitude),
+        longitude: parseFloat(cameraData.longitude),
+        address: cameraData.address || (existing ? existing.address : ''),
+        ownership_type: cameraData.ownership_type || (existing ? existing.ownership_type : 'GOVERNMENT'),
+        camera_type: cameraData.camera_type || (existing ? existing.camera_type : 'PTZ'),
+        detection_mode: (cameraData.detection_mode && cameraData.detection_mode !== 'GENERAL_SURVEILLANCE')
+          ? cameraData.detection_mode
+          : (existing ? (existing.detection_mode || 'GENERAL_SURVEILLANCE') : (cameraData.detection_mode || 'GENERAL_SURVEILLANCE')),
+        vms_vendor: cameraData.vms_vendor || (existing ? existing.vms_vendor : 'Live Sentinel Feeder'),
+        stream_url: streamData.stream_url,
+        retention_days: parseInt(cameraData.retention_days || (existing ? existing.retention_days : 15), 10),
+        status: cameraData.status || (existing ? existing.status : 'ACTIVE'),
+        installation_date: cameraData.installation_date || (existing ? existing.installation_date : now.split('T')[0]),
+        created_at: existing ? existing.created_at : (cameraData.created_at || now),
+        updated_at: now,
+        codec: streamData.codec,
+        urls: streamData.urls,
+        rtsp_url: streamData.rtsp_url,
+        whep_url: streamData.whep_url,
+        hls_url: streamData.hls_url,
+        stream_properties: streamData.stream_properties
+      };
+
+      processedCameras.push(newCamera);
+
+      const existingIdx = this.cameras.findIndex(c => c.id === newCamera.id || (c.camera_code && c.camera_code.toUpperCase() === newCamera.camera_code.toUpperCase()));
+      if (existingIdx >= 0) {
+        this.cameras[existingIdx] = newCamera;
+      } else {
+        this.cameras.push(newCamera);
+      }
+    }
+
+    this.rebuildIndexes();
+    this.saveToFile();
+
+    // High-Performance Batch Insertion to PostgreSQL in Chunks of 250
+    if (pgClient.isConnected()) {
+      try {
+        const CHUNK_SIZE = 250;
+        for (let i = 0; i < processedCameras.length; i += CHUNK_SIZE) {
+          const chunk = processedCameras.slice(i, i + CHUNK_SIZE);
+          const values = [];
+          const placeholders = [];
+          let paramIdx = 1;
+
+          chunk.forEach((c) => {
+            const rowPlaceholders = [];
+            for (let p = 0; p < 24; p++) {
+              rowPlaceholders.push(`$${paramIdx++}`);
+            }
+            placeholders.push(`(${rowPlaceholders.join(', ')}, NOW(), NOW())`);
+
+            values.push(
+              c.id, c.camera_code, c.name, c.department_id, c.department_name,
+              c.district, c.taluka, c.latitude, c.longitude, c.address,
+              c.ownership_type, c.camera_type, c.detection_mode, c.vms_vendor,
+              c.stream_url, c.rtsp_url, c.whep_url, c.hls_url, c.codec,
+              c.retention_days, c.status, c.installation_date,
+              JSON.stringify(c.stream_properties || {}), JSON.stringify(c.urls || {})
+            );
+          });
+
+          const sql = `
+            INSERT INTO cameras (
+              id, camera_code, name, department_id, department_name, district, taluka,
+              latitude, longitude, address, ownership_type, camera_type, detection_mode,
+              vms_vendor, stream_url, rtsp_url, whep_url, hls_url, codec, retention_days,
+              status, installation_date, stream_properties, urls, created_at, updated_at
+            ) VALUES ${placeholders.join(',\n')}
+            ON CONFLICT (camera_code) DO UPDATE SET
+              name = EXCLUDED.name,
+              department_id = EXCLUDED.department_id,
+              department_name = EXCLUDED.department_name,
+              district = EXCLUDED.district,
+              taluka = EXCLUDED.taluka,
+              latitude = EXCLUDED.latitude,
+              longitude = EXCLUDED.longitude,
+              address = EXCLUDED.address,
+              ownership_type = EXCLUDED.ownership_type,
+              camera_type = EXCLUDED.camera_type,
+              detection_mode = CASE 
+                WHEN EXCLUDED.detection_mode = 'GENERAL_SURVEILLANCE' AND cameras.detection_mode IS NOT NULL AND cameras.detection_mode != '' THEN cameras.detection_mode 
+                ELSE EXCLUDED.detection_mode 
+              END,
+              vms_vendor = EXCLUDED.vms_vendor,
+              stream_url = EXCLUDED.stream_url,
+              rtsp_url = EXCLUDED.rtsp_url,
+              whep_url = EXCLUDED.whep_url,
+              hls_url = EXCLUDED.hls_url,
+              codec = EXCLUDED.codec,
+              retention_days = EXCLUDED.retention_days,
+              status = EXCLUDED.status,
+              installation_date = EXCLUDED.installation_date,
+              stream_properties = EXCLUDED.stream_properties,
+              urls = EXCLUDED.urls,
+              updated_at = NOW()
+          `;
+
+          await pgClient.query(sql, values);
+        }
+      } catch (err) {
+        console.warn('PG Bulk Camera Batch Insert Error:', err.message);
+      }
+    }
+
+    return processedCameras;
   }
 }
 

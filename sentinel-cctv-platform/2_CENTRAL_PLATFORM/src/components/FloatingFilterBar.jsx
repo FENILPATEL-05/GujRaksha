@@ -128,10 +128,6 @@ export const FloatingFilterBar = ({ filters, onFilterChange, onExportCsv, depart
           <RotateCcw size={12} strokeWidth={2.2} /> Reset
         </button>
       )}
-
-      <button className="btn btn-sm" onClick={onExportCsv} title="Export CSV Report">
-        <FileSpreadsheet size={14} strokeWidth={2} /> CSV
-      </button>
     </div>
   );
 };

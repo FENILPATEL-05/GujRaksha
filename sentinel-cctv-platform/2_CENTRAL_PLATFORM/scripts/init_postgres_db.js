@@ -83,7 +83,10 @@ async function main() {
         ON CONFLICT (id) DO UPDATE SET
           camera_code = EXCLUDED.camera_code,
           name = EXCLUDED.name,
-          detection_mode = EXCLUDED.detection_mode,
+          detection_mode = CASE 
+            WHEN EXCLUDED.detection_mode = 'GENERAL_SURVEILLANCE' AND cameras.detection_mode IS NOT NULL AND cameras.detection_mode != '' THEN cameras.detection_mode 
+            ELSE EXCLUDED.detection_mode 
+          END,
           status = EXCLUDED.status`,
         [
           c.id, c.camera_code, c.name, c.department_id, c.department_name, c.district, c.taluka || '',

@@ -51,6 +51,26 @@ class AnprDataStore {
     return this.liveCameraDetections.get(cameraCode) || null;
   }
 
+  onCameraDeleted(cameraIdOrCode) {
+    if (!cameraIdOrCode) return;
+    const str = String(cameraIdOrCode).toUpperCase().trim();
+    const toDelete = [];
+    for (const [key, val] of this.liveCameraDetections.entries()) {
+      const keyUpper = String(key).toUpperCase().trim();
+      const idUpper = String(val?.camera_id || '').toUpperCase().trim();
+      const codeUpper = String(val?.camera_code || '').toUpperCase().trim();
+      if (keyUpper === str || idUpper === str || codeUpper === str || keyUpper.includes(str) || (str.length > 3 && str.includes(keyUpper))) {
+        toDelete.push(key);
+      }
+    }
+    toDelete.forEach(k => this.liveCameraDetections.delete(k));
+  }
+
+  onCamerasDeleted(ids = []) {
+    if (!Array.isArray(ids)) return;
+    ids.forEach(id => this.onCameraDeleted(id));
+  }
+
   loadFromFile() {
     try {
       if (fs.existsSync(ANPR_FILE)) {

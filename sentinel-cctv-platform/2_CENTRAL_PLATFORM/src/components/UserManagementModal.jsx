@@ -13,6 +13,7 @@ import {
   FolderOpen
 } from 'lucide-react';
 import { Pagination } from './Pagination';
+import { ConfirmWarningModal } from './ConfirmWarningModal';
 
 export const UserManagementPage = ({ departments = [], addToast }) => {
   const [users, setUsers] = useState([]);
@@ -112,28 +113,48 @@ export const UserManagementPage = ({ departments = [], addToast }) => {
     }
   };
 
-  const handleDeleteUser = async (u) => {
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    submessage: '',
+    confirmText: 'Remove User',
+    type: 'danger',
+    onConfirm: null,
+    isLoading: false
+  });
+
+  const handleDeleteUser = (u) => {
     if (u.username === 'superadmin' || u.username === 'admin') {
       addToast('Primary Superadmin account cannot be deleted.', 'error', 'Protected Account');
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to remove user '${u.name}' (${u.username}) from GujRaksha?`)) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/v1/auth/users/${u.id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) {
-        addToast(`User '${u.name}' removed successfully.`, 'success', 'User Deleted');
-        fetchUsers();
-      } else {
-        addToast(data.error?.message || 'Failed to delete user', 'error', 'Error');
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Remove User Account?',
+      message: `Are you sure you want to remove user "${u.name}" (@${u.username}) from GujRaksha?`,
+      submessage: `Assigned Role: ${u.role} | Department: ${u.department_id || 'All Statewide'}`,
+      confirmText: 'Remove User',
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(prev => ({ ...prev, isLoading: true }));
+        try {
+          const res = await fetch(`/api/v1/auth/users/${u.id}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (data.success) {
+            addToast(`User '${u.name}' removed successfully.`, 'success', 'User Deleted');
+            fetchUsers();
+          } else {
+            addToast(data.error?.message || 'Failed to delete user', 'error', 'Error');
+          }
+        } catch (err) {
+          addToast(err.message, 'error', 'Network Error');
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false, isLoading: false }));
+        }
       }
-    } catch (err) {
-      addToast(err.message, 'error', 'Network Error');
-    }
+    });
   };
 
   const renderRoleBadge = (role) => {
@@ -480,6 +501,19 @@ export const UserManagementPage = ({ departments = [], addToast }) => {
           </div>
         </div>
       )}
+
+      <ConfirmWarningModal
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        submessage={confirmDialog.submessage}
+        confirmText={confirmDialog.confirmText}
+        cancelText={confirmDialog.cancelText}
+        type={confirmDialog.type}
+        isLoading={confirmDialog.isLoading}
+      />
     </div>
   );
 };

@@ -977,6 +977,8 @@ class StreamStatsRegistry:
             if total > 0:
                 offline_msg = f" | \x1b[31m🔴 {offline} Offline (Auto-Retrying)\x1b[0m" if offline > 0 else ""
                 print(f"📊 \x1b[1m\x1b[36m[{worker_id}]\x1b[0m \x1b[32m🟢 {active}/{total} Streams Active (Scanning)\x1b[0m{offline_msg}", flush=True)
+            else:
+                print(f"📊 \x1b[1m\x1b[36m[{worker_id}]\x1b[0m \x1b[33m⏸️ 0 Feeds Active (Standby — Awaiting ANPR camera assignment)\x1b[0m", flush=True)
 
 
 GLOBAL_STATS = StreamStatsRegistry()
@@ -1394,13 +1396,21 @@ class CameraWorkerThread(threading.Thread):
 
             except Exception:
                 if cap:
-                    cap.release()
+                    try:
+                        cap.release()
+                    except Exception:
+                        pass
                 cap = None
-                GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
-                time.sleep(1.0)
+                if self.running:
+                    GLOBAL_STATS.set_status(self.camera_code, "OFFLINE")
+                    time.sleep(1.0)
 
         if cap:
-            cap.release()
+            try:
+                cap.release()
+            except Exception:
+                pass
+        GLOBAL_STATS.set_status(self.camera_code, "REMOVED")
 
 
 class DistributedWorkerManager:
@@ -1511,6 +1521,10 @@ class DistributedWorkerManager:
                 GLOBAL_STATS.set_status(code, "REMOVED")
                 del self.workers[code]
                 detached += 1
+
+        if len(current_codes) == 0:
+            with GLOBAL_STATS.lock:
+                GLOBAL_STATS.stream_statuses.clear()
 
         if detached > 0:
             print(f"⏹️ [Cluster Dispatch] Revoked {detached} cameras (Active feeds: {len(assigned_cameras)}).", flush=True)

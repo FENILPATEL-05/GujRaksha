@@ -23,13 +23,16 @@ import {
   Activity,
   Layers,
   Eye,
+  EyeOff,
   Building2,
   Lock,
   RefreshCw,
-  Info
+  Info,
+  Upload
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Pagination } from './Pagination';
+import { BulkCameraImportModal } from './BulkCameraImportModal';
 
 const renderCameraTypeIcon = (type, size = 16) => {
   const normalized = String(type || '').toUpperCase();
@@ -112,10 +115,14 @@ export const CameraRegistryPage = ({
   onDeleteCamera,
   onBulkDeleteCameras,
   onExportCsv,
+  onImportCsv,
   onAddCamera,
   onSyncFeeds,
+  onRefresh,
+  addToast,
   departments = [],
-  isLoading = false
+  isLoading = false,
+  setIsLoading
 }) => {
   const { isSuperAdmin, isDeptAdmin, isViewer, userDepartmentId, userDepartmentName, canManageCameras } = useAuth();
   const [selectedCameraForDetails, setSelectedCameraForDetails] = useState(null);
@@ -124,7 +131,9 @@ export const CameraRegistryPage = ({
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [selectedCameraIds, setSelectedCameraIds] = useState(new Set());
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+  const [isUpdatingBulk, setIsUpdatingBulk] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
 
   const handleSyncClick = async () => {
@@ -141,8 +150,16 @@ export const CameraRegistryPage = ({
   // Pagination calculation
   const totalItems = cameras.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-  const startIndex = (currentPage - 1) * itemsPerPage;
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * itemsPerPage;
   const currentCameras = cameras.slice(startIndex, startIndex + itemsPerPage);
+
+  // Auto-clamp currentPage when dataset size shrinks
+  React.useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -190,6 +207,45 @@ export const CameraRegistryPage = ({
       setSelectedCameraIds(new Set());
     } finally {
       setIsDeletingBulk(false);
+    }
+  };
+
+  const handleExecuteBulkANPR = async (enable) => {
+    if (selectedCameraIds.size === 0) return;
+    const mode = enable ? 'ANPR_DETECTION' : 'GENERAL_SURVEILLANCE';
+    const label = enable ? 'ANPR AI Detection' : 'Standard Surveillance (No ANPR)';
+
+    setIsUpdatingBulk(true);
+    try {
+      const res = await fetch('/api/v1/cameras/bulk-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ids: Array.from(selectedCameraIds),
+          updateData: {
+            detection_mode: mode
+          }
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (addToast) {
+          addToast(
+            `Successfully set ${selectedCameraIds.size} camera(s) to ${label}!`,
+            'success',
+            'Bulk AI Mode Updated'
+          );
+        }
+        setSelectedCameraIds(new Set());
+        if (onRefresh) onRefresh();
+      } else {
+        const msg = data.error?.message || data.message || 'Bulk AI mode update failed';
+        if (addToast) addToast(msg, 'error', 'Error');
+      }
+    } catch (err) {
+      if (addToast) addToast(err.message || 'Network error', 'error', 'Network Error');
+    } finally {
+      setIsUpdatingBulk(false);
     }
   };
 
@@ -437,6 +493,23 @@ export const CameraRegistryPage = ({
           <button className="btn" onClick={onExportCsv} title="Export CSV, JSON, GeoJSON Reports" style={{ height: '36px', padding: '0 11px', gap: '5px', fontSize: '12px' }}>
             <FileSpreadsheet size={13} strokeWidth={2.2} /> <span>Export</span>
           </button>
+
+          {canManageCameras && (
+            <button
+              className="btn"
+              onClick={() => {
+                if (onImportCsv) {
+                  onImportCsv();
+                } else {
+                  setIsImportModalOpen(true);
+                }
+              }}
+              title="Bulk Import Cameras via CSV File"
+              style={{ height: '36px', padding: '0 11px', gap: '5px', fontSize: '12px' }}
+            >
+              <Upload size={13} strokeWidth={2.2} /> <span>Import</span>
+            </button>
+          )}
           
           {canManageCameras && (
             <button className="btn btn-primary" onClick={onAddCamera} title="Onboard New Camera Node" style={{ height: '36px', padding: '0 13px', gap: '5px', fontSize: '12px' }}>
@@ -516,14 +589,14 @@ export const CameraRegistryPage = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'linear-gradient(90deg, rgba(239, 68, 68, 0.16) 0%, rgba(15, 23, 42, 0.9) 100%)',
-            border: '1px solid rgba(239, 68, 68, 0.4)',
+            background: 'var(--panel-bg)',
+            border: '1.5px solid rgba(239, 68, 68, 0.35)',
             padding: '10px 16px',
             borderRadius: '10px',
             marginBottom: '14px',
             flexWrap: 'wrap',
             gap: '10px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+            boxShadow: 'var(--shadow-sm)',
             animation: 'modalFadeIn 0.2s ease'
           }}
         >
@@ -540,24 +613,67 @@ export const CameraRegistryPage = ({
                 type="button"
                 className="btn btn-sm"
                 onClick={handleSelectAllFiltered}
-                style={{ fontSize: '11px', padding: '3px 10px', background: 'var(--input-bg)' }}
+                style={{ fontSize: '11px', padding: '4px 10px', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--panel-border)', borderRadius: '6px', fontWeight: 600 }}
               >
                 Select all {totalItems} matching cameras
               </button>
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             {canManageCameras && (
-              <button
-                type="button"
-                className="btn btn-sm btn-danger"
-                onClick={handleExecuteBulkDelete}
-                disabled={isDeletingBulk}
-                style={{ fontWeight: 700, gap: '6px', padding: '6px 14px' }}
-              >
-                <Trash2 size={14} strokeWidth={2.4} /> {isDeletingBulk ? 'Deleting...' : `Delete Selected (${selectedCameraIds.size})`}
-              </button>
+              <>
+                {/* Bulk Turn ON ANPR */}
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => handleExecuteBulkANPR(true)}
+                  disabled={isUpdatingBulk || isDeletingBulk}
+                  style={{
+                    background: 'rgba(56, 189, 248, 0.16)',
+                    borderColor: '#38bdf8',
+                    color: '#38bdf8',
+                    fontWeight: 700,
+                    gap: '6px',
+                    padding: '6px 13px',
+                    fontSize: '11.5px'
+                  }}
+                  title="Enable ANPR Automatic License Plate Recognition on selected cameras"
+                >
+                  <Zap size={14} strokeWidth={2.4} /> {isUpdatingBulk ? 'Updating...' : `Turn ON ANPR (${selectedCameraIds.size})`}
+                </button>
+
+                {/* Bulk Turn OFF ANPR (No ANPR) */}
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => handleExecuteBulkANPR(false)}
+                  disabled={isUpdatingBulk || isDeletingBulk}
+                  style={{
+                    background: 'rgba(148, 163, 184, 0.12)',
+                    borderColor: 'rgba(148, 163, 184, 0.35)',
+                    color: 'var(--text-secondary)',
+                    fontWeight: 600,
+                    gap: '6px',
+                    padding: '6px 13px',
+                    fontSize: '11.5px'
+                  }}
+                  title="Disable ANPR and set to standard surveillance"
+                >
+                  <EyeOff size={14} strokeWidth={2.2} /> {isUpdatingBulk ? 'Updating...' : `No ANPR / Standard (${selectedCameraIds.size})`}
+                </button>
+
+                {/* Bulk Delete */}
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  onClick={handleExecuteBulkDelete}
+                  disabled={isDeletingBulk || isUpdatingBulk}
+                  style={{ fontWeight: 700, gap: '6px', padding: '6px 14px', fontSize: '11.5px' }}
+                >
+                  <Trash2 size={14} strokeWidth={2.4} /> {isDeletingBulk ? 'Deleting...' : `Delete (${selectedCameraIds.size})`}
+                </button>
+              </>
             )}
             <button
               type="button"
@@ -571,7 +687,33 @@ export const CameraRegistryPage = ({
         </div>
       )}
 
-      <div className="table-wrap">
+      <div className="table-wrap" style={{ position: 'relative' }}>
+        {isLoading && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'rgba(3, 7, 18, 0.76)',
+              backdropFilter: 'blur(3px)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 20,
+              borderRadius: '8px',
+              gap: '10px'
+            }}
+          >
+            <RefreshCw size={32} className="spin-animation" style={{ color: 'var(--accent)', animation: 'radarSpin 1s linear infinite' }} />
+            <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#fff' }}>
+              Ingesting & Synchronizing Camera Assets...
+            </div>
+            <div style={{ fontSize: '11.5px', color: 'var(--text-dim)' }}>
+              Processing batch records and updating database registry...
+            </div>
+          </div>
+        )}
+
         <table>
           <thead>
             <tr>
@@ -595,9 +737,18 @@ export const CameraRegistryPage = ({
           <tbody>
             {currentCameras.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>
-                  <FolderOpen size={36} strokeWidth={1.5} style={{ color: 'var(--accent)', marginBottom: '8px' }} />
-                  <div>No camera assets match the search criteria.</div>
+                <td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-dim)' }}>
+                  {isLoading ? (
+                    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                      <RefreshCw size={30} className="spin-animation" style={{ color: 'var(--accent)', animation: 'radarSpin 1s linear infinite' }} />
+                      <div style={{ fontWeight: 700, fontSize: '13.5px', color: '#fff' }}>Ingesting & Loading Camera Registry...</div>
+                    </div>
+                  ) : (
+                    <>
+                      <FolderOpen size={36} strokeWidth={1.5} style={{ color: 'var(--accent)', marginBottom: '8px' }} />
+                      <div>No camera assets match the search criteria.</div>
+                    </>
+                  )}
                 </td>
               </tr>
             ) : (
@@ -982,6 +1133,23 @@ export const CameraRegistryPage = ({
           </div>
         </div>
       )}
+
+      <BulkCameraImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImportStart={() => {
+          setIsImportModalOpen(false);
+          if (setIsLoading) setIsLoading(true);
+        }}
+        onImportSuccess={() => {
+          setIsImportModalOpen(false);
+          setCurrentPage(1);
+          setSelectedCameraIds(new Set());
+          if (onRefresh) onRefresh();
+        }}
+        addToast={addToast}
+        departments={departments}
+      />
     </div>
   );
 };

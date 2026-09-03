@@ -3,6 +3,7 @@ import { Building2, X, Check, RefreshCw } from "lucide-react";
 
 export const AddDepartmentModal = ({ isOpen, onClose, onSaveSuccess, addToast, editingDept = null }) => {
   const [form, setForm] = useState({
+    code: "",
     name: "",
     nodal_officer: "",
     contact_email: "",
@@ -14,6 +15,7 @@ export const AddDepartmentModal = ({ isOpen, onClose, onSaveSuccess, addToast, e
   useEffect(() => {
     if (editingDept) {
       setForm({
+        code: editingDept.code || "",
         name: editingDept.name || "",
         nodal_officer: editingDept.nodal_officer || "",
         contact_email: editingDept.contact_email || "",
@@ -22,6 +24,7 @@ export const AddDepartmentModal = ({ isOpen, onClose, onSaveSuccess, addToast, e
       });
     } else {
       setForm({
+        code: "",
         name: "",
         nodal_officer: "",
         contact_email: "",
@@ -93,13 +96,34 @@ export const AddDepartmentModal = ({ isOpen, onClose, onSaveSuccess, addToast, e
                 <input
                   type="text"
                   required
-                  placeholder="Enter department name"
+                  placeholder="Enter department name (e.g. Home Department / Gujarat Police)"
                   value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const autoCode = !editingDept && !form.code ? val.toUpperCase().replace(/[^A-Z0-9]/g, '_').replace(/_+/g, '_').slice(0, 20) : form.code;
+                    setForm({ ...form, name: val, code: autoCode });
+                  }}
                 />
               </div>
 
-              {/* Row 2: Nodal Officer & Color */}
+              {/* Row 2: Unique Department Key */}
+              <div className="form-field span-2">
+                <label>Unique Department Key / Identifier *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. HOME, TRANSPORT, URBAN_DEV, FOREST, HEALTH (Used in CSV camera mapping)"
+                  value={form.code}
+                  disabled={!!editingDept}
+                  onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '') })}
+                  style={{ fontFamily: "var(--font-mono)", fontWeight: 700, letterSpacing: "0.5px" }}
+                />
+                <span style={{ fontSize: "11px", color: "var(--text-dim)", marginTop: "4px" }}>
+                  This unique key will be used in CSV files (`department_key`) to link cameras directly to this department.
+                </span>
+              </div>
+
+              {/* Row 3: Nodal Officer & Color */}
               <div className="form-field">
                 <label>Nodal CCTV Officer</label>
                 <input

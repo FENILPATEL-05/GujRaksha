@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SquarePen, X, Trash2, Save, RefreshCw, AlertCircle, Sliders, Radio, Zap } from 'lucide-react';
+import { ConfirmWarningModal } from './ConfirmWarningModal';
 
 
 const GUJARAT_DISTRICTS = [
@@ -209,16 +210,18 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
     }
   };
 
-  const handleDelete = async () => {
-    if (!window.confirm(`Are you sure you want to remove camera '${camera.name}' [${camera.camera_code || camera.id}] from the registry?`)) return;
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-    setIsSubmitting(true);
+  const handleExecuteDelete = async () => {
+    setIsDeleting(true);
     try {
       const targetId = camera.id || camera.camera_code;
       const res = await fetch(`/api/v1/cameras/${encodeURIComponent(targetId)}`, { method: 'DELETE' });
       const data = await res.json();
       if (res.ok && data.success) {
         if (addToast) addToast('Camera successfully deleted.', 'success', 'Camera Removed');
+        setShowDeleteConfirm(false);
         onClose();
         if (onSaveSuccess) onSaveSuccess();
       } else {
@@ -228,7 +231,7 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
     } catch (err) {
       if (addToast) addToast(err.message || 'Network error', 'error', 'Network Error');
     } finally {
-      setIsSubmitting(false);
+      setIsDeleting(false);
     }
   };
 
@@ -514,20 +517,20 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
             <button
               type="button"
               className="btn btn-danger-outline"
-              onClick={handleDelete}
-              disabled={isSubmitting}
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isSubmitting || isDeleting}
               style={{ gap: '6px' }}
             >
               <Trash2 size={14} strokeWidth={2} /> Delete Camera
             </button>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button type="button" className="btn" onClick={onClose} disabled={isSubmitting}>
+              <button type="button" className="btn" onClick={onClose} disabled={isSubmitting || isDeleting}>
                 Cancel
               </button>
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isDeleting}
                 style={{ gap: '6px' }}
               >
                 {isSubmitting ? (
@@ -544,6 +547,18 @@ export const EditModal = ({ camera, onClose, onSaveSuccess, addToast, department
           </div>
         </form>
       </div>
+
+      <ConfirmWarningModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleExecuteDelete}
+        title="Delete Camera Asset?"
+        message={`Are you sure you want to permanently remove "${camera?.name}" (${camera?.camera_code || camera?.id})?`}
+        submessage="This will unregister video stream bridges, remove GIS coordinates, and detach AI ANPR detection workers."
+        confirmText="Delete Camera"
+        type="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 };

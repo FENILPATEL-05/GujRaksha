@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef } from 'react';
+import L from 'leaflet';
 import {
   Radio,
   X,
@@ -9,151 +10,177 @@ import {
   Home,
   ZoomIn,
   ZoomOut,
-  SquarePen,
-  ExternalLink,
-  Power,
-  Copy,
-  Check,
-  Zap
+  Power
 } from 'lucide-react';
 import { LiveCCTVFeed } from './LiveCCTVFeed';
 
-export const StreamModal = ({ camera, onClose, onEditCamera }) => {
-  const [copied, setCopied] = useState(false);
+const DISTRICT_FALLBACK = {
+  'Ahmedabad': [23.0225, 72.5714], 'Surat': [21.1702, 72.8311], 'Vadodara': [22.3072, 73.1812],
+  'Rajkot': [22.3039, 70.8022], 'Gandhinagar': [23.2156, 72.6369], 'Bhavnagar': [21.7645, 72.1519],
+  'Jamnagar': [22.4707, 70.0577], 'Junagadh': [21.5222, 70.4579], 'Kutch': [23.242, 69.6669],
+};
 
+const MiniMap = ({ lat, lng, label }) => {
+  const mapRef = useRef(null);
+  const mapInstance = useRef(null);
+
+  useEffect(() => {
+    if (!mapRef.current || mapInstance.current) return;
+    const map = L.map(mapRef.current, {
+      center: [lat, lng],
+      zoom: 14,
+      zoomControl: true,
+      attributionControl: false,
+      dragging: true,
+      scrollWheelZoom: true,
+      doubleClickZoom: true,
+      touchZoom: true,
+      boxZoom: true,
+      keyboard: false
+    });
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 20,
+      maxNativeZoom: 18
+    }).addTo(map);
+
+    // Glowing cyan marker
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:14px;height:14px;border-radius:50%;background:#22d3ee;border:2px solid #fff;box-shadow:0 0 10px #22d3ee,0 0 20px rgba(34,211,238,0.4);"></div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
+    });
+    L.marker([lat, lng], { icon }).addTo(map);
+
+    if (label) {
+      L.marker([lat, lng], {
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="white-space:nowrap;font-size:10px;font-weight:700;color:#22d3ee;text-shadow:0 1px 4px #000;padding:2px 6px;background:rgba(0,0,0,0.6);border-radius:4px;transform:translateX(-50%);margin-top:4px;">${label}</div>`,
+          iconSize: [0, 0],
+          iconAnchor: [0, -12]
+        })
+      }).addTo(map);
+    }
+
+    mapInstance.current = map;
+
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+    };
+  }, [lat, lng, label]);
+
+  return (
+    <div
+      ref={mapRef}
+      style={{
+        width: '100%',
+        height: '160px',
+        borderRadius: '8px',
+        border: '1px solid var(--panel-border)',
+        overflow: 'hidden'
+      }}
+    />
+  );
+};
+
+export const StreamModal = ({ camera, onClose, onEditCamera }) => {
   if (!camera) return null;
 
-  const resolveWhepUrl = (cam) => {
-    if (!cam) return '';
-    const currentHost = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
-    const sanitizeUrl = (u) => {
-      if (!u) return u;
-      if (currentHost && currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
-        return u.replace('localhost', currentHost).replace('127.0.0.1', currentHost);
-      }
-      return u;
-    };
+  const isPTZ = (camera.camera_type || '').toUpperCase() === 'PTZ';
 
-    if (cam.whep_url && cam.whep_url.trim()) return sanitizeUrl(cam.whep_url.trim());
-    if (cam.urls && cam.urls.whep && cam.urls.whep.trim()) return sanitizeUrl(cam.urls.whep.trim());
-    if (cam.stream_url && (cam.stream_url.endsWith('/whep') || cam.stream_url.includes(':8889/'))) {
-      return sanitizeUrl(cam.stream_url.trim());
-    }
-    if (cam.rtsp_url && (cam.rtsp_url.includes(':8554/') || cam.rtsp_url.includes('/stream/'))) {
-      const match = cam.rtsp_url.match(/rtsp:\/\/(?:[^@]+@)?([^:/]+):?(\d*)\/(.+)/);
-      if (match) {
-        const hostPart = (match[1] === 'localhost' || match[1] === '127.0.0.1') ? currentHost : match[1];
-        return `http://${hostPart}:8889/${match[3]}/whep`;
-      }
-    }
-    const cleanId = String(cam.number || (cam.id || '').replace('gov-feed-', '').replace('cam-', '') || '1');
-    return `http://${currentHost}:8889/stream/${cleanId}/whep`;
-  };
-
-  const whepUrl = resolveWhepUrl(camera);
-  const rtspUrl = camera.rtsp_url || (camera.urls && camera.urls.rtsp) || camera.stream_url || '';
-
-  const handleCopyWhep = () => {
-    navigator.clipboard.writeText(whepUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
+  // Resolve camera location
+  let lat = parseFloat(camera.latitude);
+  let lng = parseFloat(camera.longitude);
+  if (isNaN(lat) || isNaN(lng)) {
+    const fallback = DISTRICT_FALLBACK[camera.district];
+    if (fallback) { lat = fallback[0]; lng = fallback[1]; }
+  }
+  const hasLocation = !isNaN(lat) && !isNaN(lng);
 
   return (
     <div className="modal-overlay">
-      <div className="modal modal-lg">
+      <div className="modal modal-xl">
         <div className="modal-head">
           <h3>
-            <Radio size={16} strokeWidth={2.2} style={{ color: 'var(--accent)' }} /> Live Surveillance Feed — <span>{camera.name}</span>
+            <Radio size={16} strokeWidth={2.2} style={{ color: 'var(--accent)' }} /> Live Feed — <span>{camera.name}</span>
           </h3>
           <button className="modal-close" onClick={onClose}><X size={16} strokeWidth={2.2} /></button>
         </div>
         <div className="modal-body">
           <div className="stream-modal-layout">
-            {/* Left: Stream Monitor Screen (Pure Raw Stream by default) */}
+            {/* Left: Stream Monitor Screen */}
             <div className="stream-screen">
               <LiveCCTVFeed camera={camera} isMuted={true} isDetailed={true} showAiVision={false} />
             </div>
 
-
-            {/* Right: Metadata Grid + PTZ Controls */}
-            <div>
-              <div className="stream-meta-grid">
+            {/* Right: Compact Info + Mini Map + PTZ */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="stream-meta-grid" style={{ gridTemplateColumns: '1fr' }}>
+                <div className="item">
+                  <span>Status</span>
+                  <b style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: camera.status === 'ACTIVE' ? '#22c55e' : '#ef4444',
+                      display: 'inline-block',
+                      boxShadow: camera.status === 'ACTIVE' ? '0 0 6px #22c55e' : '0 0 6px #ef4444',
+                      flexShrink: 0
+                    }} />
+                    {camera.status}
+                  </b>
+                </div>
                 <div className="item"><span>District</span><b>{camera.district || '—'}</b></div>
                 <div className="item"><span>Department</span><b>{camera.department_name || camera.department_id || '—'}</b></div>
-                <div className="item"><span>Protocol / SLA</span><b style={{ color: 'var(--success)' }}>WHEP WebRTC (Ultra Low Latency)</b></div>
-                <div className="item"><span>AI Vision Engine</span><b style={{ color: 'var(--accent)' }}>YOLOv9 + COCO 80 + CCT ANPR</b></div>
-                <div className="item"><span>Codec & Res</span><b>{camera.codec || camera.stream_properties?.codec || 'H.264'} · {camera.stream_properties?.resolution || camera.resolution || '1080p FHD'}</b></div>
-                <div className="item"><span>VMS Vendor</span><b>{camera.vms_vendor || 'Live Sentinel Feeder'}</b></div>
-                <div className="item"><span>Status</span><b style={{ color: camera.status === 'ACTIVE' ? 'var(--success)' : 'var(--danger)' }}>{camera.status}</b></div>
-                
-                {/* WHEP Endpoint URL */}
-                <div className="item" style={{ gridColumn: '1 / -1', background: 'rgba(34, 211, 238, 0.06)', border: '1px solid rgba(34, 211, 238, 0.2)', padding: '8px 10px', borderRadius: '6px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--accent)', fontWeight: 700 }}>WHEP URL</span>
-                    <button
-                      className="btn btn-sm"
-                      onClick={handleCopyWhep}
-                      style={{ fontSize: '10px', padding: '1px 6px', gap: '3px' }}
-                    >
-                      {copied ? <Check size={10} style={{ color: 'var(--success)' }} /> : <Copy size={10} />}
-                      {copied ? 'Copied' : 'Copy'}
-                    </button>
-                  </div>
-                  <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', wordBreak: 'break-all', marginTop: '2px' }}>
-                    {whepUrl}
-                  </div>
-                </div>
               </div>
 
-              {/* PTZ Panel */}
-              <div className="ptz-panel" style={{ marginTop: '12px' }}>
+              {/* Mini GIS Map */}
+              {hasLocation && (
                 <div>
-                  <div className="ptz-dpad">
-                    <span></span><button title="Tilt Up"><ChevronUp size={13} strokeWidth={2.4} /></button><span></span>
-                    <button title="Pan Left"><ChevronLeft size={13} strokeWidth={2.4} /></button>
-                    <button className="center" title="Reset"><Home size={11} strokeWidth={2.2} /></button>
-                    <button title="Pan Right"><ChevronRight size={13} strokeWidth={2.4} /></button>
-                    <span></span><button title="Tilt Down"><ChevronDown size={13} strokeWidth={2.4} /></button><span></span>
+                  <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.4px', color: 'var(--text-dim)', marginBottom: '5px', fontWeight: 600 }}>
+                    Camera Location
                   </div>
-                  <div className="ptz-label">Directional</div>
+                  <MiniMap lat={lat} lng={lng} label={camera.name} />
                 </div>
+              )}
 
-                <div>
-                  <div className="ptz-zoom">
-                    <button title="Zoom In"><ZoomIn size={13} strokeWidth={2} /></button>
-                    <button title="Zoom Out"><ZoomOut size={13} strokeWidth={2} /></button>
+              {/* PTZ Panel — only for PTZ cameras */}
+              {isPTZ && (
+                <div className="ptz-panel" style={{ marginTop: '4px' }}>
+                  <div>
+                    <div className="ptz-dpad">
+                      <span></span><button title="Tilt Up"><ChevronUp size={13} strokeWidth={2.4} /></button><span></span>
+                      <button title="Pan Left"><ChevronLeft size={13} strokeWidth={2.4} /></button>
+                      <button className="center" title="Reset"><Home size={11} strokeWidth={2.2} /></button>
+                      <button title="Pan Right"><ChevronRight size={13} strokeWidth={2.4} /></button>
+                      <span></span><button title="Tilt Down"><ChevronDown size={13} strokeWidth={2.4} /></button><span></span>
+                    </div>
+                    <div className="ptz-label">Directional</div>
                   </div>
-                  <div className="ptz-label">Zoom</div>
-                </div>
 
-                <div>
-                  <div className="ptz-zoom">
-                    <button title="Edit Camera" onClick={() => onEditCamera(camera)}><SquarePen size={13} strokeWidth={2} /></button>
-                    <a href={whepUrl} target="_blank" rel="noreferrer">
-                      <button title="Open WHEP Link in Browser"><ExternalLink size={13} strokeWidth={2} /></button>
-                    </a>
+                  <div>
+                    <div className="ptz-zoom">
+                      <button title="Zoom In"><ZoomIn size={13} strokeWidth={2} /></button>
+                      <button title="Zoom Out"><ZoomOut size={13} strokeWidth={2} /></button>
+                    </div>
+                    <div className="ptz-label">Zoom</div>
                   </div>
-                  <div className="ptz-label">Actions</div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
 
         <div className="modal-foot">
           <button className="btn btn-danger-outline" onClick={onClose}><Power size={14} strokeWidth={2} /> Close Session</button>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="btn" onClick={handleCopyWhep}>
-              {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'WHEP Copied!' : 'Copy WHEP URL'}
-            </button>
-            <button className="btn btn-primary" onClick={() => window.open(whepUrl, '_blank')}>
-              <ExternalLink size={14} strokeWidth={2} /> Open WHEP Endpoint
-            </button>
-          </div>
         </div>
       </div>
     </div>
   );
 };
-
