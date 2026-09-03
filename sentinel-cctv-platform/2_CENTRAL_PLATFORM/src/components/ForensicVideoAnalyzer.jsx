@@ -169,32 +169,41 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
     const frameW = canvas.width || 640;
     const frameH = canvas.height || 360;
 
+    const timeFormatted = formatTime(timestamp, true);
+
     // 1. Process Plates
     plates.forEach((p, idx) => {
       const isWatchlistHit = checkIsWatchlist(p.plate_text);
       const [bx, by, bw, bh] = p.box || [0.3, 0.4, 0.4, 0.2];
       
-      // Extract thumbnail snapshot
+      // Extract thumbnail snapshot with embedded timestamp watermark
       const snapCanvas = document.createElement("canvas");
-      snapCanvas.width = 120;
-      snapCanvas.height = 60;
+      snapCanvas.width = 160;
+      snapCanvas.height = 80;
       const sCtx = snapCanvas.getContext("2d");
       const sx = Math.max(0, (bx - 0.05) * frameW);
       const sy = Math.max(0, (by - 0.05) * frameH);
       const sw = Math.min(frameW - sx, (bw + 0.1) * frameW);
       const sh = Math.min(frameH - sy, (bh + 0.1) * frameH);
-      sCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, 120, 60);
+      sCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, 160, 80);
+
+      // Embedded Timestamp Watermark Banner on Image
+      sCtx.fillStyle = "rgba(15, 23, 42, 0.85)";
+      sCtx.fillRect(0, 80 - 20, 160, 20);
+      sCtx.fillStyle = "#eab308";
+      sCtx.font = "bold 11px monospace";
+      sCtx.fillText(`⏱ ${timeFormatted}`, 6, 80 - 6);
 
       frameDetections.push({
         id: `plt_${timestamp.toFixed(2)}_${idx}_${Date.now()}`,
         time: timestamp,
-        timeFormatted: formatTime(timestamp, true),
+        timeFormatted: timeFormatted,
         type: "PLATE",
         label: p.plate_text || "PLATE",
         confidence: Math.round((p.confidence || 0.9) * 100),
         box: p.box,
         isWatchlist: isWatchlistHit,
-        snapshot: snapCanvas.toDataURL("image/jpeg", 0.8)
+        snapshot: snapCanvas.toDataURL("image/jpeg", 0.85)
       });
     });
 
@@ -206,27 +215,34 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
       const isBike = ["motorcycle", "bike", "bicycle"].includes(cls);
       const [bx, by, bw, bh] = obj.box || [0.2, 0.2, 0.4, 0.4];
 
-      // Extract object thumbnail
+      // Extract object thumbnail with embedded timestamp watermark
       const snapCanvas = document.createElement("canvas");
-      snapCanvas.width = 90;
-      snapCanvas.height = 70;
+      snapCanvas.width = 160;
+      snapCanvas.height = 100;
       const sCtx = snapCanvas.getContext("2d");
       const sx = Math.max(0, bx * frameW);
       const sy = Math.max(0, by * frameH);
       const sw = Math.min(frameW - sx, bw * frameW);
       const sh = Math.min(frameH - sy, bh * frameH);
-      sCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, 90, 70);
+      sCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, 160, 100);
+
+      // Embedded Timestamp Watermark Banner on Image
+      sCtx.fillStyle = "rgba(15, 23, 42, 0.85)";
+      sCtx.fillRect(0, 100 - 20, 160, 20);
+      sCtx.fillStyle = isCar ? "#38bdf8" : isPerson ? "#06b6d4" : "#a855f7";
+      sCtx.font = "bold 11px monospace";
+      sCtx.fillText(`⏱ ${timeFormatted}`, 6, 100 - 6);
 
       frameDetections.push({
         id: `obj_${timestamp.toFixed(2)}_${idx}_${Date.now()}`,
         time: timestamp,
-        timeFormatted: formatTime(timestamp, true),
+        timeFormatted: timeFormatted,
         type: isCar ? "CAR" : isPerson ? "PERSON" : isBike ? "MOTORCYCLE" : "OBJECT",
         label: cls.toUpperCase(),
         confidence: Math.round((obj.confidence || 0.85) * 100),
         box: obj.box,
         isWatchlist: false,
-        snapshot: snapCanvas.toDataURL("image/jpeg", 0.75)
+        snapshot: snapCanvas.toDataURL("image/jpeg", 0.85)
       });
     });
 
@@ -411,16 +427,19 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
     });
   }, [detections, selectedDetection]);
 
-  // Click on Detection Card -> Seek Video & Highlight
+  // Click on Detection Card -> Seek Video & Highlight (Pause at timestamp without autoplay)
   const handleSelectDetection = (det) => {
     setSelectedDetection(det);
     if (videoRef.current) {
+      // Pause playback so user inspects the exact frame
+      videoRef.current.pause();
+      setIsPlaying(false);
       videoRef.current.currentTime = det.time;
       setCurrentTime(det.time);
-      drawOverlayForTime(det.time);
-      if (!isPlaying) {
-        videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
-      }
+      // Synchronize canvas bounding box highlight immediately
+      setTimeout(() => {
+        drawOverlayForTime(det.time);
+      }, 30);
     }
   };
 
@@ -822,15 +841,16 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
                           position: "absolute",
                           bottom: "3px",
                           right: "3px",
-                          background: "rgba(0,0,0,0.75)",
-                          color: "#fff",
-                          fontSize: "9.5px",
-                          fontWeight: 700,
-                          padding: "1px 4px",
+                          background: "rgba(15, 23, 42, 0.9)",
+                          border: "1px solid rgba(34, 211, 238, 0.4)",
+                          color: "#38bdf8",
+                          fontSize: "10px",
+                          fontWeight: 800,
+                          padding: "2px 5px",
                           borderRadius: "3px",
                           fontFamily: "var(--font-mono)"
                         }}>
-                          {det.timeFormatted}
+                          ⏱ {det.timeFormatted}
                         </span>
                       </div>
 
@@ -857,7 +877,7 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
                           {isPlate ? "HSRP Plate" : det.type}
                         </span>
                         {isSelected && (
-                          <span style={{ color: "var(--accent)", fontWeight: 800 }}>● PLAYING</span>
+                          <span style={{ color: "var(--accent)", fontWeight: 800 }}>● SEEKED (PAUSED)</span>
                         )}
                       </div>
                     </div>

@@ -1237,75 +1237,16 @@ class CameraWorkerThread(threading.Thread):
                         with INFERENCE_LOCK:
                             raw_boxes = self.detector.detect(frame, self.conf, self.iou)
 
-                # 4. Target-Specific Object & Vehicle Detection (Runs on both OBJECT_DETECTION and ANPR feeds)
+                # 4. Target-Specific Object Detection (Only if specifically configured for OBJECT_DETECTION)
                 raw_objects = []
-                if not is_no_ai and self.object_detector is not None:
+                if is_obj_cam and self.object_detector is not None:
                     if hasattr(self.object_detector, "triton_client") or getattr(self.object_detector, "accel_mode", "").startswith("GPU"):
                         raw_objects = self.object_detector.detect(frame, conf_thresh=0.25, iou_thresh=0.45)
                     else:
                         with INFERENCE_LOCK:
                             raw_objects = self.object_detector.detect(frame, conf_thresh=0.25, iou_thresh=0.45)
 
-
-
-                # Initialize default virtual intrusion security perimeter zone if not present
-                if self.intrusion_zone is None and (w > 0 and h > 0):
-                    default_pts = [
-                        [int(w * 0.15), int(h * 0.45)],
-                        [int(w * 0.85), int(h * 0.45)],
-                        [int(w * 0.95), int(h * 0.88)],
-                        [int(w * 0.05), int(h * 0.88)]
-                    ]
-                    self.intrusion_zone = IntrusionZone(default_pts)
-
-                # 4.2. ByteTrack Multi-Object Association & Persistent Tracking
                 tracked_objects = self.byte_tracker.update(raw_objects) if len(raw_objects) > 0 else []
-
-                # 4.3. Movement Trail Tracking, Dwell Loitering & Perimeter Intrusion Checks
-                active_track_keys = []
-                for obj in tracked_objects:
-                    bx = obj["box"]
-                    lbl = obj["label"]
-                    track_id = obj.get("track_id")
-                    x1, y1, x2, y2 = bx
-                    cx, cy = int((x1 + x2) / 2), int((y1 + y2) / 2)
-                    norm_cx, norm_cy = cx / max(1, w), cy / max(1, h)
-
-                    if track_id is not None:
-                        key = (lbl, track_id)
-                        active_track_keys.append(key)
-                        
-                        # 1. Update Motion Trajectory History
-                        self.trail_tracker.update(lbl, track_id, cx, cy, norm_cx, norm_cy, now)
-                        
-                        # 2. Check Loitering Anomaly (Dwell > 8.0s)
-                        is_loitering, dwell_time = self.dwell_tracker.update(lbl, track_id, inside=True)
-                        obj["is_loitering"] = is_loitering
-                        obj["dwell_time"] = round(dwell_time, 1)
-
-                        # 3. Check Virtual Perimeter Intrusion Zone
-                        if self.intrusion_zone is not None:
-                            is_inside, entered, _ = self.intrusion_zone.check(lbl, track_id, (x1, y1, x2, y2))
-                            obj["is_intrusion"] = is_inside
-                        else:
-                            obj["is_intrusion"] = False
-
-                        # Attach normalized movement trail points for frontend canvas HUD
-                        obj["trail_points"] = self.trail_tracker.get_normalized_points(lbl, track_id)
-
-                self.dwell_tracker.cleanup_stale(active_track_keys)
-                self.trail_tracker.cleanup_stale(max_age_seconds=8.0)
-
-                # 4.5. Terminal Log for Detected & Tracked Objects
-                if (is_selected_vision_cam or is_obj_cam) and len(tracked_objects) > 0 and (now - self.last_obj_log >= 1.5):
-                    self.last_obj_log = now
-                    obj_counts = {}
-                    for obj in tracked_objects:
-                        lbl = obj["label"].capitalize()
-                        obj_counts[lbl] = obj_counts.get(lbl, 0) + 1
-                    details_str = ", ".join([f"{cnt}x {lbl}" for lbl, cnt in obj_counts.items()])
-                    time_str = time.strftime('%H:%M:%S')
-                    print(f"\x1b[35m[AI TRACK]\x1b[0m 🎯 \x1b[33m[{self.camera_code}]\x1b[0m ByteTrack: \x1b[1m\x1b[37m{details_str}\x1b[0m (Active Tracks: {len(tracked_objects)}) | Time: {time_str}", flush=True)
 
                 # 5. Process Plate OCR (Optimized fast recognition - throttled to prevent CPU thread choking)
                 plate_detections_for_frame = []
