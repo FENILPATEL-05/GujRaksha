@@ -1507,6 +1507,7 @@ class DistributedWorkerManager:
             current_codes.add(code)
 
             if code not in self.workers or not self.workers[code].is_alive():
+                GLOBAL_STATS.set_status(code, "ACTIVE")
                 worker = CameraWorkerThread(
                     cam, self.detector, self.ocr, self.object_detector, self.central_url, self.watchlist_mgr,
                     conf=0.20, iou=0.45, frame_stride=3
