@@ -42,7 +42,9 @@ class UserDataStore {
         const raw = fs.readFileSync(USERS_FILE, "utf8");
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          const legacyMockUsers = new Set(['police_admin', 'rto_admin', 'urban_admin', 'viewer']);
+          const clean = parsed.filter(u => !legacyMockUsers.has(u.username));
+          if (clean.length > 0) return clean;
         }
       }
     } catch (e) {
@@ -73,7 +75,7 @@ class UserDataStore {
             email VARCHAR(150) UNIQUE,
             password VARCHAR(255) NOT NULL,
             name VARCHAR(150) NOT NULL,
-            role VARCHAR(50) DEFAULT 'DEPT_ADMIN',
+            role VARCHAR(50) DEFAULT 'SUPERADMIN',
             department_id VARCHAR(50) DEFAULT 'ALL',
             department_name VARCHAR(150),
             status VARCHAR(30) DEFAULT 'ACTIVE',
@@ -82,13 +84,18 @@ class UserDataStore {
           )
         `);
 
+        // Automatically clean out legacy demo users if they exist in DB
+        try {
+          await pgClient.query("DELETE FROM users WHERE username IN ('police_admin', 'rto_admin', 'urban_admin', 'viewer')");
+        } catch (_) {}
+
         const res = await pgClient.query("SELECT * FROM users ORDER BY created_at ASC");
         if (res && res.rows && res.rows.length > 0) {
           this.users = res.rows;
           this.saveToFile(this.users);
         } else {
-          // Seed database with default users
-          for (const u of this.users) {
+          // Seed database with default superadmin
+          for (const u of initialUsers) {
             await pgClient.query(
               `INSERT INTO users (id, username, email, password, name, role, department_id, department_name, status, created_at)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -96,6 +103,8 @@ class UserDataStore {
               [u.id, u.username, u.email, u.password, u.name, u.role, u.department_id, u.department_name, u.status || 'ACTIVE', u.created_at || new Date()]
             );
           }
+          this.users = [...initialUsers];
+          this.saveToFile(this.users);
         }
       }
     } catch (err) {
