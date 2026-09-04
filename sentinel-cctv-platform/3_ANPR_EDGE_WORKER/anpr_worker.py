@@ -17,6 +17,7 @@ import json
 import threading
 import socket
 import logging
+from datetime import datetime, timezone
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("anpr_worker")
@@ -1297,7 +1298,7 @@ class CameraWorkerThread(threading.Thread):
                                 "camera_code": self.camera_code,
                                 "camera_id": self.camera_id,
                                 "confidence": round(ocr_conf * 100.0, 1),
-                                "timestamp": time.strftime('%Y-%m-%dT%H:%M:%S'),
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
                                 "is_watchlist_hit": bool(watchlist_hit)
                             }
                             try:
@@ -1376,7 +1377,7 @@ class CameraWorkerThread(threading.Thread):
                         "camera_id": self.camera_id,
                         "frame_width": w,
                         "frame_height": h,
-                        "timestamp": time.strftime('%Y-%m-%dT%H:%M:%S'),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                         "detections": live_boxes
                     }
 

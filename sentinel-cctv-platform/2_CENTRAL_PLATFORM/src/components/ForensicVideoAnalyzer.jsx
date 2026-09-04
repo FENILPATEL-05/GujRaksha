@@ -659,11 +659,24 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
 
   // Load Saved Forensic Case
   const handleLoadSavedCase = (savedCase) => {
-    setDetections(savedCase.detections || []);
-    setActiveCaseTitle(savedCase.caseTitle);
-    setSelectedDetection(null);
+    const list = savedCase.detections || [];
+    setDetections(list);
+    setActiveCaseTitle(savedCase.caseTitle || "Saved Forensic Case");
+    setVideoFile({
+      name: savedCase.fileName || `${savedCase.caseTitle || "Forensic_Case"}.mp4`,
+      isLoadedArchive: true
+    });
+    const dur = savedCase.duration || (list.length > 0 ? Math.max(...list.map(d => d.time || 0)) + 3 : 60);
+    setVideoDuration(dur);
+    if (list.length > 0) {
+      setSelectedDetection(list[0]);
+      setCurrentTime(list[0].time || 0);
+    } else {
+      setSelectedDetection(null);
+      setCurrentTime(0);
+    }
     setShowSavedCasesModal(false);
-    if (addToast) addToast(`Loaded case: ${savedCase.caseTitle} (${savedCase.detections?.length || 0} detections)`, "info");
+    if (addToast) addToast(`Loaded case: ${savedCase.caseTitle} (${list.length} detections)`, "info");
   };
 
   // Delete Saved Forensic Case
@@ -858,456 +871,542 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
           />
         </div>
       ) : (
-        /* 2. Video Stage on Top */
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        /* 2-Column Split Forensic Layout (Left: Video Player & Timeline, Right: Filter & Detection Cards) */
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1.35fr) minmax(380px, 1fr)",
+          gap: "16px",
+          alignItems: "start"
+        }}>
           
-          {/* Analysis Action Strip */}
-          <div style={{
-            background: "var(--panel-bg)",
-            border: "1px solid var(--panel-border)",
-            borderRadius: "8px",
-            padding: "10px 14px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "10px"
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <Film size={18} style={{ color: "var(--accent)" }} />
-              <div>
-                <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--text-primary)" }}>
+          {/* LEFT COLUMN: Video Player, Timeline & Controls */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px", minWidth: 0 }}>
+            
+            {/* Analysis Action Strip */}
+            <div style={{
+              background: "var(--panel-bg)",
+              border: "1px solid var(--panel-border)",
+              borderRadius: "8px",
+              padding: "8px 12px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "8px"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                <Film size={16} style={{ color: "var(--accent)", flexShrink: 0 }} />
+                <span style={{ fontWeight: 700, fontSize: "12.5px", color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {videoFile.name}
                 </span>
               </div>
-            </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              {!isAnalyzing ? (
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={startForensicScan}
-                  style={{ gap: "6px", fontWeight: 700 }}
-                >
-                  <Sparkles size={14} /> Start AI Video Scan
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-danger"
-                  onClick={cancelForensicScan}
-                  style={{ gap: "6px" }}
-                >
-                  <AlertTriangle size={13} /> Stop Scanning
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Progress Bar (During Analysis) */}
-          {isAnalyzing && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11.5px", color: "var(--accent)", fontWeight: 700 }}>
-                <span>{scanStatusText}</span>
-                <span>{scanProgress}%</span>
-              </div>
-              <div style={{ width: "100%", height: "6px", background: "var(--panel-border)", borderRadius: "3px", overflow: "hidden" }}>
-                <div style={{ width: `${scanProgress}%`, height: "100%", background: "var(--accent)", transition: "width 0.2s" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {!isAnalyzing ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={startForensicScan}
+                    style={{ gap: "6px", fontWeight: 700, fontSize: "11.5px" }}
+                  >
+                    <Sparkles size={13} /> Start AI Video Scan
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-danger"
+                    onClick={cancelForensicScan}
+                    style={{ gap: "6px", fontSize: "11.5px" }}
+                  >
+                    <AlertTriangle size={13} /> Stop Scanning
+                  </button>
+                )}
               </div>
             </div>
-          )}
 
-          {/* Interactive Video Player Stage with Canvas Overlay */}
-          <div style={{
-            position: "relative",
-            width: "100%",
-            height: "440px",
-            background: "#000",
-            borderRadius: "8px",
-            overflow: "hidden",
-            border: "1px solid var(--panel-border)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
-          }}>
-            <video
-              ref={videoRef}
-              src={videoUrl}
-              muted={isMuted}
-              playsInline
-              onLoadedMetadata={handleLoadedMetadata}
-              onTimeUpdate={handleTimeUpdate}
-              onPlay={() => {
-                setIsPlaying(true);
-                setSelectedDetection(null);
-              }}
-              onPause={() => setIsPlaying(false)}
-              onEnded={() => {
-                setIsPlaying(false);
-                setSelectedDetection(null);
-              }}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                display: "block"
-              }}
-            />
+            {/* Progress Bar (During Analysis) */}
+            {isAnalyzing && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--accent)", fontWeight: 700 }}>
+                  <span>{scanStatusText}</span>
+                  <span>{scanProgress}%</span>
+                </div>
+                <div style={{ width: "100%", height: "6px", background: "var(--panel-border)", borderRadius: "3px", overflow: "hidden" }}>
+                  <div style={{ width: `${scanProgress}%`, height: "100%", background: "var(--accent)", transition: "width 0.2s" }} />
+                </div>
+              </div>
+            )}
 
-            <canvas
-              ref={overlayCanvasRef}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                pointerEvents: "none",
-                zIndex: 5
-              }}
-            />
-
-            {/* Top Overlay HUD */}
+            {/* Interactive Video Player Stage with Canvas Overlay */}
             <div style={{
-              position: "absolute",
-              top: "10px",
-              left: "12px",
+              position: "relative",
+              width: "100%",
+              height: "400px",
+              background: "#000",
+              borderRadius: "8px",
+              overflow: "hidden",
+              border: "1px solid var(--panel-border)",
               display: "flex",
               alignItems: "center",
-              gap: "8px",
-              background: "rgba(15, 23, 42, 0.85)",
-              backdropFilter: "blur(6px)",
-              padding: "4px 10px",
-              borderRadius: "6px",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              zIndex: 6
+              justifyContent: "center"
             }}>
-              <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: isPlaying ? "#22c55e" : "#eab308" }} />
-              <span style={{ fontSize: "11px", fontWeight: 700, color: "#fff", fontFamily: "var(--font-mono)" }}>
-                {formatTime(currentTime, true)} / {formatTime(videoDuration)}
-              </span>
-              {selectedDetection && (
-                <span style={{ fontSize: "10.5px", color: "var(--accent)", borderLeft: "1px solid rgba(255,255,255,0.2)", paddingLeft: "8px" }}>
-                  Inspecting: <strong>{selectedDetection.label}</strong>
-                </span>
-              )}
-            </div>
-          </div>
+              {videoUrl ? (
+                <>
+                  <video
+                    ref={videoRef}
+                    src={videoUrl}
+                    muted={isMuted}
+                    playsInline
+                    onLoadedMetadata={handleLoadedMetadata}
+                    onTimeUpdate={handleTimeUpdate}
+                    onPlay={() => {
+                      setIsPlaying(true);
+                      setSelectedDetection(null);
+                    }}
+                    onPause={() => setIsPlaying(false)}
+                    onEnded={() => {
+                      setIsPlaying(false);
+                      setSelectedDetection(null);
+                    }}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                      display: "block"
+                    }}
+                  />
 
-          {/* Timeline Scrubber with Detection Markers */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            <div style={{ position: "relative", width: "100%", height: "8px", background: "var(--input-bg)", borderRadius: "4px", overflow: "hidden" }}>
-              {videoDuration > 0 && detections.map(d => {
-                const pct = (d.time / videoDuration) * 100;
-                let dotColor = "#38bdf8";
-                if (d.isWatchlist) dotColor = "#ef4444";
-                else if (d.type === "PLATE") dotColor = "#eab308";
-                else if (d.type === "PERSON") dotColor = "#06b6d4";
-                return (
-                  <div
-                    key={d.id}
-                    onClick={() => handleSelectDetection(d)}
+                  <canvas
+                    ref={overlayCanvasRef}
                     style={{
                       position: "absolute",
-                      left: `${pct}%`,
                       top: 0,
-                      width: "3px",
+                      left: 0,
+                      width: "100%",
                       height: "100%",
-                      background: dotColor,
-                      cursor: "pointer",
-                      zIndex: 3
+                      pointerEvents: "none",
+                      zIndex: 5
                     }}
-                    title={`${d.type}: ${d.label} at ${d.timeFormatted}`}
                   />
-                );
-              })}
-            </div>
-
-            <input
-              type="range"
-              min={0}
-              max={videoDuration || 100}
-              step={0.1}
-              value={currentTime}
-              onChange={handleSeek}
-              style={{
-                width: "100%",
-                accentColor: "var(--accent)",
-                cursor: "pointer"
-              }}
-            />
-          </div>
-
-          {/* Player Controls Bar */}
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            background: "var(--panel-bg)",
-            border: "1px solid var(--panel-border)",
-            borderRadius: "8px",
-            padding: "8px 14px",
-            flexWrap: "wrap",
-            gap: "8px"
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <button
-                type="button"
-                className="btn btn-sm btn-primary"
-                onClick={togglePlay}
-                style={{ width: "32px", height: "32px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
-              >
-                {isPlaying ? <Pause size={15} /> : <Play size={15} />}
-              </button>
-
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={() => {
-                  if (videoRef.current) {
-                    videoRef.current.currentTime = 0;
-                    setCurrentTime(0);
-                    drawOverlayForTime(0);
-                  }
-                }}
-                style={{ width: "32px", height: "32px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
-                title="Rewind"
-              >
-                <RotateCcw size={14} />
-              </button>
-
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={() => setIsMuted(!isMuted)}
-                style={{ width: "32px", height: "32px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
-              >
-                {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-              </button>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={() => {
-                  if (videoRef.current?.requestFullscreen) {
-                    videoRef.current.requestFullscreen();
-                  }
-                }}
-                style={{ width: "32px", height: "32px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
-                title="Fullscreen"
-              >
-                <Maximize2 size={14} />
-              </button>
-            </div>
-          </div>
-
-          {/* 3. Detections Showcase & Attribute Intelligence BELOW Video */}
-          {detections.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "6px" }}>
-              
-              {/* Summary KPI Ribbon */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "8px" }}>
-                <div style={{ background: "var(--panel-bg)", border: "1px solid var(--panel-border)", borderRadius: "6px", padding: "8px 12px" }}>
-                  <div style={{ fontSize: "10px", textTransform: "uppercase", color: "var(--text-dim)", fontWeight: 700 }}>Total Detections</div>
-                  <div style={{ fontSize: "17px", fontWeight: 800, color: "var(--text-primary)" }}>{totalDetectionsCount}</div>
-                </div>
-
-                <div style={{ background: "rgba(234, 179, 8, 0.08)", border: "1px solid rgba(234, 179, 8, 0.3)", borderRadius: "6px", padding: "8px 12px" }}>
-                  <div style={{ fontSize: "10px", textTransform: "uppercase", color: "#eab308", fontWeight: 700 }}>Plates Recognized</div>
-                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#eab308" }}>{plateCount}</div>
-                </div>
-
-                <div style={{ background: "rgba(56, 189, 248, 0.08)", border: "1px solid rgba(56, 189, 248, 0.3)", borderRadius: "6px", padding: "8px 12px" }}>
-                  <div style={{ fontSize: "10px", textTransform: "uppercase", color: "#0284c7", fontWeight: 700 }}>Vehicles (Colored)</div>
-                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#0284c7" }}>{vehicleCount}</div>
-                </div>
-
-                <div style={{ background: "rgba(6, 182, 212, 0.08)", border: "1px solid rgba(6, 182, 212, 0.3)", borderRadius: "6px", padding: "8px 12px" }}>
-                  <div style={{ fontSize: "10px", textTransform: "uppercase", color: "#06b6d4", fontWeight: 700 }}>Persons (Gender/Clothes)</div>
-                  <div style={{ fontSize: "17px", fontWeight: 800, color: "#06b6d4" }}>{personCount}</div>
-                </div>
-
-                <div style={{ background: watchlistHitsCount > 0 ? "rgba(239, 68, 68, 0.12)" : "var(--panel-bg)", border: watchlistHitsCount > 0 ? "1px solid rgba(239, 68, 68, 0.4)" : "1px solid var(--panel-border)", borderRadius: "6px", padding: "8px 12px" }}>
-                  <div style={{ fontSize: "10px", textTransform: "uppercase", color: watchlistHitsCount > 0 ? "#ef4444" : "var(--text-dim)", fontWeight: 700 }}>Watchlist Hits</div>
-                  <div style={{ fontSize: "17px", fontWeight: 800, color: watchlistHitsCount > 0 ? "#ef4444" : "var(--text-dim)" }}>{watchlistHitsCount}</div>
-                </div>
-              </div>
-
-              {/* Advanced Forensic Filter & Search Control Center */}
-              <div style={{
-                background: "var(--input-bg)",
-                border: "1px solid var(--panel-border)",
-                borderRadius: "8px",
-                padding: "10px 12px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "8px"
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
-                  
-                  {/* Category Tabs */}
-                  <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                    {[
-                      { id: "all", label: `All (${detections.length})`, icon: Layers },
-                      { id: "persons", label: `Persons (${personCount})`, icon: User },
-                      { id: "vehicles", label: `Vehicles (${vehicleCount})`, icon: Car },
-                      { id: "plates", label: `Plates (${plateCount})`, icon: Tag },
-                      { id: "watchlist", label: `Watchlist (${watchlistHitsCount})`, icon: Shield }
-                    ].map(tab => {
-                      const Icon = tab.icon;
-                      const active = filterType === tab.id;
-                      return (
-                        <button
-                          key={tab.id}
-                          type="button"
-                          onClick={() => setFilterType(tab.id)}
-                          style={{
-                            background: active ? "var(--accent)" : "var(--panel-bg)",
-                            color: active ? "#000" : "var(--text-primary)",
-                            border: "1px solid var(--panel-border)",
-                            borderRadius: "5px",
-                            padding: "4px 10px",
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "5px",
-                            transition: "all 0.15s"
-                          }}
-                        >
-                          <Icon size={12} />
-                          {tab.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Search Bar */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--panel-bg)", border: "1px solid var(--panel-border)", borderRadius: "6px", padding: "4px 10px", width: "260px" }}>
-                    <Search size={13} style={{ color: "var(--text-dim)" }} />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search plate, color, male/female..."
-                      style={{ background: "transparent", border: "none", outline: "none", fontSize: "11.5px", color: "var(--text-primary)", width: "100%" }}
-                    />
-                    {searchQuery && (
-                      <X size={12} style={{ cursor: "pointer", color: "var(--text-dim)" }} onClick={() => setSearchQuery("")} />
-                    )}
-                  </div>
-                </div>
-
-                {/* Sub-Filters: Gender and Colors */}
-                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "10px", paddingTop: "4px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                  
-                  {/* Gender Filter */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "var(--text-dim)" }}>
-                    <Users size={12} />
-                    <span>Gender:</span>
-                    {["all", "Male", "Female"].map(g => (
+                </>
+              ) : (
+                <div style={{
+                  width: "100%",
+                  height: "100%",
+                  position: "relative",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "radial-gradient(circle at center, rgba(34, 211, 238, 0.08) 0%, #000 80%)"
+                }}>
+                  {selectedDetection && selectedDetection.snapshot ? (
+                    <div style={{ width: "100%", height: "100%", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <img
+                        src={selectedDetection.snapshot}
+                        alt={selectedDetection.label}
+                        style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                      />
+                      <div style={{
+                        position: "absolute",
+                        bottom: "16px",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        background: "rgba(15, 23, 42, 0.9)",
+                        border: "1px solid var(--accent)",
+                        padding: "6px 14px",
+                        borderRadius: "8px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        boxShadow: "0 0 20px rgba(34, 211, 238, 0.3)",
+                        backdropFilter: "blur(6px)"
+                      }}>
+                        <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--accent)" }}>
+                          🎯 {selectedDetection.label}
+                        </span>
+                        <span style={{ fontSize: "11px", color: "var(--text-dim)" }}>
+                          ⏱ {selectedDetection.timeFormatted} ({selectedDetection.confidence}%)
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", padding: "20px", textAlign: "center" }}>
+                      <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "rgba(34, 211, 238, 0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <FolderHeart size={24} style={{ color: "var(--accent)" }} />
+                      </div>
+                      <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)" }}>
+                        {activeCaseTitle || "Forensic Case Archive Loaded"}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "var(--text-dim)", maxWidth: "380px" }}>
+                        Showing <strong>{detections.length} AI detected forensic events & snapshots</strong>. Click any card in the gallery on the right to inspect.
+                      </div>
                       <button
-                        key={g}
                         type="button"
-                        onClick={() => setFilterGender(g)}
-                        style={{
-                          background: filterGender === g ? "rgba(34, 211, 238, 0.2)" : "transparent",
-                          color: filterGender === g ? "var(--accent)" : "var(--text-dim)",
-                          border: filterGender === g ? "1px solid var(--accent)" : "1px solid var(--panel-border)",
-                          borderRadius: "4px",
-                          padding: "2px 7px",
-                          fontSize: "10.5px",
-                          fontWeight: 700,
-                          cursor: "pointer"
-                        }}
+                        className="btn btn-sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        style={{ marginTop: "4px", gap: "6px", fontSize: "11.5px", background: "var(--input-bg)" }}
                       >
-                        {g === "all" ? "All" : g}
+                        <Upload size={12} /> Attach Video File for Synchronized Timeline Playback
                       </button>
-                    ))}
-                  </div>
-
-                  {/* Color Filter */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "var(--text-dim)" }}>
-                    <Palette size={12} />
-                    <span>Color:</span>
-                    {["all", "Black", "White", "Silver", "Red", "Blue", "Yellow", "Green"].map(c => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setFilterColor(c)}
-                        style={{
-                          background: filterColor === c ? "rgba(34, 211, 238, 0.2)" : "transparent",
-                          color: filterColor === c ? "var(--accent)" : "var(--text-dim)",
-                          border: filterColor === c ? "1px solid var(--accent)" : "1px solid var(--panel-border)",
-                          borderRadius: "4px",
-                          padding: "2px 7px",
-                          fontSize: "10.5px",
-                          fontWeight: 700,
-                          cursor: "pointer"
-                        }}
-                      >
-                        {c === "all" ? "All" : c}
-                      </button>
-                    ))}
-                  </div>
-
-                  {(filterGender !== "all" || filterColor !== "all" || filterType !== "all" || searchQuery) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFilterType("all");
-                        setFilterGender("all");
-                        setFilterColor("all");
-                        setSearchQuery("");
-                      }}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        color: "var(--text-dim)",
-                        fontSize: "10.5px",
-                        textDecoration: "underline",
-                        cursor: "pointer",
-                        marginLeft: "auto"
-                      }}
-                    >
-                      Reset Filters
-                    </button>
+                    </div>
                   )}
                 </div>
-              </div>
+              )}
 
-              {/* Results Count */}
-              <div style={{ fontSize: "11px", color: "var(--text-dim)", display: "flex", justifyContent: "space-between" }}>
-                <span>Showing {filteredDetections.length} of {detections.length} indexed forensic events</span>
-                <span style={{ color: "var(--accent)" }}>Click any card to inspect frozen frame at exact second</span>
-              </div>
-
-              {/* Horizontal Scrollable Detection Cards Stream */}
+              {/* Top Overlay HUD */}
               <div style={{
+                position: "absolute",
+                top: "10px",
+                left: "12px",
                 display: "flex",
-                gap: "10px",
-                overflowX: "auto",
-                paddingBottom: "8px",
-                maxHeight: "175px"
+                alignItems: "center",
+                gap: "8px",
+                background: "rgba(15, 23, 42, 0.85)",
+                backdropFilter: "blur(6px)",
+                padding: "4px 10px",
+                borderRadius: "6px",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                zIndex: 6
               }}>
-                {filteredDetections.map((det) => {
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: isPlaying ? "#22c55e" : "#eab308" }} />
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#fff", fontFamily: "var(--font-mono)" }}>
+                  {formatTime(currentTime, true)} / {formatTime(videoDuration)}
+                </span>
+                {selectedDetection && (
+                  <span style={{ fontSize: "10.5px", color: "var(--accent)", borderLeft: "1px solid rgba(255,255,255,0.2)", paddingLeft: "8px" }}>
+                    Inspecting: <strong>{selectedDetection.label}</strong>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Timeline Scrubber with Detection Markers */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <div style={{ position: "relative", width: "100%", height: "8px", background: "var(--input-bg)", borderRadius: "4px", overflow: "hidden" }}>
+                {videoDuration > 0 && detections.map(d => {
+                  const pct = (d.time / videoDuration) * 100;
+                  let dotColor = "#38bdf8";
+                  if (d.isWatchlist) dotColor = "#ef4444";
+                  else if (d.type === "PLATE") dotColor = "#eab308";
+                  else if (d.type === "PERSON") dotColor = "#06b6d4";
+                  return (
+                    <div
+                      key={d.id}
+                      onClick={() => handleSelectDetection(d)}
+                      style={{
+                        position: "absolute",
+                        left: `${pct}%`,
+                        top: 0,
+                        width: "3px",
+                        height: "100%",
+                        background: dotColor,
+                        cursor: "pointer",
+                        zIndex: 3
+                      }}
+                      title={`${d.type}: ${d.label} at ${d.timeFormatted}`}
+                    />
+                  );
+                })}
+              </div>
+
+              <input
+                type="range"
+                min={0}
+                max={videoDuration || 100}
+                step={0.1}
+                value={currentTime}
+                onChange={handleSeek}
+                style={{
+                  width: "100%",
+                  accentColor: "var(--accent)",
+                  cursor: "pointer"
+                }}
+              />
+            </div>
+
+            {/* Player Controls Bar */}
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              background: "var(--panel-bg)",
+              border: "1px solid var(--panel-border)",
+              borderRadius: "8px",
+              padding: "6px 12px",
+              flexWrap: "wrap",
+              gap: "8px"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  onClick={togglePlay}
+                  style={{ width: "30px", height: "30px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => {
+                    if (videoRef.current) {
+                      videoRef.current.currentTime = 0;
+                      setCurrentTime(0);
+                      drawOverlayForTime(0);
+                    }
+                  }}
+                  style={{ width: "30px", height: "30px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                  title="Rewind"
+                >
+                  <RotateCcw size={13} />
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => setIsMuted(!isMuted)}
+                  style={{ width: "30px", height: "30px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  {isMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+                </button>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => {
+                    if (videoRef.current?.requestFullscreen) {
+                      videoRef.current.requestFullscreen();
+                    }
+                  }}
+                  style={{ width: "30px", height: "30px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                  title="Fullscreen"
+                >
+                  <Maximize2 size={13} />
+                </button>
+              </div>
+            </div>
+
+            {/* Summary KPI Ribbon */}
+            {detections.length > 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: "6px", marginTop: "2px" }}>
+                <div style={{ background: "var(--panel-bg)", border: "1px solid var(--panel-border)", borderRadius: "6px", padding: "6px 8px" }}>
+                  <div style={{ fontSize: "9px", textTransform: "uppercase", color: "var(--text-dim)", fontWeight: 700 }}>Total Scans</div>
+                  <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--text-primary)" }}>{totalDetectionsCount}</div>
+                </div>
+
+                <div style={{ background: "rgba(234, 179, 8, 0.08)", border: "1px solid rgba(234, 179, 8, 0.3)", borderRadius: "6px", padding: "6px 8px" }}>
+                  <div style={{ fontSize: "9px", textTransform: "uppercase", color: "#eab308", fontWeight: 700 }}>Plates</div>
+                  <div style={{ fontSize: "14px", fontWeight: 800, color: "#eab308" }}>{plateCount}</div>
+                </div>
+
+                <div style={{ background: "rgba(56, 189, 248, 0.08)", border: "1px solid rgba(56, 189, 248, 0.3)", borderRadius: "6px", padding: "6px 8px" }}>
+                  <div style={{ fontSize: "9px", textTransform: "uppercase", color: "#0284c7", fontWeight: 700 }}>Vehicles</div>
+                  <div style={{ fontSize: "14px", fontWeight: 800, color: "#0284c7" }}>{vehicleCount}</div>
+                </div>
+
+                <div style={{ background: "rgba(6, 182, 212, 0.08)", border: "1px solid rgba(6, 182, 212, 0.3)", borderRadius: "6px", padding: "6px 8px" }}>
+                  <div style={{ fontSize: "9px", textTransform: "uppercase", color: "#06b6d4", fontWeight: 700 }}>Persons</div>
+                  <div style={{ fontSize: "14px", fontWeight: 800, color: "#06b6d4" }}>{personCount}</div>
+                </div>
+
+                <div style={{ background: watchlistHitsCount > 0 ? "rgba(239, 68, 68, 0.12)" : "var(--panel-bg)", border: watchlistHitsCount > 0 ? "1px solid rgba(239, 68, 68, 0.4)" : "1px solid var(--panel-border)", borderRadius: "6px", padding: "6px 8px" }}>
+                  <div style={{ fontSize: "9px", textTransform: "uppercase", color: watchlistHitsCount > 0 ? "#ef4444" : "var(--text-dim)", fontWeight: 700 }}>Watchlist</div>
+                  <div style={{ fontSize: "14px", fontWeight: 800, color: watchlistHitsCount > 0 ? "#ef4444" : "var(--text-dim)" }}>{watchlistHitsCount}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT COLUMN: Filter Panel & Detected Object Image Cards Gallery */}
+          <div style={{
+            background: "var(--panel-bg)",
+            border: "1px solid var(--panel-border)",
+            borderRadius: "10px",
+            padding: "12px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+            minWidth: 0,
+            maxHeight: "640px"
+          }}>
+            {/* Gallery Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "6px", borderBottom: "1px solid var(--panel-border)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <Sparkles size={15} style={{ color: "var(--accent)" }} />
+                <span style={{ fontWeight: 700, fontSize: "13px", color: "var(--text-primary)" }}>Forensic Detection Gallery</span>
+              </div>
+              <span className="badge" style={{ fontSize: "11px", background: "rgba(34, 211, 238, 0.12)", color: "var(--accent)", border: "1px solid rgba(34, 211, 238, 0.3)" }}>
+                {filteredDetections.length} / {detections.length} Events
+              </span>
+            </div>
+
+            {/* Filter Controls */}
+            <div style={{
+              background: "var(--input-bg)",
+              border: "1px solid var(--panel-border)",
+              borderRadius: "8px",
+              padding: "8px 10px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px"
+            }}>
+              {/* Search Bar */}
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--panel-bg)", border: "1px solid var(--panel-border)", borderRadius: "6px", padding: "5px 8px", width: "100%" }}>
+                <Search size={13} style={{ color: "var(--text-dim)", flexShrink: 0 }} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search plate, color, male/female, clothing..."
+                  style={{ background: "transparent", border: "none", outline: "none", fontSize: "11.5px", color: "var(--text-primary)", width: "100%" }}
+                />
+                {searchQuery && (
+                  <X size={12} style={{ cursor: "pointer", color: "var(--text-dim)" }} onClick={() => setSearchQuery("")} />
+                )}
+              </div>
+
+              {/* Category Filter Pills */}
+              <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                {[
+                  { id: "all", label: `All (${detections.length})`, icon: Layers },
+                  { id: "persons", label: `Persons (${personCount})`, icon: User },
+                  { id: "vehicles", label: `Vehicles (${vehicleCount})`, icon: Car },
+                  { id: "plates", label: `Plates (${plateCount})`, icon: Tag },
+                  { id: "watchlist", label: `Watchlist (${watchlistHitsCount})`, icon: Shield }
+                ].map(tab => {
+                  const Icon = tab.icon;
+                  const active = filterType === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setFilterType(tab.id)}
+                      style={{
+                        background: active ? "var(--accent)" : "var(--panel-bg)",
+                        color: active ? "#000" : "var(--text-primary)",
+                        border: "1px solid var(--panel-border)",
+                        borderRadius: "5px",
+                        padding: "3px 8px",
+                        fontSize: "10.5px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        transition: "all 0.15s"
+                      }}
+                    >
+                      <Icon size={11} />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Sub-Filters: Gender and Colors */}
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "6px", fontSize: "10.5px", color: "var(--text-dim)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+                  <span>Gender:</span>
+                  {["all", "Male", "Female"].map(g => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => setFilterGender(g)}
+                      style={{
+                        background: filterGender === g ? "rgba(34, 211, 238, 0.2)" : "transparent",
+                        color: filterGender === g ? "var(--accent)" : "var(--text-dim)",
+                        border: filterGender === g ? "1px solid var(--accent)" : "1px solid var(--panel-border)",
+                        borderRadius: "3px",
+                        padding: "1px 5px",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        cursor: "pointer"
+                      }}
+                    >
+                      {g === "all" ? "All" : g}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+                  <span>Color:</span>
+                  {["all", "Black", "White", "Silver", "Red", "Blue", "Yellow"].map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setFilterColor(c)}
+                      style={{
+                        background: filterColor === c ? "rgba(34, 211, 238, 0.2)" : "transparent",
+                        color: filterColor === c ? "var(--accent)" : "var(--text-dim)",
+                        border: filterColor === c ? "1px solid var(--accent)" : "1px solid var(--panel-border)",
+                        borderRadius: "3px",
+                        padding: "1px 5px",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        cursor: "pointer"
+                      }}
+                    >
+                      {c === "all" ? "All" : c}
+                    </button>
+                  ))}
+                </div>
+
+                {(filterGender !== "all" || filterColor !== "all" || filterType !== "all" || searchQuery) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterType("all");
+                      setFilterGender("all");
+                      setFilterColor("all");
+                      setSearchQuery("");
+                    }}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "var(--text-dim)",
+                      fontSize: "10px",
+                      textDecoration: "underline",
+                      cursor: "pointer",
+                      marginLeft: "auto"
+                    }}
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Scrollable Detection Cards Gallery Grid */}
+            <div style={{
+              flex: 1,
+              overflowY: "auto",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+              gap: "8px",
+              paddingRight: "4px"
+            }}>
+              {filteredDetections.length === 0 ? (
+                <div style={{ gridColumn: "1 / -1", padding: "40px 10px", textAlign: "center", color: "var(--text-dim)" }}>
+                  <Eye size={28} style={{ opacity: 0.5, marginBottom: "6px" }} />
+                  <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>No detection matches current filters</div>
+                  <div style={{ fontSize: "11px", marginTop: "2px" }}>Try changing search terms or category tabs above.</div>
+                </div>
+              ) : (
+                filteredDetections.map((det) => {
                   const isSelected = selectedDetection && selectedDetection.id === det.id;
                   const isPlate = det.type === "PLATE";
                   const isPerson = det.type === "PERSON";
                   const isCar = ["CAR", "MOTORCYCLE"].includes(det.type);
-                  
+
                   return (
                     <div
                       key={det.id}
                       onClick={() => handleSelectDetection(det)}
                       style={{
-                        width: "180px",
-                        flexShrink: 0,
-                        background: isSelected ? "rgba(34, 211, 238, 0.15)" : "var(--panel-bg)",
+                        background: isSelected ? "rgba(34, 211, 238, 0.15)" : "var(--input-bg)",
                         border: isSelected ? "1.5px solid var(--accent)" : "1px solid var(--panel-border)",
                         borderRadius: "8px",
                         padding: "7px",
@@ -1315,12 +1414,13 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
                         transition: "all 0.15s",
                         display: "flex",
                         flexDirection: "column",
-                        gap: "5px"
+                        gap: "5px",
+                        boxShadow: isSelected ? "0 0 12px rgba(34, 211, 238, 0.25)" : "none"
                       }}
-                      title="Click to seek video and draw bounding box"
+                      title="Click to freeze frame and highlight this target"
                     >
                       {/* Thumbnail Snapshot with Timestamp Watermark */}
-                      <div style={{ width: "100%", height: "65px", background: "#000", borderRadius: "5px", overflow: "hidden", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ width: "100%", height: "70px", background: "#000", borderRadius: "5px", overflow: "hidden", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         {det.snapshot ? (
                           <img src={det.snapshot} alt={det.label} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                         ) : (
@@ -1333,9 +1433,9 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
                           background: "rgba(15, 23, 42, 0.9)",
                           border: "1px solid rgba(34, 211, 238, 0.4)",
                           color: "#38bdf8",
-                          fontSize: "10px",
+                          fontSize: "9.5px",
                           fontWeight: 800,
-                          padding: "2px 5px",
+                          padding: "1px 4px",
                           borderRadius: "3px",
                           fontFamily: "var(--font-mono)"
                         }}>
@@ -1346,7 +1446,7 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
                       {/* Label & Confidence */}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span style={{
-                          fontSize: "11.5px",
+                          fontSize: "11px",
                           fontWeight: 800,
                           color: det.isWatchlist ? "#ef4444" : isPlate ? "#eab308" : isPerson ? "#06b6d4" : "var(--text-primary)",
                           fontFamily: isPlate ? "var(--font-mono)" : "inherit",
@@ -1356,7 +1456,7 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
                         }}>
                           {det.label}
                         </span>
-                        <span style={{ fontSize: "9.5px", color: "var(--text-dim)", fontWeight: 700 }}>
+                        <span style={{ fontSize: "9px", color: "var(--text-dim)", fontWeight: 700 }}>
                           {det.confidence}%
                         </span>
                       </div>
@@ -1374,8 +1474,8 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
                         )}
                       </div>
 
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "9.5px", marginTop: "auto" }}>
-                        <span style={{ color: isPlate ? "#eab308" : isPerson ? "#06b6d4" : "var(--accent)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "9px", marginTop: "auto" }}>
+                        <span style={{ color: isPlate ? "#eab308" : isPerson ? "#06b6d4" : "var(--accent)", fontWeight: 700 }}>
                           {det.type}
                         </span>
                         {isSelected && (
@@ -1384,10 +1484,10 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
                       </div>
                     </div>
                   );
-                })}
-              </div>
+                })
+              )}
             </div>
-          )}
+          </div>
 
         </div>
       )}

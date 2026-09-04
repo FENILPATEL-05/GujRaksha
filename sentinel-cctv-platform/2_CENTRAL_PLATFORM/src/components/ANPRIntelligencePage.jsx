@@ -55,23 +55,24 @@ import { WatchlistManagerPage } from "./WatchlistManagerPage";
 import { LiveCCTVFeed } from "./LiveCCTVFeed";
 import { ForensicVideoAnalyzer } from "./ForensicVideoAnalyzer";
 
-// Formats local Indian timestamps cleanly into 12-hour AM/PM and readable date
+// Formats ISO timestamps directly into Indian Standard Time (IST / Asia/Kolkata) with 12-hour AM/PM
 const formatIndianDateTime = (ts) => {
   if (!ts) return { time: "--:--:--", date: "--/--/----" };
-  const clean = String(ts).replace(/Z$/, '').replace(' ', 'T');
-  const d = new Date(clean);
+  const d = new Date(ts);
   if (isNaN(d.getTime())) {
     const parts = String(ts).split(/[ T]/);
     return { time: parts[1] || "", date: parts[0] || "" };
   }
   return {
-    time: d.toLocaleTimeString([], {
+    time: d.toLocaleTimeString("en-IN", {
+      timeZone: "Asia/Kolkata",
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
       hour12: true
     }),
     date: d.toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
       day: "2-digit",
       month: "short",
       year: "numeric"
@@ -339,7 +340,8 @@ export const ANPRIntelligencePage = ({
         const list = Array.isArray(json.data)
           ? json.data
           : (json.data?.detections || []);
-        setDetections(list);
+        const sorted = [...list].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setDetections(sorted);
       }
     } catch (err) {
       console.error("Error fetching ANPR detections:", err);

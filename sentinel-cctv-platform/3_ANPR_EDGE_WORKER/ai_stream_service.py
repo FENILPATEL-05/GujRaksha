@@ -20,6 +20,7 @@ import time
 import json
 import logging
 import threading
+from datetime import datetime, timezone
 from urllib.parse import urlparse, parse_qs
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
@@ -471,7 +472,7 @@ class ANPRMetadataQueue:
                 "ocr_conf": ocr_conf,
                 "crop": vehicle_crop.copy() if vehicle_crop is not None else None,
                 "vehicle_type": vehicle_type,
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S")
+                "timestamp": datetime.now(timezone.utc).isoformat()
             })
         except Exception:
             pass

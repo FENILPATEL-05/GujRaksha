@@ -107,9 +107,11 @@ class AnprDataStore {
             ...r,
             latitude: r.location_lat,
             longitude: r.location_lng,
+            timestamp: r.timestamp ? new Date(r.timestamp).toISOString() : new Date().toISOString(),
             is_read: !!r.is_read,
             is_dismissed: !!r.is_dismissed
           }));
+          this.detections.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
           this.saveToFile(this.detections);
         }
       }
@@ -239,9 +241,10 @@ class AnprDataStore {
             ...r,
             latitude: r.location_lat,
             longitude: r.location_lng,
+            timestamp: r.timestamp ? new Date(r.timestamp).toISOString() : new Date().toISOString(),
             is_read: !!r.is_read,
             is_dismissed: !!r.is_dismissed
-          }));
+          })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         }
       } catch (err) {
         console.warn("⚠️ [AnprStore] Error executing PostgreSQL getAll query:", err.message);
@@ -493,15 +496,22 @@ class AnprDataStore {
       watchlist_fir: watchlistHit ? watchlistHit.fir_number : null,
       watchlist_ps: watchlistHit ? watchlistHit.police_station : null,
       watchlist_priority: watchlistHit ? watchlistHit.priority : null,
-      timestamp: (payload.timestamp ? String(payload.timestamp).replace(/Z$/, '') : new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Kolkata' }).replace(' ', 'T')),
+      timestamp: (() => {
+        if (payload.timestamp) {
+          const d = new Date(payload.timestamp);
+          if (!isNaN(d.getTime())) return d.toISOString();
+        }
+        return new Date().toISOString();
+      })(),
       stored: true,
       is_read: false,
       is_dismissed: false,
       dismissed_at: null
     };
 
-    // Save detection in in-memory list & JSON file
+    // Save detection in in-memory list & JSON file (strictly sorted descending)
     this.detections.unshift(newDetection);
+    this.detections.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     if (this.detections.length > 500) {
       this.detections = this.detections.slice(0, 500);
     }
