@@ -7,14 +7,14 @@ const router = express.Router();
 
 
 // GET all detection events
-router.get("/detections", authenticateToken, (req, res, next) => {
+router.get("/detections", authenticateToken, async (req, res, next) => {
   try {
     const filters = {
       is_watchlist: req.query.is_watchlist,
       district: req.query.district,
       search: req.query.search
     };
-    const records = anprStore.getAll(filters);
+    const records = await anprStore.getAll(filters);
     const totalWatchlist = records.filter(r => r.is_watchlist_hit).length;
     res.json({
       success: true,

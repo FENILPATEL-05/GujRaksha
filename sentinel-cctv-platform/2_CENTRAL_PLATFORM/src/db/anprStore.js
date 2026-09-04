@@ -206,7 +206,49 @@ class AnprDataStore {
     return list;
   }
 
-  getAll(filters = {}) {
+  async getAll(filters = {}) {
+    // 1. If PostgreSQL is connected, execute high-performance indexed SQL query
+    if (pgClient.isConnected()) {
+      try {
+        let query = "SELECT * FROM anpr_detections WHERE 1=1";
+        const params = [];
+
+        if (filters.is_watchlist === "true") {
+          query += " AND is_watchlist_hit = TRUE";
+        }
+
+        if (filters.district && filters.district !== "ALL") {
+          params.push(filters.district);
+          query += ` AND LOWER(district) = LOWER($${params.length})`;
+        }
+
+        if (filters.search && filters.search.trim()) {
+          const s = `%${filters.search.trim()}%`;
+          params.push(s);
+          const pIdx = params.length;
+          query += ` AND (vehicle_plate ILIKE $${pIdx} OR camera_name ILIKE $${pIdx} OR camera_code ILIKE $${pIdx} OR district ILIKE $${pIdx})`;
+          query += " ORDER BY timestamp DESC LIMIT 2000";
+        } else {
+          // Default view: latest 500 records
+          query += " ORDER BY timestamp DESC LIMIT 500";
+        }
+
+        const res = await pgClient.query(query, params);
+        if (res && res.rows) {
+          return res.rows.map(r => ({
+            ...r,
+            latitude: r.location_lat,
+            longitude: r.location_lng,
+            is_read: !!r.is_read,
+            is_dismissed: !!r.is_dismissed
+          }));
+        }
+      } catch (err) {
+        console.warn("⚠️ [AnprStore] Error executing PostgreSQL getAll query:", err.message);
+      }
+    }
+
+    // 2. In-Memory / Fallback Search
     let result = [...this.detections];
 
     if (filters.is_watchlist === "true") {
@@ -225,6 +267,8 @@ class AnprDataStore {
         const distNorm = (d.district || "").toLowerCase();
         return pNorm.includes(q) || cNorm.includes(filters.search.toLowerCase()) || distNorm.includes(filters.search.toLowerCase());
       });
+    } else {
+      result = result.slice(0, 500);
     }
 
     return result.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));

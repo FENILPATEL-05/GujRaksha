@@ -46,13 +46,36 @@ import {
   Save,
   Settings,
   Sliders,
-  Film
+  Film,
+  Info
 } from "lucide-react";
 
 import { Pagination } from "./Pagination";
 import { WatchlistManagerPage } from "./WatchlistManagerPage";
 import { LiveCCTVFeed } from "./LiveCCTVFeed";
 import { ForensicVideoAnalyzer } from "./ForensicVideoAnalyzer";
+
+// Formats UTC/ISO timestamps directly into Indian Standard Time (IST / Asia/Kolkata)
+const formatIndianDateTime = (ts) => {
+  if (!ts) return { time: "--:--:--", date: "--/--/----" };
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return { time: String(ts), date: "" };
+  return {
+    time: d.toLocaleTimeString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true
+    }),
+    date: d.toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    })
+  };
+};
 
 export const ANPRIntelligencePage = ({
 
@@ -93,7 +116,7 @@ export const ANPRIntelligencePage = ({
   const [loading, setLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchPlate, setSearchPlate] = useState("");
-  const [watchlistOnly, setWatchlistOnly] = useState(true);
+  const [watchlistOnly, setWatchlistOnly] = useState(false);
   const [selectedDistrict, setSelectedDistrict] = useState("ALL");
 
 
@@ -1409,33 +1432,6 @@ export const ANPRIntelligencePage = ({
                 <button
                   type="button"
                   onClick={() => {
-                    setWatchlistOnly(true);
-                    setCurrentPage(1);
-                  }}
-                  style={{
-                    border: watchlistOnly ? "1px solid rgba(244, 63, 94, 0.45)" : "1px solid transparent",
-                    background: watchlistOnly ? "rgba(244, 63, 94, 0.18)" : "transparent",
-                    color: watchlistOnly ? "#fb7185" : "var(--text-secondary)",
-                    fontWeight: watchlistOnly ? 700 : 500,
-                    fontSize: "12px",
-                    padding: "6px 12px",
-                    borderRadius: "6px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                    boxShadow: watchlistOnly ? "0 0 12px rgba(244, 63, 94, 0.25)" : "none"
-                  }}
-                  title="Show only hotlist/wanted suspect vehicles (Default)"
-                >
-                  <ShieldAlert size={14} style={{ color: watchlistOnly ? "#fb7185" : "var(--text-dim)" }} />
-                  <span>Suspects Only</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
                     setWatchlistOnly(false);
                     setCurrentPage(1);
                   }}
@@ -1454,11 +1450,58 @@ export const ANPRIntelligencePage = ({
                     transition: "all 0.15s ease",
                     boxShadow: !watchlistOnly ? "0 0 12px rgba(34, 211, 238, 0.2)" : "none"
                   }}
-                  title="Show all passing vehicle scans"
+                  title="Show all passing vehicle scans (Default)"
                 >
                   <Car size={14} />
                   <span>All Scans</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWatchlistOnly(true);
+                    setCurrentPage(1);
+                  }}
+                  style={{
+                    border: watchlistOnly ? "1px solid rgba(244, 63, 94, 0.45)" : "1px solid transparent",
+                    background: watchlistOnly ? "rgba(244, 63, 94, 0.18)" : "transparent",
+                    color: watchlistOnly ? "#fb7185" : "var(--text-secondary)",
+                    fontWeight: watchlistOnly ? 700 : 500,
+                    fontSize: "12px",
+                    padding: "6px 12px",
+                    borderRadius: "6px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                    boxShadow: watchlistOnly ? "0 0 12px rgba(244, 63, 94, 0.25)" : "none"
+                  }}
+                  title="Show only hotlist/wanted suspect vehicles"
+                >
+                  <ShieldAlert size={14} style={{ color: watchlistOnly ? "#fb7185" : "var(--text-dim)" }} />
+                  <span>Suspects Only</span>
+                </button>
+              </div>
+
+              {/* Info Icon with Hover Tooltip */}
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "50%",
+                  background: "var(--input-bg)",
+                  border: "1px solid var(--panel-border)",
+                  color: "var(--accent)",
+                  cursor: "help",
+                  flexShrink: 0
+                }}
+                title="Showing the latest 500 vehicle passage records by default for optimal real-time performance. To search older historical records, enter a vehicle plate or camera keyword in the search bar to query across the entire database."
+              >
+                <Info size={14} strokeWidth={2.4} />
               </div>
             </div>
 
@@ -1686,10 +1729,10 @@ export const ANPRIntelligencePage = ({
 
                         <td style={{ fontSize: "12px", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
                           <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>
-                            {new Date(det.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            {formatIndianDateTime(det.timestamp).time}
                           </div>
                           <div style={{ fontSize: "10.5px", color: "var(--text-dim)" }}>
-                            {new Date(det.timestamp).toLocaleDateString()}
+                            {formatIndianDateTime(det.timestamp).date}
                           </div>
                         </td>
 
@@ -2025,9 +2068,9 @@ export const ANPRIntelligencePage = ({
                 </span>
               </div>
               <div>
-                <span style={{ color: "var(--text-dim)", display: "block", fontSize: "11px" }}>Detection Time</span>
-                <span style={{ color: "var(--text-primary)" }}>
-                  {new Date(selectedSnapshotDet.timestamp).toLocaleString()}
+                <span style={{ color: "var(--text-dim)", display: "block", fontSize: "11px" }}>Detection Time (IST)</span>
+                <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                  {formatIndianDateTime(selectedSnapshotDet.timestamp).date} · {formatIndianDateTime(selectedSnapshotDet.timestamp).time}
                 </span>
               </div>
             </div>

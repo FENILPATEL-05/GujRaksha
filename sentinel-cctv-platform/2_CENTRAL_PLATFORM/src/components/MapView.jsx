@@ -942,7 +942,7 @@ export const MapView = ({
                 <div class="popup-grid">
                   <div><span>Tracked Vehicle</span><b>${data.vehicle_plate}</b></div>
                   <div><span>Camera Node</span><b>${wp.camera_code || wp.camera_id}</b></div>
-                  <div><span>Timestamp</span><b>${new Date(wp.timestamp).toLocaleTimeString()}</b></div>
+                  <div><span>Timestamp (IST)</span><b>${new Date(wp.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}</b></div>
                   <div><span>Speed Logged</span><b>${wp.speed_kmh} km/h</b></div>
                 </div>
               </div>
