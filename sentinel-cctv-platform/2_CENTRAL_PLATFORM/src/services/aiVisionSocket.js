@@ -20,7 +20,9 @@ class VisionSocketClient {
     try {
       const protocol = typeof window !== "undefined" && window.location.protocol === "https:" ? "wss:" : "ws:";
       const host = typeof window !== "undefined" ? (window.location.host || "localhost:3000") : "localhost:3000";
-      const wsUrl = `${protocol}//${host}/ws/ai-vision`;
+      const isSubpath = typeof window !== "undefined" && window.location.pathname.startsWith('/gujraksha');
+      const wsPath = isSubpath ? '/gujraksha/ws/ai-vision' : '/ws/ai-vision';
+      const wsUrl = `${protocol}//${host}${wsPath}`;
 
       this.ws = new WebSocket(wsUrl);
 

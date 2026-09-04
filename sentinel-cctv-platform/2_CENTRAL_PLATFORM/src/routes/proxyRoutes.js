@@ -2,15 +2,93 @@ import express from 'express';
 import http from 'http';
 import https from 'https';
 import { URL } from 'url';
+import { spawn } from 'child_process';
 
 const router = express.Router();
+
+// Helper to stream RTSP/HTTP feeds without 302 redirects
+export function handleStreamProxy(targetUrl, req, res) {
+  if (!targetUrl) {
+    if (!res.headersSent) res.status(400).send('Missing target stream URL.');
+    return;
+  }
+
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  // RTSP Stream transcoding to multipart MJPEG
+  if (targetUrl.startsWith('rtsp://')) {
+    res.writeHead(200, {
+      'Content-Type': 'multipart/x-mixed-replace; boundary=--ffmpegframe',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Connection': 'close',
+      'Pragma': 'no-cache'
+    });
+
+    const ffmpeg = spawn('ffmpeg', [
+      '-rtsp_transport', 'tcp',
+      '-analyzeduration', '1000000',
+      '-probesize', '1000000',
+      '-i', targetUrl,
+      '-f', 'mpjpeg',
+      '-boundary_tag', 'ffmpegframe',
+      '-q:v', '5',
+      '-r', '15',
+      '-vf', 'scale=-2:480',
+      '-an',
+      'pipe:1'
+    ], { stdio: ['ignore', 'pipe', 'ignore'] });
+
+    ffmpeg.stdout.pipe(res);
+
+    ffmpeg.stdout.on('error', (err) => {
+      if (err.code !== 'EPIPE') {
+        console.warn('FFmpeg pipe stdout error:', err.message);
+      }
+    });
+
+    req.on('close', () => {
+      try { ffmpeg.kill('SIGKILL'); } catch (e) {}
+    });
+
+    ffmpeg.on('error', (err) => {
+      console.error('FFmpeg RTSP Stream Proxy Error:', err.message);
+      if (!res.headersSent) res.status(500).send('Stream error');
+    });
+    return;
+  }
+
+  // Direct HTTP/HTTPS Proxying
+  try {
+    const client = targetUrl.startsWith('https') ? https : http;
+    const reqProxy = client.get(targetUrl, (streamRes) => {
+      res.writeHead(streamRes.statusCode, streamRes.headers);
+      streamRes.pipe(res);
+    });
+
+    req.on('close', () => {
+      reqProxy.destroy();
+    });
+
+    reqProxy.on('error', (err) => {
+      console.error('Proxy Stream Error:', err.message);
+      if (!res.headersSent) {
+        res.status(502).json({ error: 'Failed to proxy target stream', details: err.message });
+      }
+    });
+  } catch (err) {
+    console.error('Proxy Exception:', err.message);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Proxy Exception', details: err.message });
+    }
+  }
+}
 
 // 1. WHEP WebRTC SDP Proxy Endpoint (Supports POST / GET / OPTIONS / PATCH / DELETE)
 router.all(['/proxy-whep', '/whep-proxy', '/whep/*'], (req, res) => {
   let targetUrl = req.query.url;
   if (!targetUrl && req.path.startsWith('/whep/')) {
     const streamPath = req.path.replace(/^\/whep\//, '');
-    const mediamtxHost = process.env.MEDIAMTX_HOST || '127.0.0.1';
+    const mediamtxHost = process.env.MEDIAMTX_HOST || '103.250.160.189';
     targetUrl = `http://${mediamtxHost}:8889/${streamPath}`;
   }
   if (!targetUrl) {
@@ -20,7 +98,7 @@ router.all(['/proxy-whep', '/whep-proxy', '/whep/*'], (req, res) => {
   // Handle CORS Preflight
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, PATCH, DELETE');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept, Location');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept, Location, Authorization');
   res.setHeader('Access-Control-Expose-Headers', 'Location, Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -35,6 +113,17 @@ router.all(['/proxy-whep', '/whep-proxy', '/whep/*'], (req, res) => {
       'Content-Type': req.headers['content-type'] || 'application/sdp',
       'Accept': req.headers['accept'] || 'application/sdp'
     };
+
+    // Forward Basic Auth if credentials are in URL
+    if (parsedUrl.username && parsedUrl.password) {
+      const authStr = `${decodeURIComponent(parsedUrl.username)}:${decodeURIComponent(parsedUrl.password)}`;
+      requestHeaders['Authorization'] = `Basic ${Buffer.from(authStr).toString('base64')}`;
+    } else if (req.headers['authorization']) {
+      requestHeaders['Authorization'] = req.headers['authorization'];
+    } else {
+      // Default Basic Auth for Gov feeds if none provided
+      requestHeaders['Authorization'] = 'Basic ' + Buffer.from('fenil.patel@nxon.io:WWL7-E6HY-ZC54').toString('base64');
+    }
 
     const options = {
       hostname: parsedUrl.hostname,
@@ -80,74 +169,14 @@ router.all(['/proxy-whep', '/whep-proxy', '/whep/*'], (req, res) => {
   }
 });
 
-import { spawn } from 'child_process';
-
 // 2. Generic HTTP / RTSP / MJPEG / HLS Media Stream Proxy
 router.get(['/proxy-stream', '/mjpeg-feed'], (req, res) => {
   const targetUrl = req.query.url;
-  if (!targetUrl) {
-    return res.status(400).send('Missing target stream URL.');
-  }
-
-  res.setHeader('Access-Control-Allow-Origin', '*');
-
-  // If RTSP Stream (including H.265 / HEVC physical cameras):
-  if (targetUrl.startsWith('rtsp://')) {
-    res.writeHead(200, {
-      'Content-Type': 'multipart/x-mixed-replace; boundary=--ffmpegframe',
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Connection': 'close',
-      'Pragma': 'no-cache'
-    });
-
-    const ffmpeg = spawn('ffmpeg', [
-      '-rtsp_transport', 'tcp',
-      '-i', targetUrl,
-      '-f', 'mpjpeg',
-      '-boundary_tag', 'ffmpegframe',
-      '-q:v', '4',
-      '-r', '20',
-      '-an',
-      'pipe:1'
-    ], { stdio: ['ignore', 'pipe', 'ignore'] });
-
-    ffmpeg.stdout.pipe(res);
-
-    req.on('close', () => {
-      try { ffmpeg.kill('SIGKILL'); } catch (e) {}
-    });
-
-    ffmpeg.on('error', (err) => {
-      console.error('FFmpeg RTSP Stream Proxy Error:', err.message);
-      if (!res.headersSent) res.status(500).send('Stream error');
-    });
-    return;
-  }
-
-  try {
-    const client = targetUrl.startsWith('https') ? https : http;
-    const reqProxy = client.get(targetUrl, (streamRes) => {
-      res.writeHead(streamRes.statusCode, streamRes.headers);
-      streamRes.pipe(res);
-    });
-
-    reqProxy.on('error', (err) => {
-      console.error('Proxy Stream Error:', err.message);
-      if (!res.headersSent) {
-        res.status(502).json({ error: 'Failed to proxy target stream', details: err.message });
-      }
-    });
-  } catch (err) {
-    console.error('Proxy Exception:', err.message);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Proxy Exception', details: err.message });
-    }
-  }
+  handleStreamProxy(targetUrl, req, res);
 });
 
 // 3. AI Stream Video Feed & Telemetry Proxy (Matching Sentinel CCTV Registry Core Engine)
 router.get('/ai/video_feed', (req, res) => {
-
   res.setHeader('Access-Control-Allow-Origin', '*');
   const aiServiceHost = process.env.AI_STREAM_HOST || '127.0.0.1';
   const aiServicePort = process.env.AI_STREAM_PORT || 8090;
@@ -166,10 +195,10 @@ router.get('/ai/video_feed', (req, res) => {
   });
 
   proxyReq.on('error', (err) => {
-    console.warn('AI Stream Service Offline, falling back to RTSP FFmpeg proxy:', err.message);
+    console.warn('AI Stream Service Offline, falling back to direct stream:', err.message);
     const source = req.query.source;
     if (source) {
-      return res.redirect(`/api/v1/proxy-stream?url=${encodeURIComponent(source)}`);
+      return handleStreamProxy(source, req, res);
     }
     if (!res.headersSent) {
       res.status(502).json({ error: 'AI Video Stream Service Offline', details: err.message });
@@ -247,7 +276,6 @@ router.post('/ai/scan_frame', (req, res) => {
 });
 
 router.get('/ai/stats', (req, res) => {
-
   res.setHeader('Access-Control-Allow-Origin', '*');
   const aiServiceHost = process.env.AI_STREAM_HOST || '127.0.0.1';
   const aiServicePort = process.env.AI_STREAM_PORT || 8090;

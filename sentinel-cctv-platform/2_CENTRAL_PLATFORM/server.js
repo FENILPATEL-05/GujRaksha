@@ -9,6 +9,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { spawn } from 'child_process';
 
 
 import cameraRoutes from './src/routes/cameraRoutes.js';
@@ -141,13 +142,45 @@ mountApiEndpoints('/gujraksha');
 
 
 
+function ensureAiStreamService() {
+  const aiServicePort = process.env.AI_STREAM_PORT || 8090;
+  const req = http.get(`http://127.0.0.1:${aiServicePort}/api/v1/ai/stats`, () => {
+    console.log(`🧠 AI Vision Stream Engine active on port ${aiServicePort}`);
+  });
+  req.on('error', () => {
+    console.log(`🚀 Starting AI Vision Stream Engine on port ${aiServicePort}...`);
+    const candidatePaths = [
+      path.join(__dirname, '..', '3_ANPR_EDGE_WORKER', 'ai_stream_service.py'),
+      path.join(__dirname, 'ai_stream_service.py')
+    ];
+    const scriptPath = candidatePaths.find(p => fs.existsSync(p));
+    if (scriptPath) {
+      try {
+        const venvPython = path.join(path.dirname(scriptPath), 'venv', 'bin', 'python3');
+        const pyExec = fs.existsSync(venvPython) ? venvPython : 'python3';
+        const pyProc = spawn(pyExec, [scriptPath], {
+          detached: true,
+          stdio: 'ignore',
+          cwd: path.dirname(scriptPath)
+        });
+        pyProc.unref();
+      } catch (err) {
+        console.warn('Could not auto-start AI Stream Service:', err.message);
+      }
+    }
+  });
+}
+
 async function startServer() {
   await pgClient.waitUntilReady();
   await pool.loadFromDatabase();
   await departmentStore.loadFromDatabase();
   await watchlistStore.loadFromDatabase();
   await anprStore.loadFromDatabase();
-  const isProd = process.env.NODE_ENV === 'production';
+  
+  ensureAiStreamService();
+
+  const isProd = process.env.NODE_ENV === 'production' || fs.existsSync(path.join(__dirname, 'dist', 'index.html'));
 
   if (!isProd) {
     // Single Port Dev Setup using Vite Middleware
@@ -174,7 +207,6 @@ async function startServer() {
       res.sendFile(path.join(staticDir, 'index.html'));
     });
   }
-
 
   const server = http.createServer(app);
   visionWsServer.init(server);

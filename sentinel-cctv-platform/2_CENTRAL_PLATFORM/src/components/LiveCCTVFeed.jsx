@@ -122,7 +122,7 @@ export const LiveCCTVFeed = ({
   }, []);
 
   const resolveStreamPath = useCallback((cam) => {
-    if (!cam) return "stream/1";
+    if (!cam) return "stream/cam01";
     const cleanId = getCleanId(cam);
     const raw = cam.whep_url || cam.rtsp_url || cam.stream_url || (cam.urls && (cam.urls.whep || cam.urls.rtsp)) || "";
 
@@ -141,52 +141,32 @@ export const LiveCCTVFeed = ({
       return "webcam";
     }
 
-    return `stream/${cleanId}`;
+    const paddedId = String(cleanId).startsWith('cam') ? cleanId : (String(cleanId).length === 1 ? `cam0${cleanId}` : `cam${cleanId}`);
+    return `stream/${paddedId}`;
   }, [getCleanId]);
 
   const resolveWhepApiUrl = useCallback((cam) => {
     if (!cam) return "";
     const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
-    const currentHost = typeof window !== "undefined" ? (window.location.hostname || "localhost") : "localhost";
-    const sanitizeUrl = (u) => {
-      if (!u) return u;
-      let res = u;
-      if (currentHost && currentHost !== "localhost" && currentHost !== "127.0.0.1") {
-        res = res.split("localhost").join(currentHost).split("127.0.0.1").join(currentHost);
-      }
-      if (isHttps && res.includes(":8889/")) {
-        res = res.replace(/^http:\/\/[^/]+:8889\//, "/whep/");
-      }
-      return res;
-    };
+    const apiPrefix = typeof window !== 'undefined' && window.location.pathname.startsWith('/gujraksha') ? '/gujraksha' : '';
 
-    if (cam.whep_url && cam.whep_url.trim()) return sanitizeUrl(cam.whep_url.trim());
-    if (cam.urls && cam.urls.whep && cam.urls.whep.trim()) return sanitizeUrl(cam.urls.whep.trim());
-    if (cam.stream_url && (cam.stream_url.endsWith('/whep') || cam.stream_url.includes(':8889/'))) {
-      return sanitizeUrl(cam.stream_url.trim());
+    let directWhep = (cam.whep_url || (cam.urls && cam.urls.whep) || '').trim();
+    if (!directWhep && (cam.rtsp_url || cam.stream_url)) {
+      const streamPath = resolveStreamPath(cam);
+      directWhep = `http://fenil.patel@nxon.io:WWL7-E6HY-ZC54@103.250.160.189:8889/${streamPath}/whep`;
     }
 
-    if (cam.rtsp_url && (cam.rtsp_url.includes(':8554/') || cam.rtsp_url.includes('/stream/'))) {
-      const match = cam.rtsp_url.match(/rtsp:\/\/(?:.+@)?([^:/]+):?(\d*)\/(.+)/);
-      if (match) {
-        if (isHttps) {
-          return `/whep/${match[3]}/whep`;
-        }
-        const hostPart = (match[1] === 'localhost' || match[1] === '127.0.0.1') ? currentHost : match[1];
-        return `http://${hostPart}:8889/${match[3]}/whep`;
-      }
+    if (!directWhep) {
+      const streamPath = resolveStreamPath(cam);
+      directWhep = `http://fenil.patel@nxon.io:WWL7-E6HY-ZC54@103.250.160.189:8889/${streamPath}/whep`;
     }
 
-    const cleanId = getCleanId(cam);
-    let path = resolveStreamPath(cam);
-    if (path === "stream" || path === "stream/") {
-      path = `stream/${cleanId}`;
-    }
+    // On HTTPS, route through backend proxy endpoint to avoid Mixed Content block
     if (isHttps) {
-      return `/whep/${path}/whep`;
+      return `${apiPrefix}/api/v1/proxy-whep?url=${encodeURIComponent(directWhep)}`;
     }
-    return `http://${currentHost}:8889/${path}/whep`;
-  }, [resolveStreamPath, getCleanId]);
+    return directWhep;
+  }, [resolveStreamPath]);
 
   const whepApiUrl = resolveWhepApiUrl(camera);
   const rawStreamUrl = camera ? (camera.stream_url || camera.rtsp_url || whepApiUrl) : "";
