@@ -277,7 +277,8 @@ export const ForensicVideoAnalyzer = ({ addToast, watchlist = [] }) => {
     let plates = [];
 
     try {
-      const res = await fetch("/api/v1/ai/scan_frame", {
+      const apiPrefix = typeof window !== 'undefined' && window.location.pathname.startsWith('/gujraksha') ? '/gujraksha' : '';
+      const res = await fetch(`${apiPrefix}/api/v1/ai/scan_frame`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64Data })

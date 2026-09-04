@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
 
-// Automatically route API calls through /gujraksha/api and WHEP streams through /whep when hosted under /gujraksha/ or HTTPS
+// Automatically route API calls and streams when hosted under /gujraksha/ or HTTPS reverse proxies
 if (typeof window !== 'undefined' && !window.__gujraksha_api_patched__) {
   window.__gujraksha_api_patched__ = true;
   const originalFetch = window.fetch;
@@ -15,10 +15,13 @@ if (typeof window !== 'undefined' && !window.__gujraksha_api_patched__) {
       
       if (isSubpath && url.startsWith('/api/') && !url.startsWith('/gujraksha/api/')) {
         url = '/gujraksha' + url;
+      } else if (isSubpath && url.startsWith('/whep') && !url.startsWith('/gujraksha/whep')) {
+        url = '/gujraksha' + url;
       }
       
       if (isHttps && url.includes(':8889/')) {
-        url = url.replace(/^http:\/\/[^/]+:8889\//, '/whep/');
+        const apiPrefix = isSubpath ? '/gujraksha' : '';
+        url = `${apiPrefix}/api/v1/proxy-whep?url=${encodeURIComponent(url)}`;
       }
     }
     return originalFetch.call(this, url, init);
