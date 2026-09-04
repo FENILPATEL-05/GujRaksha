@@ -471,7 +471,7 @@ class ANPRMetadataQueue:
                 "ocr_conf": ocr_conf,
                 "crop": vehicle_crop.copy() if vehicle_crop is not None else None,
                 "vehicle_type": vehicle_type,
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S")
             })
         except Exception:
             pass

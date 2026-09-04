@@ -1297,7 +1297,7 @@ class CameraWorkerThread(threading.Thread):
                                 "camera_code": self.camera_code,
                                 "camera_id": self.camera_id,
                                 "confidence": round(ocr_conf * 100.0, 1),
-                                "timestamp": time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                                "timestamp": time.strftime('%Y-%m-%dT%H:%M:%S'),
                                 "is_watchlist_hit": bool(watchlist_hit)
                             }
                             try:
@@ -1376,7 +1376,7 @@ class CameraWorkerThread(threading.Thread):
                         "camera_id": self.camera_id,
                         "frame_width": w,
                         "frame_height": h,
-                        "timestamp": time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                        "timestamp": time.strftime('%Y-%m-%dT%H:%M:%S'),
                         "detections": live_boxes
                     }
 

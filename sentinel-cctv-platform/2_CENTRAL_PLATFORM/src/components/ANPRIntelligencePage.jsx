@@ -55,21 +55,23 @@ import { WatchlistManagerPage } from "./WatchlistManagerPage";
 import { LiveCCTVFeed } from "./LiveCCTVFeed";
 import { ForensicVideoAnalyzer } from "./ForensicVideoAnalyzer";
 
-// Formats UTC/ISO timestamps directly into Indian Standard Time (IST / Asia/Kolkata)
+// Formats local Indian timestamps cleanly into 12-hour AM/PM and readable date
 const formatIndianDateTime = (ts) => {
   if (!ts) return { time: "--:--:--", date: "--/--/----" };
-  const d = new Date(ts);
-  if (isNaN(d.getTime())) return { time: String(ts), date: "" };
+  const clean = String(ts).replace(/Z$/, '').replace(' ', 'T');
+  const d = new Date(clean);
+  if (isNaN(d.getTime())) {
+    const parts = String(ts).split(/[ T]/);
+    return { time: parts[1] || "", date: parts[0] || "" };
+  }
   return {
-    time: d.toLocaleTimeString("en-IN", {
-      timeZone: "Asia/Kolkata",
+    time: d.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
       hour12: true
     }),
     date: d.toLocaleDateString("en-IN", {
-      timeZone: "Asia/Kolkata",
       day: "2-digit",
       month: "short",
       year: "numeric"

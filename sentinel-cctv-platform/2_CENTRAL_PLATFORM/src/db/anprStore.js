@@ -493,7 +493,7 @@ class AnprDataStore {
       watchlist_fir: watchlistHit ? watchlistHit.fir_number : null,
       watchlist_ps: watchlistHit ? watchlistHit.police_station : null,
       watchlist_priority: watchlistHit ? watchlistHit.priority : null,
-      timestamp: payload.timestamp || new Date().toISOString(),
+      timestamp: (payload.timestamp ? String(payload.timestamp).replace(/Z$/, '') : new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Kolkata' }).replace(' ', 'T')),
       stored: true,
       is_read: false,
       is_dismissed: false,
