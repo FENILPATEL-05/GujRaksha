@@ -17,14 +17,18 @@ import {
   ChevronDown,
   Shield,
   Eye,
-  Sparkles
+  Sparkles,
+  Menu,
+  X
 } from 'lucide-react';
 
 export const Header = ({ activeView, onViewChange, onOpenGap, onOpenUserMgmt, departmentCount = 26 }) => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout, isAdmin } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const profileRef = useRef(null);
+  const mobileMenuRef = useRef(null);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -58,8 +62,9 @@ export const Header = ({ activeView, onViewChange, onOpenGap, onOpenUserMgmt, de
           <button
             className={activeView === 'map' ? 'active' : ''}
             onClick={() => onViewChange('map')}
+            title="Statewide GIS Map Control & Tactical Feeds"
           >
-            <MapPin size={14} strokeWidth={2.2} />
+            <MapPin size={15} strokeWidth={2.2} />
             <span>GIS Map</span>
           </button>
           {isAdmin && (
@@ -67,36 +72,41 @@ export const Header = ({ activeView, onViewChange, onOpenGap, onOpenUserMgmt, de
               <button
                 className={activeView === 'registry' ? 'active' : ''}
                 onClick={() => onViewChange('registry')}
+                title="CCTV Camera Asset Registry & Diagnostics"
               >
-                <Camera size={14} strokeWidth={2.2} />
+                <Camera size={15} strokeWidth={2.2} />
                 <span>Cameras</span>
               </button>
               <button
                 className={activeView === 'departments' ? 'active' : ''}
                 onClick={() => onViewChange('departments')}
+                title={`Department Hierarchy Directory (${departmentCount} Departments)`}
               >
-                <Building2 size={14} strokeWidth={2.2} />
+                <Building2 size={15} strokeWidth={2.2} />
                 <span>Departments ({departmentCount})</span>
               </button>
               <button
                 className={activeView === 'videowall' ? 'active' : ''}
                 onClick={() => onViewChange('videowall')}
+                title="Live Multi-Camera Tactical Video Wall Matrix"
               >
-                <LayoutGrid size={14} strokeWidth={2.2} />
+                <LayoutGrid size={15} strokeWidth={2.2} />
                 <span>Video Wall</span>
               </button>
               <button
                 className={activeView === 'anpr' ? 'active' : ''}
                 onClick={() => onViewChange('anpr')}
+                title="AI Vision Intelligence & ANPR Vehicle Intercept"
               >
-                <Car size={14} strokeWidth={2.2} />
+                <Car size={15} strokeWidth={2.2} />
                 <span>AI Vision & ANPR</span>
               </button>
               <button
                 className={activeView === 'users' ? 'active' : ''}
                 onClick={() => onViewChange('users')}
+                title="User RBAC Access Control & System Permissions"
               >
-                <Users size={14} strokeWidth={2.2} />
+                <Users size={15} strokeWidth={2.2} />
                 <span>Users & Roles</span>
               </button>
             </>
@@ -109,10 +119,9 @@ export const Header = ({ activeView, onViewChange, onOpenGap, onOpenUserMgmt, de
         {isAdmin && (
           <>
             <button
-              className="btn btn-sm"
+              className="btn btn-sm header-gap-btn"
               onClick={onOpenGap}
               title="Statewide CCTV Density & Blind-Spot Coverage Analysis"
-              style={{ gap: '6px', padding: '6px 12px' }}
             >
               <PieChart size={14} strokeWidth={2.2} />
               <span>Gap Analysis</span>
@@ -140,6 +149,20 @@ export const Header = ({ activeView, onViewChange, onOpenGap, onOpenUserMgmt, de
             <Sun size={15} strokeWidth={2.2} style={{ color: '#f59e0b' }} />
           ) : (
             <Moon size={15} strokeWidth={2.2} style={{ color: '#6366f1' }} />
+          )}
+        </button>
+
+        {/* Mobile Hamburger Toggle Button */}
+        <button
+          className="btn btn-sm btn-icon mobile-menu-toggle"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          title={isMobileMenuOpen ? "Close Menu" : "Open Menu"}
+          aria-label="Toggle Navigation Menu"
+        >
+          {isMobileMenuOpen ? (
+            <X size={18} strokeWidth={2.4} style={{ color: "var(--accent)" }} />
+          ) : (
+            <Menu size={18} strokeWidth={2.4} />
           )}
         </button>
 
@@ -189,6 +212,89 @@ export const Header = ({ activeView, onViewChange, onOpenGap, onOpenUserMgmt, de
           )}
         </div>
       </div>
+
+      {/* Mobile Responsive Navigation Drawer */}
+      {isMobileMenuOpen && (
+        <div className="mobile-nav-drawer" ref={mobileMenuRef}>
+          <div className="mobile-nav-links">
+            <button
+              className={activeView === 'map' ? 'active' : ''}
+              onClick={() => {
+                onViewChange('map');
+                setIsMobileMenuOpen(false);
+              }}
+            >
+              <MapPin size={16} strokeWidth={2.2} />
+              <span>GIS Map</span>
+            </button>
+
+            {isAdmin && (
+              <>
+                <button
+                  className={activeView === 'registry' ? 'active' : ''}
+                  onClick={() => {
+                    onViewChange('registry');
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  <Camera size={16} strokeWidth={2.2} />
+                  <span>Cameras Registry</span>
+                </button>
+                <button
+                  className={activeView === 'departments' ? 'active' : ''}
+                  onClick={() => {
+                    onViewChange('departments');
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  <Building2 size={16} strokeWidth={2.2} />
+                  <span>Departments ({departmentCount})</span>
+                </button>
+                <button
+                  className={activeView === 'videowall' ? 'active' : ''}
+                  onClick={() => {
+                    onViewChange('videowall');
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  <LayoutGrid size={16} strokeWidth={2.2} />
+                  <span>Video Wall Grid</span>
+                </button>
+                <button
+                  className={activeView === 'anpr' ? 'active' : ''}
+                  onClick={() => {
+                    onViewChange('anpr');
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  <Car size={16} strokeWidth={2.2} />
+                  <span>AI Vision & ANPR</span>
+                </button>
+                <button
+                  className={activeView === 'users' ? 'active' : ''}
+                  onClick={() => {
+                    onViewChange('users');
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  <Users size={16} strokeWidth={2.2} />
+                  <span>Users & Roles</span>
+                </button>
+                <button
+                  className="mobile-gap-analysis-btn"
+                  onClick={() => {
+                    onOpenGap();
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  <PieChart size={16} strokeWidth={2.2} />
+                  <span>Statewide Gap Analysis</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 };

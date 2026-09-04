@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldAlert,
   Video,
@@ -25,6 +25,16 @@ export const IncidentRadarPanel = ({
 
   const activeCount = incidents.length;
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   const handleDismissAll = () => {
     if (typeof onDismissAll === 'function') {
       onDismissAll();
@@ -35,9 +45,17 @@ export const IncidentRadarPanel = ({
 
   return (
     <>
+      {/* Backdrop for small screens and zoom mode */}
+      {isOpen && (
+        <div
+          className="ai-threat-backdrop"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
       {/* 1. Right-Edge Floating Trigger Tab */}
       <button
-        className={`ai-threat-toggle-tab ${activeCount > 0 ? 'has-threats' : 'all-clear'}`}
+        className={`ai-threat-toggle-tab ${activeCount > 0 ? 'has-threats' : 'all-clear'} ${isOpen ? 'tab-hidden' : ''}`}
         onClick={() => setIsOpen(!isOpen)}
         title={activeCount > 0 ? `${activeCount} Active AI Alerts` : 'All Security Feeds Normal'}
       >

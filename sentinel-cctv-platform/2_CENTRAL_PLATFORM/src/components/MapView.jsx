@@ -3,7 +3,7 @@ import L from 'leaflet';
 import { useTheme } from '../context/ThemeContext';
 import { IncidentRadarPanel } from './IncidentRadarPanel';
 import { PoliceTacticalDock } from './PoliceTacticalDock';
-import { Plus, Minus, Crosshair, Radio, ShieldAlert, Layers, Eye, MapPin, Shield, X, AlertTriangle } from 'lucide-react';
+import { Plus, Minus, Crosshair, Radio, ShieldAlert, Layers, Eye, MapPin, Shield, X, AlertTriangle, Video } from 'lucide-react';
 
 
 
@@ -512,6 +512,7 @@ export const MapView = ({
     if (filters.department && filters.department !== 'ALL') params.set('department', filters.department);
     if (filters.district && filters.district !== 'ALL') params.set('district', filters.district);
     if (filters.status && filters.status !== 'ALL') params.set('status', filters.status);
+    if (filters.detection_mode && filters.detection_mode !== 'ALL') params.set('detection_mode', filters.detection_mode);
     if (filters.search && filters.search.trim() !== '') params.set('search', filters.search.trim());
 
     if (spatialAbortRef.current) {
@@ -536,6 +537,14 @@ export const MapView = ({
       }
     } finally {
       setIsSpatialLoading(false);
+    }
+  }, [filters]);
+
+  // Clear stale spatial markers immediately when any filter changes
+  useEffect(() => {
+    setSpatialData(null);
+    if (markersLayer.current) {
+      markersLayer.current.clearLayers();
     }
   }, [filters]);
 
@@ -592,7 +601,11 @@ export const MapView = ({
     const zoom = map.getZoom();
 
     // 1. Statewide District Hubs (when zoom < 10)
-    if (spatialData && spatialData.clustered && Array.isArray(spatialData.clusters) && spatialData.clusters.length > 0) {
+    if (spatialData && spatialData.clustered && Array.isArray(spatialData.clusters)) {
+      if (spatialData.clusters.length === 0) {
+        if (leafletMap.current) leafletMap.current.invalidateSize();
+        return;
+      }
       spatialData.clusters.forEach(cl => {
         const count = cl.count;
         const sizeClass = count >= 500 ? 'large' : count >= 50 ? 'medium' : 'small';
@@ -634,7 +647,9 @@ export const MapView = ({
     }
 
     // 2. Adaptive Viewport Clustering with STRICT MAX 100 MARKERS LIMIT
-    const activeCameras = (spatialData && Array.isArray(spatialData.cameras)) ? spatialData.cameras : (zoom >= 10 ? cameras : []);
+    const activeCameras = (spatialData && Array.isArray(spatialData.cameras))
+      ? spatialData.cameras
+      : (Array.isArray(cameras) ? cameras : []);
     const mapBounds = map.getBounds().pad(0.08);
 
     const visibleCameras = [];
@@ -1004,38 +1019,21 @@ export const MapView = ({
         </div>
       )}
 
-      {/* Floating Active Vehicle Trajectory HUD Banner (Model 2 Test Case) */}
+      {/* Floating Active Vehicle Trajectory HUD Banner */}
       {trajectoryData && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '72px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 1000,
-            background: 'var(--panel-bg)',
-            border: '1px solid var(--danger)',
-            borderRadius: '12px',
-            padding: '10px 18px',
-            backdropFilter: 'blur(14px)',
-            boxShadow: '0 8px 30px rgba(244,63,94,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="trajectory-hud-banner">
+          <div className="trajectory-hud-left">
             <span className="alarm-pulse-dot"></span>
             <div>
-              <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--danger)', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+              <div className="trajectory-hud-title">
                 ACTIVE VEHICLE ROUTE TRAJECTORY TRACED
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                <span className="plate-number" style={{ background: '#000', color: '#fff', padding: '1px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>
+              <div className="trajectory-hud-info">
+                <span className="plate-number">
                   {trajectoryData.vehicle_plate}
                 </span>
-                <span>·</span>
-                <span style={{ color: 'var(--text-secondary)' }}>
+                <span className="trajectory-dot-sep">·</span>
+                <span className="trajectory-hud-sub">
                   {trajectoryData.total_spotted} Checkpoint Hits along Gujarat Highway Corridor
                 </span>
               </div>
@@ -1043,70 +1041,49 @@ export const MapView = ({
           </div>
 
           <button
-            className="btn btn-sm"
+            className="btn btn-sm trajectory-exit-btn"
             onClick={onClearTrackVehicle}
-            style={{ background: 'var(--danger)', color: '#fff', fontSize: '11px', padding: '5px 12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
-            <X size={12} /> Exit Route Mode
+            <X size={12} /> <span>Exit Route Mode</span>
           </button>
         </div>
       )}
 
       {/* Real-Time Emergency Live Watchlist Hit Floating Alert Banner */}
       {latestLiveHit && (
-        <div
-          className="emergency-hit-banner"
-          style={{
-            position: 'absolute',
-            top: '76px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 1100,
-            background: 'linear-gradient(135deg, rgba(225, 29, 72, 0.96), rgba(159, 18, 57, 0.98))',
-            color: '#fff',
-            borderRadius: '12px',
-            padding: '10px 18px',
-            boxShadow: '0 12px 35px rgba(225, 29, 72, 0.65), 0 0 0 2px rgba(255, 255, 255, 0.35)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            animation: 'pulse 1.2s infinite ease-in-out',
-            maxWidth: '92vw'
-          }}
-        >
-          <div style={{ background: '#fff', color: '#e11d48', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+        <div className="emergency-hit-banner">
+          <div className="emergency-hit-icon">
             <ShieldAlert size={20} color="#e11d48" strokeWidth={2.4} />
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '13px', fontWeight: 900, letterSpacing: '0.5px' }}>
+          <div className="emergency-hit-body">
+            <div className="emergency-hit-title-row">
+              <span className="emergency-hit-title">
                 WATCHLIST TARGET DETECTED: {latestLiveHit.vehicleNo || latestLiveHit.vehicle_plate}
               </span>
-              <span style={{ background: '#000', color: '#fbbf24', fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(251, 191, 36, 0.4)' }}>
+              <span className="emergency-hit-tag">
                 {latestLiveHit.watchlist_category || 'STOLEN VEHICLE'}
               </span>
             </div>
-            <div style={{ fontSize: '11px', opacity: 0.95, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div className="emergency-hit-location">
               <MapPin size={11} style={{ flexShrink: 0 }} />
               <span>Spotted at <b>{latestLiveHit.camera?.name || latestLiveHit.cameraName || 'Gujarat CCTV Node'}</b> [{latestLiveHit.camera?.camera_code || latestLiveHit.cameraCode || 'GJ-GOV'}] ({latestLiveHit.district || 'Gujarat'})</span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+          <div className="emergency-hit-actions">
             <button
-              className="btn btn-sm"
+              className="btn btn-sm emergency-action-btn"
               onClick={() => {
                 handleLocateIncident(latestLiveHit);
                 onCameraSelect(latestLiveHit.camera || { id: latestLiveHit.cameraId, name: latestLiveHit.cameraName, camera_code: latestLiveHit.cameraCode, stream_url: latestLiveHit.stream_url });
                 setLatestLiveHit(null);
               }}
-              style={{ background: '#fff', color: '#e11d48', fontWeight: 800, fontSize: '11.5px', padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
             >
-              <Video size={13} /> Intercept & Watch Live
+              <Video size={13} /> <span>Intercept & Watch Live</span>
             </button>
             <button
+              className="emergency-dismiss-btn"
               onClick={() => setLatestLiveHit(null)}
-              style={{ background: 'rgba(0,0,0,0.3)', border: 'none', color: '#fff', borderRadius: '6px', padding: '5px 7px', cursor: 'pointer' }}
               title="Dismiss Banner"
             >
               <X size={14} />
