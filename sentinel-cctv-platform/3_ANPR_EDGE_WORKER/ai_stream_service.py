@@ -420,6 +420,14 @@ class AsyncFrameReader:
                     self._init_cap(self.active_source)
                 time.sleep(0.01)
 
+        # Safely release OpenCV VideoCapture on its own thread upon loop exit
+        if self.cap:
+            try:
+                self.cap.release()
+            except Exception:
+                pass
+            self.cap = None
+
     def read(self) -> Optional[np.ndarray]:
         with self.lock:
             frame = self._buffer[self._active_idx]
@@ -429,11 +437,6 @@ class AsyncFrameReader:
 
     def release(self):
         self.stopped = True
-        if self.cap:
-            try:
-                self.cap.release()
-            except Exception:
-                pass
 
 
 # Local Disk Snapshot Storage Directory for ANPR Cameras
@@ -680,7 +683,10 @@ class AsyncAIStreamEngine:
                 self.latest_plate_boxes = p_boxes
                 self.infer_time_ms = infer_ms
 
-            time.sleep(0.005)
+            # Dynamic pacing: sleep at least 10ms, targeting ~25 FPS inference to keep CPU load low
+            t_elapsed = time.time() - t0
+            sleep_needed = max(0.01, 0.04 - t_elapsed)
+            time.sleep(sleep_needed)
 
     def get_frame_and_ai(self):
         frame = self.reader.read()
@@ -695,6 +701,79 @@ class AsyncAIStreamEngine:
         self.reader.release()
 
 
+STREAM_ENGINE_POOL: Dict[str, Any] = {}
+STREAM_ENGINE_LOCK = threading.Lock()
+
+class PooledStreamEngine:
+    def __init__(self, engine: AsyncAIStreamEngine):
+        self.engine = engine
+        self.ref_count = 1
+        self.last_accessed = time.time()
+        self.cleanup_timer = None
+
+
+def get_or_create_stream_engine(
+    source: str,
+    fallback_source: Optional[str] = None,
+    is_anpr_camera: bool = False,
+    camera_id: str = "",
+    camera_code: str = ""
+) -> AsyncAIStreamEngine:
+    """Reuses existing active stream engine for the camera to prevent duplicate RTSP connections and CPU overload."""
+    global STREAM_ENGINE_POOL
+    pool_key = f"{source}::{is_anpr_camera}"
+    with STREAM_ENGINE_LOCK:
+        if pool_key in STREAM_ENGINE_POOL:
+            item = STREAM_ENGINE_POOL[pool_key]
+            if item.cleanup_timer is not None:
+                item.cleanup_timer.cancel()
+                item.cleanup_timer = None
+            item.ref_count += 1
+            item.last_accessed = time.time()
+            logger.info(f"🔄 [Stream Pool] Reusing active engine for {pool_key} (active viewers: {item.ref_count})")
+            return item.engine
+
+        logger.info(f"✨ [Stream Pool] Creating new stream engine for {pool_key}")
+        engine = AsyncAIStreamEngine(
+            source=source,
+            fallback_source=fallback_source,
+            is_anpr_camera=is_anpr_camera,
+            camera_id=camera_id or "gov-feed-1",
+            camera_code=camera_code or "GJ-GOV-001"
+        )
+        STREAM_ENGINE_POOL[pool_key] = PooledStreamEngine(engine)
+        return engine
+
+
+def _delayed_engine_cleanup(pool_key: str):
+    with STREAM_ENGINE_LOCK:
+        if pool_key in STREAM_ENGINE_POOL:
+            item = STREAM_ENGINE_POOL[pool_key]
+            if item.ref_count <= 0:
+                try:
+                    item.engine.release()
+                except Exception as e:
+                    logger.warning(f"Error releasing stream engine {pool_key}: {e}")
+                del STREAM_ENGINE_POOL[pool_key]
+                logger.info(f"🛑 [Stream Pool] Cleaned up idle stream engine for: {pool_key}")
+
+
+def release_stream_engine(source: str, is_anpr_camera: bool = False, delay_sec: float = 4.0):
+    """Decrements viewer count and schedules graceful shutdown after grace period."""
+    global STREAM_ENGINE_POOL
+    pool_key = f"{source}::{is_anpr_camera}"
+    with STREAM_ENGINE_LOCK:
+        if pool_key in STREAM_ENGINE_POOL:
+            item = STREAM_ENGINE_POOL[pool_key]
+            item.ref_count -= 1
+            logger.info(f"🔽 [Stream Pool] Viewer disconnected for {pool_key} (remaining viewers: {item.ref_count})")
+            if item.ref_count <= 0:
+                if item.cleanup_timer is not None:
+                    item.cleanup_timer.cancel()
+                timer = threading.Timer(delay_sec, _delayed_engine_cleanup, args=[pool_key])
+                timer.daemon = True
+                item.cleanup_timer = timer
+                timer.start()
 
 
 def create_placeholder_frame(text: str) -> np.ndarray:
@@ -737,8 +816,8 @@ def generate_frames(
     stream_trail_tracker = TrailTracker(max_trail_length=45)
     stream_dwell_tracker = DwellTracker(dwell_threshold=8.0)
 
-    engine = AsyncAIStreamEngine(
-        source,
+    engine = get_or_create_stream_engine(
+        source=source,
         fallback_source=fallback,
         is_anpr_camera=is_anpr,
         camera_id=camera_id or "gov-feed-1",
@@ -951,7 +1030,7 @@ def generate_frames(
             if elapsed < 0.016:
                 time.sleep(0.016 - elapsed)
     finally:
-        engine.release()
+        release_stream_engine(source, is_anpr_camera=is_anpr, delay_sec=4.0)
         current_ai_stats["is_active"] = False
 
 
