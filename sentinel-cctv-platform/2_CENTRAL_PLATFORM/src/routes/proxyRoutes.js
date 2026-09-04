@@ -188,18 +188,17 @@ router.get('/ai/video_feed', (req, res) => {
     hostname: aiServiceHost,
     port: aiServicePort,
     path: targetPath,
-    method: 'GET'
+    method: 'GET',
+    headers: {
+      'Accept': 'multipart/x-mixed-replace, image/jpeg, */*'
+    }
   }, (proxyRes) => {
     res.writeHead(proxyRes.statusCode, proxyRes.headers);
     proxyRes.pipe(res);
   });
 
   proxyReq.on('error', (err) => {
-    console.warn('AI Stream Service Offline, falling back to direct stream:', err.message);
-    const source = req.query.source;
-    if (source) {
-      return handleStreamProxy(source, req, res);
-    }
+    console.warn('AI Stream Service connection issue:', err.message);
     if (!res.headersSent) {
       res.status(502).json({ error: 'AI Video Stream Service Offline', details: err.message });
     }

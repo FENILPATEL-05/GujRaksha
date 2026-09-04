@@ -106,35 +106,46 @@ async function main() {
     }
     console.log(`👤 Synced Default Super Admin (User: ${initialUsers[0].username} | Email: ${initialUsers[0].email}) into PostgreSQL.`);
 
-    // 4. Migrate Cameras (if any defined)
-    for (const c of initialCameras) {
-      await client.query(
-        `INSERT INTO cameras (
-          id, camera_code, name, department_id, department_name, district, taluka,
-          latitude, longitude, address, ownership_type, camera_type, detection_mode,
-          vms_vendor, stream_url, rtsp_url, whep_url, hls_url, codec, retention_days,
-          status, installation_date, stream_properties, urls
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
-        ON CONFLICT (id) DO UPDATE SET
-          camera_code = EXCLUDED.camera_code,
-          name = EXCLUDED.name,
-          detection_mode = CASE 
-            WHEN EXCLUDED.detection_mode = 'GENERAL_SURVEILLANCE' AND cameras.detection_mode IS NOT NULL AND cameras.detection_mode != '' THEN cameras.detection_mode 
-            ELSE EXCLUDED.detection_mode 
-          END,
-          status = EXCLUDED.status`,
-        [
-          c.id, c.camera_code, c.name, c.department_id, c.department_name, c.district, c.taluka || '',
-          parseFloat(c.latitude) || 23.0, parseFloat(c.longitude) || 72.5, c.address || '', c.ownership_type || 'GOVERNMENT',
-          c.camera_type || 'PTZ', c.detection_mode || 'TRAFFIC_MONITORING', c.vms_vendor || 'Live Sentinel Feeder',
-          c.stream_url || '', c.rtsp_url || '', c.whep_url || '', c.hls_url || '', c.codec || 'H.264',
-          parseInt(c.retention_days || 15, 10), c.status || 'ACTIVE', c.installation_date || '2026-08-25',
-          JSON.stringify(c.stream_properties || {}), JSON.stringify(c.urls || {})
-        ]
-      );
+    // 4. Migrate Cameras (30 Gujarat Government Live Feeds)
+    let camerasToSeed = initialCameras;
+    if (!camerasToSeed || camerasToSeed.length === 0) {
+      try {
+        const { default: onboardingService } = await import('../src/services/onboardingService.js');
+        const syncRes = await onboardingService.syncGovernmentLiveFeeds();
+        camerasToSeed = syncRes.cameras || [];
+      } catch (err) {
+        console.warn('⚠️ Could not auto-sync live feeds during init:', err.message);
+      }
     }
-    if (initialCameras.length > 0) {
-      console.log(`📦 Synced ${initialCameras.length} cameras into PostgreSQL.`);
+
+    if (camerasToSeed && camerasToSeed.length > 0) {
+      for (const c of camerasToSeed) {
+        await client.query(
+          `INSERT INTO cameras (
+            id, camera_code, name, department_id, department_name, district, taluka,
+            latitude, longitude, address, ownership_type, camera_type, detection_mode,
+            vms_vendor, stream_url, rtsp_url, whep_url, hls_url, codec, retention_days,
+            status, installation_date, stream_properties, urls
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+          ON CONFLICT (id) DO UPDATE SET
+            camera_code = EXCLUDED.camera_code,
+            name = EXCLUDED.name,
+            detection_mode = CASE 
+              WHEN EXCLUDED.detection_mode = 'GENERAL_SURVEILLANCE' AND cameras.detection_mode IS NOT NULL AND cameras.detection_mode != '' THEN cameras.detection_mode 
+              ELSE EXCLUDED.detection_mode 
+            END,
+            status = EXCLUDED.status`,
+          [
+            c.id, c.camera_code, c.name, c.department_id, c.department_name, c.district, c.taluka || '',
+            parseFloat(c.latitude) || 23.0, parseFloat(c.longitude) || 72.5, c.address || '', c.ownership_type || 'GOVERNMENT',
+            c.camera_type || 'PTZ', c.detection_mode || 'TRAFFIC_MONITORING', c.vms_vendor || 'Live Sentinel Feeder',
+            c.stream_url || '', c.rtsp_url || '', c.whep_url || '', c.hls_url || '', c.codec || 'H.264',
+            parseInt(c.retention_days || 15, 10), c.status || 'ACTIVE', c.installation_date || '2026-08-25',
+            JSON.stringify(c.stream_properties || {}), JSON.stringify(c.urls || {})
+          ]
+        );
+      }
+      console.log(`📦 Synced ${camerasToSeed.length} cameras into PostgreSQL.`);
     }
 
     // 5. Migrate Watchlist (if any defined)

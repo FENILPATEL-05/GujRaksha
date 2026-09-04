@@ -41,8 +41,8 @@ from bytetrack_tracker import ByteTrackTracker
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("AIStreamService")
 
-## Low-latency TCP FFmpeg capture configuration to prevent video artifacts & glitching
-os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|fflags;nobuffer+discardcorrupt|flags;low_delay|max_delay;0|reorder_queue_size;0"
+## Instant-connect TCP FFmpeg capture configuration (0.1s probe & zero buffer delay)
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|analyzeduration;100000|probesize;100000|stimeout;2000000|fflags;nobuffer+discardcorrupt|flags;low_delay|max_delay;0|reorder_queue_size;0"
 
 # Strictly filtered 5 surveillance target classes (+ COCO class IDs)
 COCO_TARGET_CLASSES = {
@@ -750,11 +750,24 @@ def generate_frames(
 
 
     try:
+        connection_wait_count = 0
         while True:
             t_loop_start = time.time()
             frame, tracked_objects, plate_boxes, infer_time_ms = engine.get_frame_and_ai()
             if frame is None:
-                time.sleep(0.01)
+                connection_wait_count += 1
+                # Yield instant connecting frame to keep HTTP connection alive and responsive
+                connecting_frame = np.zeros((360, 640, 3), dtype=np.uint8)
+                cv2.rectangle(connecting_frame, (10, 10), (630, 350), (35, 45, 65), 1)
+                dots = "." * ((connection_wait_count % 4) + 1)
+                cv2.putText(connecting_frame, f"CONNECTING AI VISION{dots}", (140, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 215, 255), 2)
+                cv2.putText(connecting_frame, f"TARGET: {camera_code or 'GOV-FEED'}", (140, 210), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (160, 200, 240), 1)
+                cv2.putText(connecting_frame, "Establishing Secure RTSP Stream...", (140, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (120, 140, 170), 1)
+                ret_c, buf_c = cv2.imencode('.jpg', connecting_frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                if ret_c:
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + buf_c.tobytes() + b'\r\n')
+                time.sleep(0.08)
                 continue
 
             current_epoch = time.time()

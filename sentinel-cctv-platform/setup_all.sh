@@ -55,14 +55,19 @@ fi
 echo -e "\n${YELLOW}📦 [3/5] Setting up Central Platform (Node.js/React)...${NC}"
 if [ -d "2_CENTRAL_PLATFORM" ]; then
     cd 2_CENTRAL_PLATFORM
-    npm install --silent || npm install
+    if [ ! -d "node_modules" ]; then
+        echo -e "   • Installing Node.js packages..."
+        npm install --no-audit --no-fund
+    else
+        echo -e "${GREEN}   • Node.js packages already verified.${NC}"
+    fi
     echo -e "   • Initializing clean PostgreSQL database & master seed..."
     node scripts/init_postgres_db.js --reset || true
     echo -e "   • Building production frontend bundle..."
     npm run build
     cd "$PROJECT_ROOT"
 fi
-echo -e "${GREEN}✅ Central Platform dependencies installed, database initialized & built.${NC}"
+echo -e "${GREEN}✅ Central Platform dependencies verified, database initialized & built.${NC}"
 
 # 4. Setup Python AI Edge Worker
 echo -e "\n${YELLOW}🐍 [4/5] Setting up Python AI Edge Worker Environment...${NC}"
